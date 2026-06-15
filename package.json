@@ -9,10 +9,10 @@
     "lint": "next lint"
   },
   "engines": {
-    "node": ">=18.18.0"
+    "node": "22.x"
   },
   "dependencies": {
-    "next": "15.1.6",
+    "next": "15.5.19",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "zustand": "5.0.3",
@@ -47,6 +47,6 @@
     "postcss": "8.5.1",
     "autoprefixer": "10.4.20",
     "eslint": "9.18.0",
-    "eslint-config-next": "15.1.6"
+    "eslint-config-next": "15.5.19"
   }
 }
