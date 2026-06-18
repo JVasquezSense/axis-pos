@@ -87,7 +87,7 @@ function AdminDashboard() {
             ))}
           </div>
 
-          <LiveWidgets data={data} />
+          <LiveWidgets />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">

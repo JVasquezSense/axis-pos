@@ -94,16 +94,27 @@ export function AlertsPanel({ data }: { data: AlertItem[] }) {
 
 type WidgetKind = "tables" | "kitchen" | "inventory";
 
-export function LiveWidgets({ data }: { data: DashboardData }) {
+export function LiveWidgets() {
   const [detail, setDetail] = useState<WidgetKind | null>(null);
-  const occPct = Math.round((data.occupancy.occupied / data.occupancy.total) * 100);
+  const tablesAll = useTablesStore((s) => s.tables);
+  const tickets = useKitchenStore((s) => s.tickets);
+  const inventoryItems = useInventoryStore((s) => s.items);
+
+  const occupiedN = tablesAll.filter((t) => t.status === "occupied" || t.status === "billing").length;
+  const totalTables = tablesAll.length || 1;
+  const occPct = Math.round((occupiedN / totalTables) * 100);
+  const activeTickets = tickets.filter((t) => t.status !== "ready");
+  const avgWait = activeTickets.length
+    ? Math.round(activeTickets.reduce((s, t) => s + minutesAgo(new Date(t.createdAt)), 0) / activeTickets.length)
+    : 0;
+  const criticalN = inventoryItems.filter((i) => i.status !== "normal").length;
 
   const widgets: { kind: WidgetKind; icon: React.ElementType; label: string; value: string; sub: string; pct: number; color: string; bar: string }[] = [
     {
       kind: "tables",
       icon: Armchair,
       label: "Mesas ocupadas",
-      value: `${data.occupancy.occupied}/${data.occupancy.total}`,
+      value: `${occupiedN}/${tablesAll.length}`,
       sub: `${occPct}% de ocupación`,
       pct: occPct,
       color: "text-emerald-500",
@@ -113,9 +124,9 @@ export function LiveWidgets({ data }: { data: DashboardData }) {
       kind: "kitchen",
       icon: ChefHat,
       label: "Pedidos en cocina",
-      value: formatNumber(data.kitchenLoad.active),
-      sub: `~${data.kitchenLoad.avgMinutes} min promedio`,
-      pct: 65,
+      value: formatNumber(activeTickets.length),
+      sub: avgWait ? `~${avgWait} min promedio` : "sin órdenes activas",
+      pct: Math.min(activeTickets.length * 15, 100),
       color: "text-amber-500",
       bar: "bg-amber-500",
     },
@@ -123,9 +134,9 @@ export function LiveWidgets({ data }: { data: DashboardData }) {
       kind: "inventory",
       icon: Package,
       label: "Inventario crítico",
-      value: formatNumber(data.criticalStock),
+      value: formatNumber(criticalN),
       sub: "insumos por reponer",
-      pct: 25,
+      pct: Math.min(criticalN * 20, 100),
       color: "text-destructive",
       bar: "bg-destructive",
     },

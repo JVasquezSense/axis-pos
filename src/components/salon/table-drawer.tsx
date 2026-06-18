@@ -122,7 +122,7 @@ export function TableDrawer({
                   <p className="mb-2 text-sm font-semibold">Pedido actual</p>
                   <div className="rounded-xl border border-border">
                     <div className="flex items-center justify-between p-3 text-sm">
-                      <span className="text-muted-foreground">3 productos · sin enviar a caja</span>
+                      <span className="text-muted-foreground">Pedido en curso · enviado a cocina</span>
                       <ClipboardList className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <Separator />

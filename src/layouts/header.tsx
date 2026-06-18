@@ -1,6 +1,9 @@
 "use client";
 
-import { Bell } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Bell, AlertTriangle, ChefHat, Globe, CheckCheck } from "lucide-react";
 import { MobileNav } from "./mobile-nav";
 import { GlobalSearch } from "@/components/shared/global-search";
 import { RoleSwitcher } from "@/components/shared/role-switcher";
@@ -15,8 +18,55 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useInventoryStore } from "@/store/inventory.store";
+import { useKitchenStore } from "@/store/kitchen.store";
+import { useWebStore } from "@/store/web.store";
+import { minutesAgo } from "@/lib/utils";
+
+interface Notif {
+  icon: React.ElementType;
+  tone: string;
+  title: string;
+  desc: string;
+  href: string;
+}
 
 export function Header() {
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const critical = useInventoryStore((s) => s.items.filter((i) => i.status === "critical"));
+  const tickets = useKitchenStore((s) => s.tickets);
+  const webReview = useWebStore((s) => s.liveOrders.filter((o) => o.status === "review"));
+
+  const lateTickets = tickets.filter((t) => t.status !== "ready" && minutesAgo(new Date(t.createdAt)) >= 15);
+
+  const allNotifs: Notif[] = [
+    ...critical.map((i) => ({
+      icon: AlertTriangle,
+      tone: "text-destructive bg-destructive/10",
+      title: `${i.name} en nivel crítico`,
+      desc: `Quedan ${i.stock} ${i.unit} · reponer`,
+      href: "/inventory",
+    })),
+    ...lateTickets.map((t) => ({
+      icon: ChefHat,
+      tone: "text-amber-500 bg-amber-500/10",
+      title: `${t.code}${t.table ? ` · Mesa ${t.table}` : ""} demorada`,
+      desc: `${minutesAgo(new Date(t.createdAt))} min en cocina`,
+      href: "/kitchen",
+    })),
+    ...webReview.map((o) => ({
+      icon: Globe,
+      tone: "text-primary bg-primary/10",
+      title: `Pedido web ${o.code} por verificar`,
+      desc: `${o.customer} · comprobante subido`,
+      href: "/website",
+    })),
+  ];
+  const notifs = mounted ? allNotifs : [];
+
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md lg:px-6">
       <MobileNav />
@@ -31,24 +81,37 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
+              {notifs.length > 0 && (
+                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground ring-2 ring-background">
+                  {notifs.length}
+                </span>
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
+            <DropdownMenuLabel className="flex items-center justify-between">
+              Notificaciones
+              {notifs.length > 0 && <span className="text-xs font-normal text-muted-foreground">{notifs.length} activas</span>}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex-col items-start gap-0.5">
-              <span className="font-medium">Carne de res por agotarse</span>
-              <span className="text-xs text-muted-foreground">Quedan 2.1 kg · Hace 5 min</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex-col items-start gap-0.5">
-              <span className="font-medium">Mesa 7 supera tiempo objetivo</span>
-              <span className="text-xs text-muted-foreground">Pedido #1042 · Hace 8 min</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex-col items-start gap-0.5">
-              <span className="font-medium">Nuevo pedido web recibido</span>
-              <span className="text-xs text-muted-foreground">Demo Burger · Hace 12 min</span>
-            </DropdownMenuItem>
+            {notifs.length === 0 ? (
+              <div className="flex flex-col items-center gap-1.5 px-4 py-6 text-center text-muted-foreground">
+                <CheckCheck className="h-7 w-7" />
+                <p className="text-sm">Todo al día</p>
+              </div>
+            ) : (
+              notifs.slice(0, 6).map((n, i) => (
+                <DropdownMenuItem key={i} onClick={() => router.push(n.href)} className="flex items-start gap-2.5 py-2.5">
+                  <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${n.tone}`}>
+                    <n.icon className="h-4 w-4" />
+                  </span>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium leading-tight">{n.title}</span>
+                    <span className="text-xs text-muted-foreground">{n.desc}</span>
+                  </span>
+                </DropdownMenuItem>
+              ))
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -66,11 +129,13 @@ export function Header() {
               <p className="text-xs text-muted-foreground">Propietario · Demo Burger</p>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Mi perfil</DropdownMenuItem>
-            <DropdownMenuItem>Configuración</DropdownMenuItem>
-            <DropdownMenuItem>Facturación</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toast.info("Perfil de usuario")}>Mi perfil</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/admin")}>Configuración</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/admin")}>Facturación</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">Cerrar sesión</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => router.push("/")}>
+              Cerrar sesión
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

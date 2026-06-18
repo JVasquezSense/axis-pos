@@ -8,8 +8,8 @@ interface TablesState {
   addTable: (t: RestaurantTable) => void;
   moveOccupancy: (sourceId: string, targetId: string) => void;
   mergeTables: (sourceId: string, targetId: string) => void;
-  /** Marca una mesa como ocupada (al tomar un pedido). */
-  occupy: (number: number, waiter?: string) => void;
+  /** Marca una mesa como ocupada (al tomar un pedido) y acumula su consumo. */
+  occupy: (number: number, total?: number, waiter?: string) => void;
   /** Libera una mesa (al cobrar). */
   free: (number: number) => void;
 }
@@ -59,11 +59,17 @@ export const useTablesStore = create<TablesState>()(
           };
         }),
 
-      occupy: (number, waiter) =>
+      occupy: (number, total, waiter) =>
         set((s) => ({
           tables: s.tables.map((t) =>
-            t.number === number && t.status !== "occupied"
-              ? { ...t, status: "occupied", seatedAt: t.seatedAt ?? new Date().toISOString(), waiter: t.waiter ?? waiter }
+            t.number === number
+              ? {
+                  ...t,
+                  status: "occupied",
+                  seatedAt: t.seatedAt ?? new Date().toISOString(),
+                  waiter: t.waiter ?? waiter,
+                  orderTotal: total != null ? (t.orderTotal ?? 0) + total : t.orderTotal,
+                }
               : t
           ),
         })),

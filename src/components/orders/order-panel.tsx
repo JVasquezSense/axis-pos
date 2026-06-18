@@ -164,7 +164,7 @@ export function OrderPanel() {
               className="col-span-2"
               onClick={() => {
                 const ticket = addFromOrder(lines, tableNumber, tableNumber ? "dine_in" : "takeaway");
-                if (tableNumber) occupyTable(tableNumber);
+                if (tableNumber) occupyTable(tableNumber, total);
                 toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
                 clear();
                 router.push("/kitchen");
