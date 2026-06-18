@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { Users, Search, UserPlus, Star } from "lucide-react";
 import type { Customer } from "@/types";
 import { crmService } from "@/services/crm.service";
@@ -13,31 +14,42 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CustomerDetail } from "@/components/crm/customer-detail";
+import { AddCustomerDialog } from "@/components/crm/add-customer-dialog";
 import { LOYALTY } from "@/lib/status";
 import { cn, formatCurrency, initials } from "@/lib/utils";
 
 export default function CrmPage() {
   const { data, loading } = useAsync(() => crmService.getCustomers());
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Customer | null>(null);
   const [open, setOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+
+  useEffect(() => {
+    if (data) setCustomers(data);
+  }, [data]);
 
   const filtered = useMemo(
     () =>
-      (data ?? []).filter((c) =>
+      customers.filter((c) =>
         query ? c.name.toLowerCase().includes(query.toLowerCase()) || c.phone.includes(query) : true
       ),
-    [data, query]
+    [customers, query]
   );
 
   const totals = useMemo(() => {
-    const items = data ?? [];
     return {
-      count: items.length,
-      vip: items.filter((c) => c.tier === "platinum" || c.tier === "gold").length,
-      revenue: items.reduce((s, c) => s + c.totalSpent, 0),
+      count: customers.length,
+      vip: customers.filter((c) => c.tier === "platinum" || c.tier === "gold").length,
+      revenue: customers.reduce((s, c) => s + c.totalSpent, 0),
     };
-  }, [data]);
+  }, [customers]);
+
+  const addCustomer = (c: Customer) => {
+    setCustomers((prev) => [c, ...prev]);
+    toast.success("Cliente registrado", { description: c.name });
+  };
 
   const select = (c: Customer) => {
     setSelected(c);
@@ -51,7 +63,7 @@ export default function CrmPage() {
         description="Fidelización y relación con tus comensales"
         icon={<Users className="h-5 w-5" />}
         actions={
-          <Button size="sm">
+          <Button size="sm" onClick={() => setAddOpen(true)}>
             <UserPlus className="h-4 w-4" /> Nuevo cliente
           </Button>
         }
@@ -124,6 +136,7 @@ export default function CrmPage() {
       </div>
 
       <CustomerDetail customer={selected} open={open} onOpenChange={setOpen} />
+      <AddCustomerDialog open={addOpen} onOpenChange={setAddOpen} onCreate={addCustomer} />
     </div>
   );
 }

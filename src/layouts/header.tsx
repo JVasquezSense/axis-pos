@@ -1,7 +1,8 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Bell } from "lucide-react";
 import { MobileNav } from "./mobile-nav";
+import { GlobalSearch } from "@/components/shared/global-search";
 import { RoleSwitcher } from "@/components/shared/role-switcher";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -20,16 +21,7 @@ export function Header() {
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md lg:px-6">
       <MobileNav />
 
-      <div className="relative hidden max-w-md flex-1 md:block">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          placeholder="Buscar pedidos, mesas, productos…"
-          className="h-9 w-full rounded-lg border border-border bg-muted/50 pl-9 pr-16 text-sm outline-none transition-colors focus:border-primary focus:bg-background"
-        />
-        <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
-          ⌘K
-        </kbd>
-      </div>
+      <GlobalSearch />
 
       <div className="flex flex-1 items-center justify-end gap-1.5 md:flex-none">
         <RoleSwitcher />

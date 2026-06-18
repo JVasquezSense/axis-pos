@@ -24,6 +24,7 @@ export interface LiveWebOrder {
   phone: string;
   method: PaymentMethod;
   items: number;
+  lines: { name: string; quantity: number }[];
   total: number;
   createdAt: number;
   receipt?: string; // data URL del comprobante
@@ -87,6 +88,7 @@ export const useWebStore = create<WebState>()(
       method,
       total,
       items,
+      lines: cart.map((l) => ({ name: l.product.name, quantity: l.quantity })),
       createdAt: Date.now(),
       status: "awaiting_receipt",
     };

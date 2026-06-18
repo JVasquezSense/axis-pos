@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { LiveWebOrder } from "@/store/web.store";
 import { useWebStore, WEB_ORDER_STATUS } from "@/store/web.store";
+import { useKitchenStore } from "@/store/kitchen.store";
 import { PAYMENT_LABEL } from "@/lib/payments";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +33,13 @@ import { formatCurrency } from "@/lib/utils";
 
 export default function WebsitePage() {
   const { liveOrders, verifyOrder, dispatchOrder, rejectOrder } = useWebStore();
+  const addWebTicket = useKitchenStore((s) => s.addWebTicket);
   const [viewing, setViewing] = useState<LiveWebOrder | null>(null);
+
+  const verifyAndSend = (o: LiveWebOrder) => {
+    verifyOrder(o.id);
+    addWebTicket({ code: o.code, items: o.lines, customer: o.customer });
+  };
 
   const counts = {
     review: liveOrders.filter((o) => o.status === "review").length,
@@ -132,8 +139,8 @@ export default function WebsitePage() {
                       order={o}
                       onView={() => setViewing(o)}
                       onVerify={() => {
-                        verifyOrder(o.id);
-                        toast.success(`Pago de ${o.code} verificado`);
+                        verifyAndSend(o);
+                        toast.success(`Pago de ${o.code} verificado`, { description: "Enviado a cocina" });
                       }}
                       onReject={() => {
                         rejectOrder(o.id);
@@ -193,8 +200,8 @@ export default function WebsitePage() {
                 </Button>
                 <Button
                   onClick={() => {
-                    verifyOrder(viewing.id);
-                    toast.success("Pago verificado");
+                    verifyAndSend(viewing);
+                    toast.success("Pago verificado", { description: "Enviado a cocina" });
                     setViewing(null);
                   }}
                 >

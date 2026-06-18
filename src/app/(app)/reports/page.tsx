@@ -25,7 +25,7 @@ export default function ReportsPage() {
             <Button variant="outline" size="sm">
               <Calendar className="h-4 w-4" /> Mes actual
             </Button>
-            <Button size="sm">
+            <Button size="sm" onClick={() => window.print()}>
               <Download className="h-4 w-4" /> PDF
             </Button>
           </>

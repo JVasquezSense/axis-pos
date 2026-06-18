@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Calendar, Download, LayoutDashboard } from "lucide-react";
 import { dashboardService } from "@/services/dashboard.service";
 import { useAsync } from "@/hooks/use-async";
 import { useAppStore } from "@/store/app.store";
+import { exportCsv } from "@/lib/export";
+import { formatCurrency } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +42,21 @@ const ADMIN_ACTIONS: QuickAction[] = [
 function AdminDashboard() {
   const { data, loading } = useAsync(() => dashboardService.getSummary());
 
+  const exportSummary = () => {
+    if (!data) return;
+    exportCsv(
+      "dashboard-resumen-axis",
+      ["Indicador", "Valor", "Variación %"],
+      [
+        ...data.kpis.map((k) => [k.label, k.format === "currency" ? formatCurrency(k.value) : String(k.value), k.delta]),
+        ["", "", ""],
+        ["Producto más vendido", "Unidades", "Ingresos"],
+        ...data.topProducts.map((p) => [p.name, p.units, Math.round(p.revenue)]),
+      ]
+    );
+    toast.success("Resumen exportado", { description: "Dashboard · CSV (Excel)" });
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -50,7 +68,7 @@ function AdminDashboard() {
             <Button variant="outline" size="sm">
               <Calendar className="h-4 w-4" /> Hoy
             </Button>
-            <Button size="sm">
+            <Button size="sm" onClick={exportSummary}>
               <Download className="h-4 w-4" /> Exportar
             </Button>
           </>

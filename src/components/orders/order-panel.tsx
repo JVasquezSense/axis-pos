@@ -17,11 +17,15 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { TABLES } from "@/mock/tables";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
+import { useKitchenStore } from "@/store/kitchen.store";
+import { useTablesStore } from "@/store/tables.store";
 import { formatCurrency } from "@/lib/utils";
 
 export function OrderPanel() {
   const router = useRouter();
   const { lines, tableNumber, increment, decrement, remove, clear, setTable } = useOrderStore();
+  const addFromOrder = useKitchenStore((s) => s.addFromOrder);
+  const occupyTable = useTablesStore((s) => s.occupy);
   const subtotal = orderSelectors.subtotal(lines);
   const tax = Math.round(subtotal * TAX_RATE);
   const total = subtotal + tax;
@@ -159,7 +163,10 @@ export function OrderPanel() {
             <Button
               className="col-span-2"
               onClick={() => {
-                toast.success("Pedido enviado a cocina", { description: `${count} productos · ${formatCurrency(total)}` });
+                const ticket = addFromOrder(lines, tableNumber, tableNumber ? "dine_in" : "takeaway");
+                if (tableNumber) occupyTable(tableNumber);
+                toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
+                clear();
                 router.push("/kitchen");
               }}
             >

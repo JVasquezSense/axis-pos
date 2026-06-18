@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Armchair, Plus } from "lucide-react";
 import type { RestaurantTable, TableStatus } from "@/types";
-import { salonService } from "@/services/salon.service";
-import { useAsync } from "@/hooks/use-async";
+import { useTablesStore } from "@/store/tables.store";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -50,56 +49,20 @@ function nextPosition(tables: RestaurantTable[], zone: string) {
 }
 
 export default function SalonPage() {
-  const { data, loading } = useAsync(() => salonService.getTables());
-  const [tables, setTables] = useState<RestaurantTable[]>([]);
+  const tables = useTablesStore((s) => s.tables);
+  const addTableStore = useTablesStore((s) => s.addTable);
+  const moveTable = useTablesStore((s) => s.moveOccupancy);
+  const mergeTable = useTablesStore((s) => s.mergeTables);
+  const [mounted, setMounted] = useState(false);
   const [selected, setSelected] = useState<RestaurantTable | null>(null);
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
-  // Carga inicial → estado local editable
-  useEffect(() => {
-    if (data) setTables(data);
-  }, [data]);
+  useEffect(() => setMounted(true), []);
 
   const select = (t: RestaurantTable) => {
     setSelected(t);
     setOpen(true);
-  };
-
-  const moveTable = (sourceId: string, targetId: string) => {
-    setTables((prev) => {
-      const src = prev.find((t) => t.id === sourceId);
-      if (!src) return prev;
-      return prev.map((t) => {
-        if (t.id === targetId)
-          return { ...t, status: src.status, guests: src.guests, waiter: src.waiter, seatedAt: src.seatedAt, orderTotal: src.orderTotal };
-        if (t.id === sourceId)
-          return { ...t, status: "available" as const, guests: undefined, waiter: undefined, seatedAt: undefined, orderTotal: undefined };
-        return t;
-      });
-    });
-  };
-
-  const mergeTable = (sourceId: string, targetId: string) => {
-    setTables((prev) => {
-      const src = prev.find((t) => t.id === sourceId);
-      const tgt = prev.find((t) => t.id === targetId);
-      if (!src || !tgt) return prev;
-      return prev.map((t) => {
-        if (t.id === sourceId)
-          return {
-            ...t,
-            status: "occupied" as const,
-            guests: (src.guests ?? 0) + (tgt.guests ?? 0),
-            orderTotal: (src.orderTotal ?? 0) + (tgt.orderTotal ?? 0),
-            waiter: src.waiter ?? tgt.waiter,
-            seatedAt: src.seatedAt ?? tgt.seatedAt,
-          };
-        if (t.id === targetId)
-          return { ...t, status: "available" as const, guests: undefined, waiter: undefined, seatedAt: undefined, orderTotal: undefined };
-        return t;
-      });
-    });
   };
 
   const createTable = (form: NewTableData) => {
@@ -114,7 +77,7 @@ export default function SalonPage() {
       x: pos.x,
       y: pos.y,
     };
-    setTables((prev) => [...prev, newTable]);
+    addTableStore(newTable);
     toast.success(`Mesa ${form.number} agregada`, { description: `${form.zone} · ${form.capacity} personas` });
   };
 
@@ -153,7 +116,7 @@ export default function SalonPage() {
         ))}
       </div>
 
-      {loading && tables.length === 0 ? (
+      {!mounted ? (
         <Skeleton className="h-[560px] w-full rounded-2xl" />
       ) : (
         <TableMap tables={tables} onSelect={select} />

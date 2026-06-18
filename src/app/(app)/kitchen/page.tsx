@@ -4,8 +4,8 @@ import { useEffect, useReducer, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { ChefHat, Radio } from "lucide-react";
-import type { KdsTicket, KdsStatus } from "@/types";
-import { kitchenService } from "@/services/kitchen.service";
+import type { KdsStatus } from "@/types";
+import { useKitchenStore } from "@/store/kitchen.store";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,45 +14,26 @@ import { KDS_STATUS } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 const COLUMNS: KdsStatus[] = ["pending", "preparing", "ready"];
-const NEXT: Record<KdsStatus, KdsStatus> = { pending: "preparing", preparing: "ready", ready: "ready" };
 
 export default function KitchenPage() {
-  const [tickets, setTickets] = useState<KdsTicket[] | null>(null);
+  const tickets = useKitchenStore((s) => s.tickets);
+  const advanceStore = useKitchenStore((s) => s.advance);
+  const toggleItem = useKitchenStore((s) => s.toggleItem);
+  const [mounted, setMounted] = useState(false);
   const [, forceTick] = useReducer((x) => x + 1, 0);
 
-  useEffect(() => {
-    kitchenService.getTickets().then(setTickets);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
-  // Simula reloj en vivo (recalcula tiempos de espera) — preparado para WebSockets
+  // Reloj en vivo: recalcula los tiempos de espera — preparado para WebSockets
   useEffect(() => {
-    const unsub = kitchenService.subscribe(() => forceTick(), 5000);
     const clock = setInterval(() => forceTick(), 15000);
-    return () => {
-      unsub();
-      clearInterval(clock);
-    };
+    return () => clearInterval(clock);
   }, []);
 
   const advance = (id: string) => {
-    setTickets((prev) =>
-      prev!.map((t) => {
-        if (t.id !== id) return t;
-        const next = NEXT[t.status];
-        if (next === "ready") toast.success(`${t.code} listo para servir`);
-        return { ...t, status: next, items: next === "ready" ? t.items.map((i) => ({ ...i, done: true })) : t.items };
-      })
-    );
-  };
-
-  const toggleItem = (ticketId: string, index: number) => {
-    setTickets((prev) =>
-      prev!.map((t) =>
-        t.id === ticketId
-          ? { ...t, items: t.items.map((it, i) => (i === index ? { ...it, done: !it.done } : it)) }
-          : t
-      )
-    );
+    const t = tickets.find((x) => x.id === id);
+    if (t && t.status === "preparing") toast.success(`${t.code} listo para servir`);
+    advanceStore(id);
   };
 
   return (
@@ -83,7 +64,7 @@ export default function KitchenPage() {
                 </span>
               </div>
               <div className="scrollbar-thin flex-1 space-y-3 overflow-y-auto px-0.5">
-                {!tickets ? (
+                {!mounted ? (
                   Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)
                 ) : (
                   <AnimatePresence mode="popLayout">
@@ -92,7 +73,7 @@ export default function KitchenPage() {
                     ))}
                   </AnimatePresence>
                 )}
-                {tickets && colTickets.length === 0 && (
+                {mounted && colTickets.length === 0 && (
                   <p className="py-8 text-center text-sm text-muted-foreground">Sin órdenes</p>
                 )}
               </div>

@@ -17,10 +17,10 @@ import {
   CheckCircle2,
   Timer,
 } from "lucide-react";
-import { salonService } from "@/services/salon.service";
-import { kitchenService } from "@/services/kitchen.service";
 import { inventoryService } from "@/services/inventory.service";
 import { dashboardService } from "@/services/dashboard.service";
+import { useKitchenStore } from "@/store/kitchen.store";
+import { useTablesStore } from "@/store/tables.store";
 import { useAsync } from "@/hooks/use-async";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -61,17 +61,17 @@ function StatCard({
 // MESERO
 // ===========================================================================
 export function WaiterDashboard() {
-  const { data: tables, loading } = useAsync(() => salonService.getTables());
-  const { data: tickets } = useAsync(() => kitchenService.getTickets());
+  const tables = useTablesStore((s) => s.tables);
+  const tickets = useKitchenStore((s) => s.tickets);
 
-  const counts = (tables ?? []).reduce(
+  const counts = tables.reduce(
     (a, t) => ((a[t.status] = (a[t.status] ?? 0) + 1), a),
     {} as Record<string, number>
   );
-  const attention = (tables ?? []).filter(
+  const attention = tables.filter(
     (t) => t.status === "billing" || (t.seatedAt && minutesAgo(new Date(t.seatedAt)) > 60)
   );
-  const ready = (tickets ?? []).filter((t) => t.status === "ready");
+  const ready = tickets.filter((t) => t.status === "ready");
 
   const actions: QuickAction[] = [
     { label: "Tomar pedido", description: "Nueva orden", icon: "ClipboardList", href: "/orders", color: "primary", primary: true },
@@ -99,9 +99,7 @@ export function WaiterDashboard() {
             <Badge variant="destructive">{attention.length}</Badge>
           </CardHeader>
           <CardContent className="space-y-2">
-            {loading ? (
-              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
-            ) : attention.length === 0 ? (
+            {attention.length === 0 ? (
               <EmptyState icon={<CheckCircle2 />} title="Todo bajo control" description="Ninguna mesa requiere atención ahora." className="border-0" />
             ) : (
               attention.map((t) => (
@@ -156,8 +154,8 @@ export function WaiterDashboard() {
 // ===========================================================================
 export function CashierDashboard() {
   const { data, loading } = useAsync(() => dashboardService.getSummary());
-  const { data: tables } = useAsync(() => salonService.getTables());
-  const toCollect = (tables ?? []).filter((t) => t.status === "billing");
+  const tables = useTablesStore((s) => s.tables);
+  const toCollect = tables.filter((t) => t.status === "billing");
 
   const actions: QuickAction[] = [
     { label: "Cobrar", description: "Procesar pago", icon: "CreditCard", href: "/checkout", color: "primary", primary: true },
@@ -243,13 +241,13 @@ export function CashierDashboard() {
 // COCINA
 // ===========================================================================
 export function KitchenDashboard() {
-  const { data: tickets, loading } = useAsync(() => kitchenService.getTickets());
+  const tickets = useKitchenStore((s) => s.tickets);
   const { data: inventory } = useAsync(() => inventoryService.getItems());
 
-  const pending = (tickets ?? []).filter((t) => t.status === "pending");
-  const preparing = (tickets ?? []).filter((t) => t.status === "preparing");
-  const ready = (tickets ?? []).filter((t) => t.status === "ready");
-  const urgent = (tickets ?? []).filter((t) => t.priority || (t.status !== "ready" && minutesAgo(new Date(t.createdAt)) >= 15));
+  const pending = tickets.filter((t) => t.status === "pending");
+  const preparing = tickets.filter((t) => t.status === "preparing");
+  const ready = tickets.filter((t) => t.status === "ready");
+  const urgent = tickets.filter((t) => t.priority || (t.status !== "ready" && minutesAgo(new Date(t.createdAt)) >= 15));
   const critical = (inventory ?? []).filter((i) => i.status !== "normal");
 
   const actions: QuickAction[] = [
@@ -277,9 +275,7 @@ export function KitchenDashboard() {
             <Badge variant="destructive">{urgent.length}</Badge>
           </CardHeader>
           <CardContent className="space-y-2">
-            {loading ? (
-              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
-            ) : urgent.length === 0 ? (
+            {urgent.length === 0 ? (
               <EmptyState icon={<CheckCircle2 />} title="Línea al día" description="No hay órdenes atrasadas." className="border-0" />
             ) : (
               urgent.map((t) => (
