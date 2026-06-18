@@ -1,0 +1,131 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type { InventoryItem, StockStatus } from "@/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const CATEGORIES = ["Carnes", "Lácteos", "Verduras", "Frutas", "Panadería", "Abarrotes", "Bebidas", "Pescados", "Congelados"];
+const UNITS = ["kg", "g", "L", "ml", "und", "caja", "bolsa"];
+
+function statusFor(stock: number, min: number): StockStatus {
+  if (stock <= min * 0.4) return "critical";
+  if (stock < min) return "low";
+  return "normal";
+}
+
+export function AddSupplyDialog({
+  open,
+  onOpenChange,
+  onCreate,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onCreate: (item: InventoryItem) => void;
+}) {
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [stock, setStock] = useState(0);
+  const [unit, setUnit] = useState("kg");
+  const [minStock, setMinStock] = useState(0);
+  const [cost, setCost] = useState(0);
+  const [supplier, setSupplier] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setName(""); setCategory(CATEGORIES[0]); setStock(0); setUnit("kg"); setMinStock(0); setCost(0); setSupplier("");
+    }
+  }, [open]);
+
+  const valid = name.trim() && cost > 0 && minStock >= 0;
+
+  const submit = () => {
+    if (!valid) return;
+    onCreate({
+      id: `i-${Date.now()}`,
+      name: name.trim(),
+      category,
+      stock,
+      unit,
+      minStock,
+      cost,
+      supplier: supplier.trim() || "Sin proveedor",
+      status: statusFor(stock, minStock),
+      updatedAt: "Justo ahora",
+    });
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Nuevo insumo</DialogTitle>
+          <DialogDescription>Registra una materia prima con su stock inicial y costo.</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Nombre del insumo</label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Carne de res molida" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Categoría</label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Unidad</label>
+              <Select value={unit} onValueChange={setUnit}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Stock inicial</label>
+              <Input type="number" min={0} step="0.01" value={stock} onChange={(e) => setStock(Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Stock mínimo</label>
+              <Input type="number" min={0} step="0.01" value={minStock} onChange={(e) => setMinStock(Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Costo unit. (COP)</label>
+              <Input type="number" min={0} value={cost} onChange={(e) => setCost(Number(e.target.value))} />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Proveedor</label>
+            <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Ej: Frigorífico La 70" />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={submit} disabled={!valid}>Agregar insumo</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

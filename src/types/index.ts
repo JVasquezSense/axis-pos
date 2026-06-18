@@ -191,6 +191,26 @@ export interface InventoryItem {
   updatedAt: string;
 }
 
+// Kardex / movimientos
+export type MovementType = "inicial" | "entrada" | "salida" | "ajuste";
+
+export interface InventoryMovement {
+  id: string;
+  inventoryId: string;
+  date: string;
+  type: MovementType;
+  quantity: number; // + entrada / − salida
+  balance: number; // saldo tras el movimiento
+  unitCost: number;
+  reason: string;
+}
+
+export interface PhysicalCount {
+  inventoryId: string;
+  theoretical: number; // saldo teórico (sistema)
+  physical: number; // conteo físico
+}
+
 // ---------------------------------------------------------------------------
 // CRM / Clientes
 // ---------------------------------------------------------------------------
