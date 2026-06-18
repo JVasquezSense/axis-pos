@@ -1,10 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Info } from "lucide-react";
 import * as Icons from "lucide-react";
 import type { Kpi } from "@/types";
 import { Card } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sparkline } from "./sparkline";
 import { AnimatedNumber } from "./animated-number";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
@@ -41,7 +42,19 @@ export function KpiCard({ kpi, index = 0 }: { kpi: Kpi; index?: number }) {
           </span>
         </div>
         <div className="mt-4">
-          <p className="text-sm text-muted-foreground">{kpi.label}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm text-muted-foreground">{kpi.label}</p>
+            {kpi.info && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground/60 transition-colors hover:text-foreground" aria-label="Cómo se calcula">
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-pretty leading-relaxed">{kpi.info}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
           <p className="mt-1 text-2xl font-bold tracking-tight">
             <AnimatedNumber value={kpi.value} format={(n) => formatValue(kpi, n)} />
           </p>

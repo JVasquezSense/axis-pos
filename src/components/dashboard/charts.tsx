@@ -6,12 +6,15 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import type { TimeSeriesPoint } from "@/types";
+import type { TimeSeriesPoint, YoYPoint } from "@/types";
 import { formatCompact, formatCurrency } from "@/lib/utils";
 
 const axis = {
@@ -59,6 +62,29 @@ export function SalesByHourChart({ data }: { data: TimeSeriesPoint[] }) {
           animationDuration={900}
         />
       </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function SalesVsLastYearChart({ data }: { data: YoYPoint[] }) {
+  const chartData = data.map((d) => ({ label: d.label, "Este año": d.current, "Año pasado": d.previous }));
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <LineChart data={chartData} margin={{ top: 10, right: 8, left: -4, bottom: 0 }}>
+        <defs>
+          <linearGradient id="yoyFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+        <XAxis dataKey="label" {...axis} />
+        <YAxis {...axis} width={44} tickFormatter={(v) => formatCompact(v)} />
+        <Tooltip content={<ChartTooltip />} />
+        <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+        <Line type="monotone" dataKey="Año pasado" stroke="hsl(var(--muted-foreground))" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+        <Line type="monotone" dataKey="Este año" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+      </LineChart>
     </ResponsiveContainer>
   );
 }

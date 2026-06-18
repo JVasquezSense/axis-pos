@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Hash, ShoppingBag } from "lucide-react";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
 import { ORDERS } from "@/mock/datasets";
+import { TABLES } from "@/mock/tables";
 import { PageHeader } from "@/components/shared/page-header";
 import { Icon } from "@/components/shared/icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,8 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaymentDialog } from "@/components/checkout/payment-dialog";
 import { PAYMENT_METHODS } from "@/lib/payments";
+import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -23,25 +26,38 @@ export default function CheckoutPage() {
   const storeLines = useOrderStore((s) => s.lines);
   const storeTable = useOrderStore((s) => s.tableNumber);
   const clear = useOrderStore((s) => s.clear);
+  const setStoreTable = useOrderStore((s) => s.setTable);
 
   // Si no hay pedido en curso, usar uno de ejemplo (mesa 7) para la demo
   const fallback = ORDERS[1];
   const usingStore = storeLines.length > 0;
   const lines = usingStore ? storeLines : fallback.lines;
-  const table = usingStore ? storeTable : fallback.tableNumber;
+  const initialTable = usingStore ? storeTable : fallback.tableNumber ?? null;
 
+  const [table, setTableLocal] = useState<number | null>(initialTable ?? null);
+  const [saleType, setSaleType] = useState<SaleTypeId>("dine_in");
   const [tipRate, setTipRate] = useState(0.1);
   const [discount, setDiscount] = useState(0);
   const [method, setMethod] = useState<PaymentMethod>("card");
   const [payOpen, setPayOpen] = useState(false);
 
+  const st = SALE_TYPE_MAP[saleType];
+
   const subtotal = useMemo(() => orderSelectors.subtotal(lines), [lines]);
-  const taxedBase = Math.max(subtotal - discount, 0);
-  const tax = Math.round(taxedBase * TAX_RATE);
-  const tip = Math.round(subtotal * tipRate);
+  const autoDiscount = st.full ? subtotal : Math.round(subtotal * (st.discountPct ?? 0));
+  const effectiveDiscount = Math.min(discount + autoDiscount, subtotal);
+  const taxedBase = Math.max(subtotal - effectiveDiscount, 0);
+  const tax = st.noTax ? 0 : Math.round(taxedBase * TAX_RATE);
+  const tip = st.full ? 0 : Math.round(subtotal * tipRate);
   const total = taxedBase + tax + tip;
 
-  const breakdown: PaymentBreakdown = { subtotal, tax, taxRate: TAX_RATE, discount, tip, total };
+  const breakdown: PaymentBreakdown = { subtotal, tax, taxRate: st.noTax ? 0 : TAX_RATE, discount: effectiveDiscount, tip, total };
+
+  const changeTable = (value: string) => {
+    const next = value === "none" ? null : Number(value);
+    setTableLocal(next);
+    if (usingStore) setStoreTable(next);
+  };
 
   return (
     <div className="space-y-6">
@@ -51,6 +67,60 @@ export default function CheckoutPage() {
         icon={<CreditCard className="h-5 w-5" />}
         actions={<Badge variant="secondary">{orderSelectors.count(lines)} ítems</Badge>}
       />
+
+      {/* Datos de la venta: mesa + tipo */}
+      <Card>
+        <CardContent className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Mesa / origen</label>
+            <Select value={table === null ? "none" : String(table)} onValueChange={changeTable}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  <span className="flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Venta directa</span>
+                </SelectItem>
+                {TABLES.map((t) => (
+                  <SelectItem key={t.id} value={String(t.number)}>
+                    <span className="flex items-center gap-2"><Hash className="h-4 w-4" /> Mesa {t.number} · {t.zone}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Tipo de venta</label>
+            <Select value={saleType} onValueChange={(v) => setSaleType(v as SaleTypeId)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SALE_TYPES.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    <span className="flex items-center gap-2">
+                      <Icon name={s.icon} className="h-4 w-4" /> {s.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+        {(st.discountPct || st.full || st.noTax) && (
+          <div className="border-t border-border px-4 py-2.5">
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Icon name={st.icon} className="h-3.5 w-3.5" />
+              <span>
+                <strong className="text-foreground">{st.label}:</strong> {st.hint}
+                {st.full && " · total $0"}
+                {st.discountPct && ` · -${Math.round(st.discountPct * 100)}% automático`}
+                {st.noTax && " · sin IVA"}
+              </span>
+            </p>
+          </div>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_400px]">
         {/* Detalle */}
@@ -70,15 +140,13 @@ export default function CheckoutPage() {
                     {l.quantity} × {formatCurrency(l.unitPrice)}
                   </p>
                 </div>
-                <span className="text-sm font-semibold">
-                  {formatCurrency(orderSelectors.lineTotal(l))}
-                </span>
+                <span className="text-sm font-semibold">{formatCurrency(orderSelectors.lineTotal(l))}</span>
               </div>
             ))}
 
             <Separator className="my-3" />
 
-            <div>
+            <div className={cn(st.full && "pointer-events-none opacity-50")}>
               <p className="mb-2 text-sm font-semibold">Propina sugerida</p>
               <div className="grid grid-cols-4 gap-2">
                 {TIP_OPTIONS.map((t) => (
@@ -97,7 +165,7 @@ export default function CheckoutPage() {
             </div>
 
             <div className="mt-3">
-              <p className="mb-2 text-sm font-semibold">Descuento</p>
+              <p className="mb-2 text-sm font-semibold">Descuento adicional</p>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -122,8 +190,10 @@ export default function CheckoutPage() {
             </CardHeader>
             <CardContent className="space-y-1.5 text-sm">
               <Row label="Subtotal" value={formatCurrency(subtotal)} />
-              {discount > 0 && <Row label="Descuento" value={`- ${formatCurrency(discount)}`} accent />}
-              <Row label={`IVA (${Math.round(TAX_RATE * 100)}%)`} value={formatCurrency(tax)} muted />
+              {effectiveDiscount > 0 && (
+                <Row label={st.full ? `Descuento (${st.label})` : "Descuento"} value={`- ${formatCurrency(effectiveDiscount)}`} accent />
+              )}
+              <Row label={st.noTax ? "IVA (exento)" : `IVA (${Math.round(TAX_RATE * 100)}%)`} value={formatCurrency(tax)} muted />
               <Row label="Propina" value={formatCurrency(tip)} muted />
               <Separator className="my-2" />
               <div className="flex items-center justify-between">
@@ -172,9 +242,10 @@ export default function CheckoutPage() {
         method={method}
         breakdown={breakdown}
         table={table}
+        saleType={st.label}
         onComplete={() => {
           if (usingStore) clear();
-          toast.success("Venta registrada correctamente");
+          toast.success("Venta registrada correctamente", { description: st.label });
         }}
       />
     </div>

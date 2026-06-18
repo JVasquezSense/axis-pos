@@ -20,8 +20,8 @@ export const DASHBOARD: DashboardData = {
   kpis: [
     { id: "sales", label: "Ventas del día", value: 4287500, format: "currency", delta: 12.4, icon: "DollarSign", spark: [12, 18, 14, 22, 28, 24, 32, 38, 35, 42] },
     { id: "orders", label: "Pedidos activos", value: 23, format: "number", delta: 8.1, icon: "ShoppingBag", spark: [8, 10, 9, 12, 14, 13, 16, 18, 20, 23] },
-    { id: "avg", label: "Ticket promedio", value: 64200, format: "currency", delta: 4.7, icon: "Receipt", spark: [55, 58, 56, 60, 59, 62, 61, 63, 64, 64] },
-    { id: "margin", label: "Margen bruto", value: 68.5, format: "percent", delta: -1.2, icon: "TrendingUp", spark: [70, 69, 71, 68, 69, 67, 68, 69, 68, 68] },
+    { id: "avg", label: "Ticket promedio", value: 64200, format: "currency", delta: 4.7, icon: "Receipt", spark: [55, 58, 56, 60, 59, 62, 61, 63, 64, 64], info: "Ventas del día ÷ número de pedidos cerrados. Hoy: $4.287.500 ÷ 67 pedidos ≈ $64.200. Mide cuánto gasta en promedio cada mesa/cliente." },
+    { id: "margin", label: "Margen bruto", value: 68.5, format: "percent", delta: -1.2, icon: "TrendingUp", spark: [70, 69, 71, 68, 69, 67, 68, 69, 68, 68], info: "(Ventas − Costo de insumos) ÷ Ventas × 100. Usa el costeo de las recetas (food cost). Hoy las ventas dejan 68,5% después de descontar la materia prima." },
   ],
   salesByHour: [
     { label: "08", value: 120000 }, { label: "10", value: 280000 },
@@ -39,6 +39,20 @@ export const DASHBOARD: DashboardData = {
     { label: "Vie", value: 6230000, secondary: 5400000 },
     { label: "Sáb", value: 7840000, secondary: 6800000 },
     { label: "Dom", value: 5210000, secondary: 4900000 },
+  ],
+  salesVsLastYear: [
+    { label: "Ene", current: 98000000, previous: 82000000 },
+    { label: "Feb", current: 102000000, previous: 86000000 },
+    { label: "Mar", current: 112000000, previous: 91000000 },
+    { label: "Abr", current: 108000000, previous: 95000000 },
+    { label: "May", current: 119000000, previous: 99000000 },
+    { label: "Jun", current: 128450000, previous: 104000000 },
+    { label: "Jul", current: 124000000, previous: 108000000 },
+    { label: "Ago", current: 131000000, previous: 112000000 },
+    { label: "Sep", current: 126000000, previous: 110000000 },
+    { label: "Oct", current: 134000000, previous: 115000000 },
+    { label: "Nov", current: 142000000, previous: 121000000 },
+    { label: "Dic", current: 158000000, previous: 133000000 },
   ],
   topProducts: [
     { id: "p5", name: "Axis Classic", category: "Hamburguesas", units: 87, revenue: 2427300, image: "🍔" },

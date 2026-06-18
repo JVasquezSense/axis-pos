@@ -3,16 +3,25 @@
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { Minus, Plus, Trash2, ShoppingCart, Send, Hash } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart, Send, Hash, ChevronDown, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/shared/empty-state";
+import { TABLES } from "@/mock/tables";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { formatCurrency } from "@/lib/utils";
 
 export function OrderPanel() {
   const router = useRouter();
-  const { lines, tableNumber, increment, decrement, remove, clear } = useOrderStore();
+  const { lines, tableNumber, increment, decrement, remove, clear, setTable } = useOrderStore();
   const subtotal = orderSelectors.subtotal(lines);
   const tax = Math.round(subtotal * TAX_RATE);
   const total = subtotal + tax;
@@ -30,13 +39,42 @@ export function OrderPanel() {
             </span>
           )}
         </div>
-        {tableNumber ? (
-          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium">
-            <Hash className="h-3 w-3" /> Mesa {tableNumber}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">Para llevar</span>
-        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted">
+              {tableNumber ? (
+                <>
+                  <Hash className="h-3.5 w-3.5 text-primary" /> Mesa {tableNumber}
+                </>
+              ) : (
+                <>
+                  <ShoppingBag className="h-3.5 w-3.5" /> Para llevar
+                </>
+              )}
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
+            <DropdownMenuLabel>Asignar a mesa</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setTable(null)}>
+              <ShoppingBag className="h-4 w-4" /> Para llevar
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <div className="grid grid-cols-4 gap-1 p-1">
+              {TABLES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTable(t.number)}
+                  className={`flex h-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent ${
+                    tableNumber === t.number ? "bg-primary text-primary-foreground" : "bg-muted"
+                  }`}
+                >
+                  {t.number}
+                </button>
+              ))}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="scrollbar-thin flex-1 overflow-y-auto p-3">

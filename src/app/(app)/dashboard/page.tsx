@@ -10,7 +10,7 @@ import { KpiCard } from "@/components/shared/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SalesByHourChart, SalesByDayChart } from "@/components/dashboard/charts";
+import { SalesByHourChart, SalesByDayChart, SalesVsLastYearChart } from "@/components/dashboard/charts";
 import { TopProducts, AlertsPanel, LiveWidgets } from "@/components/dashboard/widgets";
 import { DashboardSkeleton } from "@/components/dashboard/skeleton";
 import { QuickActions, type QuickAction } from "@/components/dashboard/quick-actions";
@@ -111,6 +111,19 @@ function AdminDashboard() {
 
             <AlertsPanel data={data.alerts} />
           </div>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <div>
+                <CardTitle>Ventas vs. año pasado</CardTitle>
+                <p className="text-sm text-muted-foreground">Comparativo mensual 2026 vs 2025</p>
+              </div>
+              <Badge variant="success">+22% acumulado</Badge>
+            </CardHeader>
+            <CardContent>
+              <SalesVsLastYearChart data={data.salesVsLastYear} />
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

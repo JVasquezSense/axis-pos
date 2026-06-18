@@ -50,6 +50,42 @@ export default function SalonPage() {
     setOpen(true);
   };
 
+  const moveTable = (sourceId: string, targetId: string) => {
+    setTables((prev) => {
+      const src = prev.find((t) => t.id === sourceId);
+      if (!src) return prev;
+      return prev.map((t) => {
+        if (t.id === targetId)
+          return { ...t, status: src.status, guests: src.guests, waiter: src.waiter, seatedAt: src.seatedAt, orderTotal: src.orderTotal };
+        if (t.id === sourceId)
+          return { ...t, status: "available" as const, guests: undefined, waiter: undefined, seatedAt: undefined, orderTotal: undefined };
+        return t;
+      });
+    });
+  };
+
+  const mergeTable = (sourceId: string, targetId: string) => {
+    setTables((prev) => {
+      const src = prev.find((t) => t.id === sourceId);
+      const tgt = prev.find((t) => t.id === targetId);
+      if (!src || !tgt) return prev;
+      return prev.map((t) => {
+        if (t.id === sourceId)
+          return {
+            ...t,
+            status: "occupied" as const,
+            guests: (src.guests ?? 0) + (tgt.guests ?? 0),
+            orderTotal: (src.orderTotal ?? 0) + (tgt.orderTotal ?? 0),
+            waiter: src.waiter ?? tgt.waiter,
+            seatedAt: src.seatedAt ?? tgt.seatedAt,
+          };
+        if (t.id === targetId)
+          return { ...t, status: "available" as const, guests: undefined, waiter: undefined, seatedAt: undefined, orderTotal: undefined };
+        return t;
+      });
+    });
+  };
+
   const createTable = (form: NewTableData) => {
     const pos = nextPosition(tables, form.zone);
     const newTable: RestaurantTable = {
@@ -107,7 +143,14 @@ export default function SalonPage() {
         <TableMap tables={tables} onSelect={select} />
       )}
 
-      <TableDrawer table={selected} open={open} onOpenChange={setOpen} />
+      <TableDrawer
+        table={selected}
+        open={open}
+        onOpenChange={setOpen}
+        tables={tables}
+        onMove={moveTable}
+        onMerge={mergeTable}
+      />
       <AddTableDialog
         open={addOpen}
         onOpenChange={setAddOpen}

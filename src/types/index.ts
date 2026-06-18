@@ -24,6 +24,13 @@ export interface Kpi {
   delta: number; // variación % vs periodo anterior
   icon: string; // nombre de icono lucide
   spark: number[];
+  info?: string; // explicación de cómo se calcula (tooltip)
+}
+
+export interface YoYPoint {
+  label: string;
+  current: number;
+  previous: number;
 }
 
 export interface TimeSeriesPoint {
@@ -54,6 +61,7 @@ export interface DashboardData {
   kpis: Kpi[];
   salesByHour: TimeSeriesPoint[];
   salesByDay: TimeSeriesPoint[];
+  salesVsLastYear: YoYPoint[];
   topProducts: TopProduct[];
   alerts: AlertItem[];
   occupancy: { occupied: number; total: number };

@@ -18,6 +18,7 @@ export function PaymentDialog({
   method,
   breakdown,
   table,
+  saleType,
   onComplete,
 }: {
   open: boolean;
@@ -25,6 +26,7 @@ export function PaymentDialog({
   method: PaymentMethod;
   breakdown: PaymentBreakdown;
   table?: number | null;
+  saleType?: string;
   onComplete: () => void;
 }) {
   const [phase, setPhase] = useState<Phase>("processing");
@@ -80,7 +82,7 @@ export function PaymentDialog({
                 <span className="text-xs text-muted-foreground">{code}</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                {table ? `Mesa ${table} · ` : ""}15 jun 2026, 8:42 p.m.
+                {table ? `Mesa ${table} · ` : ""}{saleType ? `${saleType} · ` : ""}15 jun 2026, 8:42 p.m.
               </p>
               <Separator className="my-3" />
               <Row label="Subtotal" value={formatCurrency(breakdown.subtotal)} />
