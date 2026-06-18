@@ -22,15 +22,31 @@ const ZONE_Y: Record<string, number> = {
   Barra: 78,
 };
 
-/** Calcula una posición libre en el mapa para la zona dada. */
+/**
+ * Encuentra una posición libre en el mapa para la zona dada, evitando que la
+ * nueva mesa se superponga con las existentes. Prueba primero la fila de la zona
+ * y, si está llena, recorre todo el lienzo hasta hallar un hueco.
+ */
 function nextPosition(tables: RestaurantTable[], zone: string) {
-  const inZone = tables.filter((t) => t.zone === zone).length;
-  const col = inZone % 4;
-  const row = Math.floor(inZone / 4);
-  return {
-    x: Math.min(12 + col * 21, 88),
-    y: Math.min((ZONE_Y[zone] ?? 48) + row * 11, 92),
-  };
+  const baseY = ZONE_Y[zone] ?? 48;
+  // Dos mesas chocan si están muy cerca en X y en Y (nodo ~6% ancho · ~16% alto)
+  const free = (x: number, y: number) =>
+    !tables.some((t) => Math.abs(t.x - x) < 10 && Math.abs(t.y - y) < 16);
+
+  const xs = [12, 32, 52, 74, 90];
+  const yBands = [baseY, baseY + 18, baseY - 15];
+  for (const y of yBands) {
+    if (y < 7 || y > 93) continue;
+    for (const x of xs) if (free(x, y)) return { x, y };
+  }
+
+  // Último recurso: barrido fino de todo el lienzo
+  for (let y = 10; y <= 90; y += 5) {
+    for (let x = 10; x <= 92; x += 5) {
+      if (free(x, y)) return { x, y };
+    }
+  }
+  return { x: 50, y: 50 };
 }
 
 export default function SalonPage() {
