@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { Check, Loader2, Printer, Mail } from "lucide-react";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -100,10 +101,10 @@ export function PaymentDialog({
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => window.print()}>
                 <Printer className="h-4 w-4" /> Imprimir
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => toast.success("Factura enviada", { description: `${code} por correo` })}>
                 <Mail className="h-4 w-4" /> Enviar
               </Button>
             </div>
