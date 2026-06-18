@@ -6,6 +6,7 @@ import { Calendar, Download, LayoutDashboard } from "lucide-react";
 import { dashboardService } from "@/services/dashboard.service";
 import { useAsync } from "@/hooks/use-async";
 import { useAppStore } from "@/store/app.store";
+import { useSalesStore, applyLiveKpis } from "@/store/sales.store";
 import { exportCsv } from "@/lib/export";
 import { formatCurrency } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
@@ -13,7 +14,7 @@ import { KpiCard } from "@/components/shared/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SalesByHourChart, SalesByDayChart, SalesVsLastYearChart } from "@/components/dashboard/charts";
+import { SalesByHourChart, SalesByDayChart, SalesVsLastYearChart } from "@/components/dashboard/charts-lazy";
 import { TopProducts, AlertsPanel, LiveWidgets } from "@/components/dashboard/widgets";
 import { DashboardSkeleton } from "@/components/dashboard/skeleton";
 import { QuickActions, type QuickAction } from "@/components/dashboard/quick-actions";
@@ -41,6 +42,7 @@ const ADMIN_ACTIONS: QuickAction[] = [
 
 function AdminDashboard() {
   const { data, loading } = useAsync(() => dashboardService.getSummary());
+  const records = useSalesStore((s) => s.records);
 
   const exportSummary = () => {
     if (!data) return;
@@ -82,7 +84,7 @@ function AdminDashboard() {
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {data.kpis.map((kpi, i) => (
+            {applyLiveKpis(data.kpis, records).map((kpi, i) => (
               <KpiCard key={kpi.id} kpi={kpi} index={i} />
             ))}
           </div>

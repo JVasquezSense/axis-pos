@@ -21,7 +21,8 @@ import {
 import { useInventoryStore } from "@/store/inventory.store";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useWebStore } from "@/store/web.store";
-import { minutesAgo } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
+import { initials, minutesAgo } from "@/lib/utils";
 
 interface Notif {
   icon: React.ElementType;
@@ -39,6 +40,8 @@ export function Header() {
   const critical = useInventoryStore((s) => s.items.filter((i) => i.status === "critical"));
   const tickets = useKitchenStore((s) => s.tickets);
   const webReview = useWebStore((s) => s.liveOrders.filter((o) => o.status === "review"));
+  const userName = useAuthStore((s) => s.name);
+  const logout = useAuthStore((s) => s.logout);
 
   const lateTickets = tickets.filter((t) => t.status !== "ready" && minutesAgo(new Date(t.createdAt)) >= 15);
 
@@ -119,13 +122,13 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <button className="ml-1 rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring">
               <Avatar className="h-9 w-9">
-                <AvatarFallback>JV</AvatarFallback>
+                <AvatarFallback>{initials(userName)}</AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2.5 py-2">
-              <p className="text-sm font-semibold">Juan Vásquez</p>
+              <p className="text-sm font-semibold">{userName}</p>
               <p className="text-xs text-muted-foreground">Propietario · Demo Burger</p>
             </div>
             <DropdownMenuSeparator />
@@ -133,7 +136,13 @@ export function Header() {
             <DropdownMenuItem onClick={() => router.push("/admin")}>Configuración</DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push("/admin")}>Facturación</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => router.push("/")}>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => {
+                logout();
+                router.push("/");
+              }}
+            >
               Cerrar sesión
             </DropdownMenuItem>
           </DropdownMenuContent>

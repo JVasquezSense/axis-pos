@@ -21,6 +21,7 @@ import { inventoryService } from "@/services/inventory.service";
 import { dashboardService } from "@/services/dashboard.service";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useTablesStore } from "@/store/tables.store";
+import { useSalesStore, applyLiveKpis } from "@/store/sales.store";
 import { useAsync } from "@/hooks/use-async";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -154,6 +155,7 @@ export function WaiterDashboard() {
 // ===========================================================================
 export function CashierDashboard() {
   const { data, loading } = useAsync(() => dashboardService.getSummary());
+  const records = useSalesStore((s) => s.records);
   const tables = useTablesStore((s) => s.tables);
   const toCollect = tables.filter((t) => t.status === "billing");
 
@@ -164,7 +166,7 @@ export function CashierDashboard() {
     { label: "Salón", description: "Ver mesas", icon: "Armchair", href: "/salon", color: "emerald" },
   ];
 
-  const kpis = (data?.kpis ?? []).filter((k) => ["sales", "orders", "avg"].includes(k.id));
+  const kpis = applyLiveKpis(data?.kpis ?? [], records).filter((k) => ["sales", "orders", "avg"].includes(k.id));
 
   return (
     <div className="space-y-6">

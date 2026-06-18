@@ -14,23 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { orderSelectors } from "@/store/order.store";
+import { distribute } from "@/lib/split";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const PERSON_COLORS = [
   "bg-violet-500", "bg-emerald-500", "bg-sky-500", "bg-amber-500",
   "bg-rose-500", "bg-fuchsia-500", "bg-cyan-500", "bg-orange-500",
 ];
-
-/** Reparte `total` en `weights.length` montos enteros que suman exactamente `total`. */
-function distribute(total: number, weights: number[]): number[] {
-  const sum = weights.reduce((a, b) => a + b, 0) || 1;
-  const raw = weights.map((w) => (total * w) / sum);
-  const floored = raw.map(Math.floor);
-  let rem = total - floored.reduce((a, b) => a + b, 0);
-  const order = raw.map((r, i) => ({ i, f: r - Math.floor(r) })).sort((a, b) => b.f - a.f);
-  for (let k = 0; rem > 0 && order.length; k++, rem--) floored[order[k % order.length].i]++;
-  return floored;
-}
 
 export function SplitBillDialog({
   open,

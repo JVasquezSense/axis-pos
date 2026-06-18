@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Sparkles, Store, Globe } from "lucide-react";
 import { ROLE_LIST } from "@/lib/roles";
 import { useAppStore } from "@/store/app.store";
+import { useAuthStore } from "@/store/auth.store";
 import { Icon } from "@/components/shared/icon";
 import { cn } from "@/lib/utils";
 
@@ -26,9 +27,11 @@ const ROLE_STYLE: Record<string, string> = {
 export default function LandingPage() {
   const router = useRouter();
   const setRole = useAppStore((s) => s.setRole);
+  const login = useAuthStore((s) => s.login);
 
   const enter = (roleId: string, route: string) => {
     setRole(roleId as never);
+    login();
     router.push(route);
   };
 
@@ -104,6 +107,7 @@ export default function LandingPage() {
         >
           <Link
             href="/dashboard"
+            onClick={() => login()}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:shadow-lg"
           >
             <Store className="h-4 w-4" /> Ir al panel completo

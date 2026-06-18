@@ -77,7 +77,7 @@ export function PaymentDialog({
             </div>
 
             {/* Recibo */}
-            <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-sm">
+            <div className="print-area rounded-xl border border-dashed border-border bg-muted/30 p-4 text-sm">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">Axis POS · Demo Burger</span>
                 <span className="text-xs text-muted-foreground">{code}</span>
@@ -100,7 +100,7 @@ export function PaymentDialog({
               </p>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="print-hidden mt-4 grid grid-cols-2 gap-2">
               <Button variant="outline" size="sm" onClick={() => window.print()}>
                 <Printer className="h-4 w-4" /> Imprimir
               </Button>
@@ -109,7 +109,7 @@ export function PaymentDialog({
               </Button>
             </div>
             <Button
-              className="mt-2"
+              className="print-hidden mt-2"
               onClick={() => {
                 onOpenChange(false);
                 onComplete();

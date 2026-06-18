@@ -10,8 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { SalesByHourChart } from "@/components/dashboard/charts";
-import { DonutChart } from "@/components/reports/charts";
+import { SalesByHourChart } from "@/components/dashboard/charts-lazy";
+import { DonutChart } from "@/components/reports/charts-lazy";
 import { TENANT_STATUS, PLAN_LABEL } from "@/lib/status";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 

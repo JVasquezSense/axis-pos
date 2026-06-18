@@ -9,26 +9,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { RevenueLineChart, ProfitBarChart, DonutChart } from "@/components/reports/charts";
+import { RevenueLineChart, ProfitBarChart, DonutChart } from "@/components/reports/charts-lazy";
 
 export default function ReportsPage() {
   const { data, loading } = useAsync(() => reportsService.getExecutive());
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-area">
       <PageHeader
         title="Reportes ejecutivos"
         description="Análisis de rentabilidad · Junio 2026"
         icon={<BarChart3 className="h-5 w-5" />}
         actions={
-          <>
+          <div className="print-hidden flex items-center gap-2">
             <Button variant="outline" size="sm">
               <Calendar className="h-4 w-4" /> Mes actual
             </Button>
             <Button size="sm" onClick={() => window.print()}>
               <Download className="h-4 w-4" /> PDF
             </Button>
-          </>
+          </div>
         }
       />
 
