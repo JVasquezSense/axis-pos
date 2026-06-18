@@ -18,6 +18,7 @@ import { PaymentDialog } from "@/components/checkout/payment-dialog";
 import { PAYMENT_METHODS } from "@/lib/payments";
 import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
+import { useInventoryStore } from "@/store/inventory.store";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const TIP_OPTIONS = [0, 0.05, 0.1, 0.15];
@@ -27,6 +28,7 @@ export default function CheckoutPage() {
   const storeTable = useOrderStore((s) => s.tableNumber);
   const clear = useOrderStore((s) => s.clear);
   const setStoreTable = useOrderStore((s) => s.setTable);
+  const applySale = useInventoryStore((s) => s.applySale);
 
   // Si no hay pedido en curso, usar uno de ejemplo (mesa 7) para la demo
   const fallback = ORDERS[1];
@@ -244,8 +246,13 @@ export default function CheckoutPage() {
         table={table}
         saleType={st.label}
         onComplete={() => {
+          // Cierra el loop: descuenta insumos del inventario y registra el kardex
+          const ref = table ? `mesa ${table}` : "mostrador";
+          const { affected } = applySale(ref, lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })));
           if (usingStore) clear();
-          toast.success("Venta registrada correctamente", { description: st.label });
+          toast.success("Venta registrada correctamente", {
+            description: affected > 0 ? `${st.label} · ${affected} salidas de inventario` : st.label,
+          });
         }}
       />
     </div>

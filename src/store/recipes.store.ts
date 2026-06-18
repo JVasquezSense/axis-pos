@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { Recipe, RecipeIngredient, RecipeVariation } from "@/types";
 import { RECIPES } from "@/mock/recipes";
 
@@ -19,7 +20,9 @@ interface RecipesState {
   duplicate: (id: string) => void;
 }
 
-export const useRecipesStore = create<RecipesState>((set) => ({
+export const useRecipesStore = create<RecipesState>()(
+  persist(
+    (set) => ({
   recipes: structuredClone(RECIPES),
   create: (recipe) => set((s) => ({ recipes: [recipe, ...s.recipes] })),
   update: (recipe) =>
@@ -43,7 +46,10 @@ export const useRecipesStore = create<RecipesState>((set) => ({
       next.splice(idx + 1, 0, copy);
       return { recipes: next };
     }),
-}));
+    }),
+    { name: "axis-recipes", version: 1, partialize: (s) => ({ recipes: s.recipes }) }
+  )
+);
 
 // ---------------------------------------------------------------------------
 // Helpers de creación

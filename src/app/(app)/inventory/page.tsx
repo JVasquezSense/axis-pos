@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { InventoryItem, StockStatus } from "@/types";
 import { inventoryService } from "@/services/inventory.service";
+import { useInventoryStore } from "@/store/inventory.store";
 import { useAsync } from "@/hooks/use-async";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card } from "@/components/ui/card";
@@ -38,20 +39,20 @@ type SortKey = "name" | "category" | "stock" | "cost" | "value" | "status";
 const STATUS_RANK: Record<StockStatus, number> = { critical: 0, low: 1, normal: 2 };
 
 export default function InventoryPage() {
-  const { data, loading } = useAsync(() => inventoryService.getItems());
-  const { data: movements } = useAsync(() => inventoryService.getMovements());
+  // Fuente única de verdad: el store (se alimenta de las ventas en Caja)
+  const items = useInventoryStore((s) => s.items);
+  const movements = useInventoryStore((s) => s.movements);
+  const addItemStore = useInventoryStore((s) => s.addItem);
   const { data: counts } = useAsync(() => inventoryService.getPhysicalCounts());
 
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "status", dir: "asc" });
   const [addOpen, setAddOpen] = useState(false);
 
-  useEffect(() => {
-    if (data) setItems(data);
-  }, [data]);
+  useEffect(() => setMounted(true), []);
 
   const categories = useMemo(() => Array.from(new Set(items.map((i) => i.category))), [items]);
 
@@ -98,7 +99,7 @@ export default function InventoryPage() {
   };
 
   const addItem = (item: InventoryItem) => {
-    setItems((prev) => [item, ...prev]);
+    addItemStore(item);
     toast.success("Insumo agregado", { description: item.name });
   };
 
@@ -164,7 +165,7 @@ export default function InventoryPage() {
               </Button>
             </div>
 
-            {loading && items.length === 0 ? (
+            {!mounted ? (
               <div className="space-y-2 p-4">
                 {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>
@@ -185,7 +186,7 @@ export default function InventoryPage() {
                 </TableBody>
               </Table>
             )}
-            {!loading && filtered.length === 0 && (
+            {mounted && filtered.length === 0 && (
               <p className="py-12 text-center text-sm text-muted-foreground">Sin resultados para los filtros aplicados.</p>
             )}
           </Card>

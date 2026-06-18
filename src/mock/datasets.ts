@@ -203,7 +203,7 @@ const line = (pid: string, qty: number) => {
 
 export const ORDERS: Order[] = ([
   { id: "o1", code: "#1051", tableNumber: 8, channel: "dine_in", status: "pending", waiter: "Valentina G.", lines: [line("p5", 2), line("p14", 2), line("p1", 1)], createdAt: minsAgo(3), subtotal: 0, tax: 0, total: 0 },
-  { id: "o2", code: "#1048", tableNumber: 7, channel: "dine_in", status: "preparing", waiter: "Andrés M.", lines: [line("p10", 1), line("p11", 1), line("p16", 2)], createdAt: minsAgo(14), subtotal: 0, tax: 0, total: 0 },
+  { id: "o2", code: "#1048", tableNumber: 7, channel: "dine_in", status: "preparing", waiter: "Andrés M.", lines: [line("p5", 2), line("p6", 1), line("p14", 2)], createdAt: minsAgo(14), subtotal: 0, tax: 0, total: 0 },
   { id: "o3", code: "#1049", tableNumber: 2, channel: "web", status: "preparing", customer: "Daniela Vargas", lines: [line("p6", 1), line("p8", 1)], createdAt: minsAgo(9), subtotal: 0, tax: 0, total: 0 },
   { id: "o4", code: "#1045", tableNumber: 10, channel: "dine_in", status: "ready", waiter: "Valentina G.", lines: [line("p13", 1), line("p17", 1)], createdAt: minsAgo(18), subtotal: 0, tax: 0, total: 0 },
   { id: "o5", code: "#1046", channel: "delivery", status: "ready", customer: "Carlos Mejía", lines: [line("p19", 2), line("p20", 1)], createdAt: minsAgo(21), subtotal: 0, tax: 0, total: 0 },

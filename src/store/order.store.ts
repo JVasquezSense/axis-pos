@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { OrderLine, Product, ModifierOption } from "@/types";
 
 export const TAX_RATE = 0.08;
@@ -22,7 +23,9 @@ interface OrderState {
 const lineTotal = (l: OrderLine) =>
   (l.unitPrice + l.modifiers.reduce((s, m) => s + m.price, 0)) * l.quantity;
 
-export const useOrderStore = create<OrderState>((set) => ({
+export const useOrderStore = create<OrderState>()(
+  persist(
+    (set) => ({
   tableNumber: null,
   lines: [],
   tip: 0,
@@ -71,7 +74,13 @@ export const useOrderStore = create<OrderState>((set) => ({
   setTip: (v) => set({ tip: v }),
   setDiscount: (v) => set({ discount: v }),
   clear: () => set({ lines: [], tip: 0, discount: 0, tableNumber: null }),
-}));
+    }),
+    {
+      name: "axis-order",
+      partialize: (s) => ({ lines: s.lines, tableNumber: s.tableNumber, tip: s.tip, discount: s.discount }),
+    }
+  )
+);
 
 // Selectores derivados
 export const orderSelectors = {

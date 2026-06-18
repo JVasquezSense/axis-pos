@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { Product, PaymentMethod } from "@/types";
 
 export interface WebCartLine {
@@ -45,7 +46,9 @@ interface WebState {
 
 let seq = 1060;
 
-export const useWebStore = create<WebState>((set, get) => ({
+export const useWebStore = create<WebState>()(
+  persist(
+    (set, get) => ({
   cart: [],
   liveOrders: [],
   add: (product) =>
@@ -112,7 +115,18 @@ export const useWebStore = create<WebState>((set, get) => ({
     set((s) => ({
       liveOrders: s.liveOrders.map((o) => (o.id === id ? { ...o, status: "rejected" } : o)),
     })),
-}));
+    }),
+    {
+      name: "axis-web",
+      version: 1,
+      // No persistimos las imágenes de comprobante (data URLs) para no saturar localStorage
+      partialize: (s) => ({
+        cart: s.cart,
+        liveOrders: s.liveOrders.map((o) => ({ ...o, receipt: undefined })),
+      }),
+    }
+  )
+);
 
 export const WEB_ORDER_STATUS: Record<
   WebOrderStatus,

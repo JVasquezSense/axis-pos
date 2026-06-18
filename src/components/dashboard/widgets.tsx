@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { salonService } from "@/services/salon.service";
 import { kitchenService } from "@/services/kitchen.service";
-import { inventoryService } from "@/services/inventory.service";
+import { useInventoryStore } from "@/store/inventory.store";
 import { useAsync } from "@/hooks/use-async";
 import { TABLE_STATUS, STOCK_STATUS } from "@/lib/status";
 import { formatCurrency, formatNumber, formatElapsed, minutesAgo, cn } from "@/lib/utils";
@@ -172,16 +172,16 @@ export function LiveWidgets({ data }: { data: DashboardData }) {
 function WidgetDetailDialog({ kind, onClose }: { kind: WidgetKind | null; onClose: () => void }) {
   const { data: tables, loading: lt } = useAsync(() => salonService.getTables());
   const { data: tickets, loading: lk } = useAsync(() => kitchenService.getTickets());
-  const { data: inventory, loading: li } = useAsync(() => inventoryService.getItems());
+  const inventory = useInventoryStore((s) => s.items);
 
   const occupied = (tables ?? []).filter((t) => t.status === "occupied" || t.status === "billing");
   const active = (tickets ?? []).filter((t) => t.status !== "ready");
-  const lowStock = (inventory ?? []).filter((i) => i.status !== "normal");
+  const lowStock = inventory.filter((i) => i.status !== "normal");
 
   const config = {
     tables: { title: "Mesas ocupadas", desc: "Detalle de mesas con servicio en curso", loading: lt },
     kitchen: { title: "Pedidos en cocina", desc: "Órdenes en preparación", loading: lk },
-    inventory: { title: "Inventario crítico", desc: "Insumos por reponer", loading: li },
+    inventory: { title: "Inventario crítico", desc: "Insumos por reponer", loading: false },
   };
   const c = kind ? config[kind] : null;
 
