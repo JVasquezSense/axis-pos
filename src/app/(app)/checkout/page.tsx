@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CreditCard, Hash, ShoppingBag } from "lucide-react";
+import { CreditCard, Hash, ShoppingBag, SplitSquareHorizontal } from "lucide-react";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
 import { ORDERS } from "@/mock/datasets";
 import { TABLES } from "@/mock/tables";
@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaymentDialog } from "@/components/checkout/payment-dialog";
+import { SplitBillDialog } from "@/components/checkout/split-bill-dialog";
 import { PAYMENT_METHODS } from "@/lib/payments";
 import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
@@ -42,6 +43,7 @@ export default function CheckoutPage() {
   const [discount, setDiscount] = useState(0);
   const [method, setMethod] = useState<PaymentMethod>("card");
   const [payOpen, setPayOpen] = useState(false);
+  const [splitOpen, setSplitOpen] = useState(false);
 
   const st = SALE_TYPE_MAP[saleType];
 
@@ -202,6 +204,9 @@ export default function CheckoutPage() {
                 <span className="text-base font-semibold">Total a pagar</span>
                 <span className="text-2xl font-bold text-primary">{formatCurrency(total)}</span>
               </div>
+              <Button variant="outline" className="mt-3 w-full" onClick={() => setSplitOpen(true)} disabled={total <= 0}>
+                <SplitSquareHorizontal className="h-4 w-4" /> Dividir cuenta
+              </Button>
             </CardContent>
           </Card>
 
@@ -237,6 +242,8 @@ export default function CheckoutPage() {
           </Card>
         </div>
       </div>
+
+      <SplitBillDialog open={splitOpen} onOpenChange={setSplitOpen} lines={lines} subtotal={subtotal} total={total} />
 
       <PaymentDialog
         open={payOpen}
