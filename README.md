@@ -103,14 +103,17 @@ vercel --prod   # producción
 
 > Node ≥ 18.18 (definido en `engines`). La demo es 100% frontend, sin backend ni autenticación.
 
-## 🔌 Migración a backend Django
+## 🔌 Backend (repositorio separado)
 
-1. Copiar `.env.example` → `.env.local` y configurar `NEXT_PUBLIC_API_URL`.
-2. Implementar `request()` real en `src/services/http.ts`.
-3. Reemplazar cada `mockRequest(...)` por `request<T>("/endpoint/")` en los servicios.
-4. Conectar `kitchenService.subscribe()` a Django Channels (WebSocket).
+El backend (Django + DRF + Channels, listo para Railway) vive en su propio repo:
+**https://github.com/JVasquezSense/axis-pos-backend**
 
-Los tipos de `src/types` ya están pensados para mapear 1:1 con los serializers DRF.
+Para conectar el frontend al backend real:
+1. En `.env.local` define `NEXT_PUBLIC_USE_API=true` y `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL`.
+2. El `request()` real ya está implementado en `src/services/http.ts`.
+3. En cada servicio, cambia `mockRequest(...)` por `request<T>("/endpoint/")`.
+
+Los tipos de `src/types` mapean 1:1 con los serializers DRF.
 
 ---
 
