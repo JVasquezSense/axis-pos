@@ -37,12 +37,16 @@ export function Header() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const critical = useInventoryStore((s) => s.items.filter((i) => i.status === "critical"));
+  // Seleccionamos arrays crudos (referencia estable) y filtramos en el cuerpo,
+  // para no devolver un array nuevo en cada render (evita bucle de renders).
+  const items = useInventoryStore((s) => s.items);
   const tickets = useKitchenStore((s) => s.tickets);
-  const webReview = useWebStore((s) => s.liveOrders.filter((o) => o.status === "review"));
+  const liveOrders = useWebStore((s) => s.liveOrders);
   const userName = useAuthStore((s) => s.name);
   const logout = useAuthStore((s) => s.logout);
 
+  const critical = items.filter((i) => i.status === "critical");
+  const webReview = liveOrders.filter((o) => o.status === "review");
   const lateTickets = tickets.filter((t) => t.status !== "ready" && minutesAgo(new Date(t.createdAt)) >= 15);
 
   const allNotifs: Notif[] = [
