@@ -8,11 +8,12 @@ import { NAV_ITEMS, NAV_GROUPS } from "@/lib/nav";
 import { ROLE_NAV } from "@/lib/roles";
 import { useAppStore } from "@/store/app.store";
 import { Icon } from "@/components/shared/icon";
+import { LogoMark } from "@/components/shared/logo";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { sidebarCollapsed, toggleSidebar, role, restaurant } = useAppStore();
+  const { sidebarCollapsed, toggleSidebar, role } = useAppStore();
   const allowed = ROLE_NAV[role];
   const items = NAV_ITEMS.filter((i) => allowed.includes(i.key));
 
@@ -25,8 +26,8 @@ export function Sidebar() {
     >
       {/* Brand */}
       <div className="flex h-16 items-center gap-3 px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-accent text-white shadow-lg">
-          <span className="text-lg font-black">A</span>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 shadow-lg ring-1 ring-white/10">
+          <LogoMark className="h-6 w-6" />
         </div>
         <AnimatePresence>
           {!sidebarCollapsed && (
@@ -36,8 +37,8 @@ export function Sidebar() {
               exit={{ opacity: 0, width: 0 }}
               className="overflow-hidden whitespace-nowrap"
             >
-              <p className="text-sm font-bold leading-tight text-white">Axis POS</p>
-              <p className="text-[11px] leading-tight text-sidebar-foreground/60">{restaurant.name}</p>
+              <p className="text-sm font-black leading-tight tracking-[0.15em] text-white">AXIS</p>
+              <p className="text-[10px] font-semibold leading-tight tracking-[0.3em] text-gold">POS SYSTEM</p>
             </motion.div>
           )}
         </AnimatePresence>

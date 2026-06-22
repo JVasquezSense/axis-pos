@@ -8,6 +8,7 @@ import { NAV_ITEMS, NAV_GROUPS } from "@/lib/nav";
 import { ROLE_NAV } from "@/lib/roles";
 import { useAppStore } from "@/store/app.store";
 import { Icon } from "@/components/shared/icon";
+import { LogoMark } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -15,7 +16,7 @@ import { cn } from "@/lib/utils";
 export function MobileNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const { role, restaurant } = useAppStore();
+  const role = useAppStore((s) => s.role);
   const items = NAV_ITEMS.filter((i) => ROLE_NAV[role].includes(i.key));
 
   return (
@@ -27,12 +28,12 @@ export function MobileNav() {
       </SheetTrigger>
       <SheetContent side="left" className="w-72 bg-sidebar p-0 text-sidebar-foreground">
         <div className="flex h-16 items-center gap-3 px-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-accent text-white">
-            <span className="text-lg font-black">A</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10">
+            <LogoMark className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white">Axis POS</p>
-            <p className="text-[11px] text-sidebar-foreground/60">{restaurant.name}</p>
+            <p className="text-sm font-black tracking-[0.15em] text-white">AXIS</p>
+            <p className="text-[10px] font-semibold tracking-[0.3em] text-gold">POS SYSTEM</p>
           </div>
         </div>
         <nav className="scrollbar-thin space-y-5 overflow-y-auto px-3 py-4">
