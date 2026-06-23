@@ -38,23 +38,36 @@ export function IngredientEditor({
       )}
 
       {value.map((ing) => (
-        <div key={ing.id} className="grid grid-cols-12 items-center gap-2 rounded-xl border border-border p-2">
-          <div className="col-span-12 sm:col-span-5">
+        <div key={ing.id} className="space-y-2 rounded-xl border border-border p-3">
+          {/* Fila 1: insumo + eliminar */}
+          <div className="flex items-center gap-2">
             <Select value={ing.inventoryId} onValueChange={(v) => pickItem(ing.id, v)}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Insumo del inventario" />
+              <SelectTrigger className="h-9 flex-1">
+                <SelectValue placeholder="Selecciona el insumo del inventario" />
               </SelectTrigger>
               <SelectContent>
                 {INVENTORY.map((i) => (
                   <SelectItem key={i.id} value={i.id}>
-                    {i.name}
+                    {i.name} <span className="text-muted-foreground">· {i.unit}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <button
+              onClick={() => onChange(value.filter((i) => i.id !== ing.id))}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              title="Quitar insumo"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
-          <div className="col-span-4 sm:col-span-2">
-            <div className="flex items-center gap-1">
+
+          {/* Fila 2: cantidad + merma + costo (anchos cómodos) */}
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                Cantidad{ing.unit ? ` (${ing.unit})` : ""}
+              </label>
               <Input
                 type="number"
                 min={0}
@@ -63,11 +76,11 @@ export function IngredientEditor({
                 onChange={(e) => update(ing.id, { quantity: Number(e.target.value) })}
                 className="h-9"
               />
-              <span className="w-8 shrink-0 text-xs text-muted-foreground">{ing.unit || "—"}</span>
             </div>
-          </div>
-          <div className="col-span-4 sm:col-span-2">
-            <div className="flex items-center gap-1" title="Merma / desperdicio">
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground" title="Desperdicio">
+                Merma (%)
+              </label>
               <Input
                 type="number"
                 min={0}
@@ -76,19 +89,13 @@ export function IngredientEditor({
                 onChange={(e) => update(ing.id, { waste: Math.min(Number(e.target.value), 90) / 100 })}
                 className="h-9"
               />
-              <span className="text-xs text-muted-foreground">%</span>
             </div>
-          </div>
-          <div className="col-span-3 text-right text-sm font-semibold sm:col-span-2">
-            {formatCurrency(ingredientCost(ing))}
-          </div>
-          <div className="col-span-1 flex justify-end">
-            <button
-              onClick={() => onChange(value.filter((i) => i.id !== ing.id))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Costo</label>
+              <div className="flex h-9 items-center justify-end rounded-lg border border-border bg-muted/40 px-3 text-sm font-semibold">
+                {formatCurrency(ingredientCost(ing))}
+              </div>
+            </div>
           </div>
         </div>
       ))}

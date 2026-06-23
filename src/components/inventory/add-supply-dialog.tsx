@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const CATEGORIES = ["Carnes", "Lácteos", "Verduras", "Frutas", "Panadería", "Abarrotes", "Bebidas", "Pescados", "Congelados"];
-const UNITS = ["kg", "g", "L", "ml", "und", "caja", "bolsa"];
+const UNITS = ["Kg", "Gr", "Lt", "Ml", "Und"];
 
 function statusFor(stock: number, min: number): StockStatus {
   if (stock <= min * 0.4) return "critical";
@@ -35,7 +35,7 @@ export function AddSupplyDialog({
   const [name, setName] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [stock, setStock] = useState(0);
-  const [unit, setUnit] = useState("kg");
+  const [unit, setUnit] = useState("Kg");
   const [minStock, setMinStock] = useState(0);
   const [cost, setCost] = useState(0);
   const [supplier, setSupplier] = useState("");

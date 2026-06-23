@@ -70,7 +70,7 @@ export function RecipeEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl gap-0 overflow-hidden p-0">
+      <DialogContent className="max-w-4xl gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-border p-5">
           <div className="flex items-center gap-3">
             <input
@@ -220,6 +220,9 @@ export function RecipeEditor({
                 <p className="text-sm text-muted-foreground">
                   Selecciona qué insumos del inventario consume la receta. La <strong>merma %</strong> ajusta el costo por desperdicio.
                 </p>
+                <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  💡 ¿No encuentras un insumo? Créalo en <strong className="text-foreground">Inventario → + Insumo</strong> y luego selecciónalo aquí.
+                </p>
                 <IngredientEditor value={draft.ingredients} onChange={(ingredients) => set({ ingredients })} />
               </TabsContent>
 
@@ -228,33 +231,45 @@ export function RecipeEditor({
                 <p className="text-sm text-muted-foreground">
                   Cada variación ajusta el precio y puede agregar insumos extra (ej. doble carne, tamaño jarra).
                 </p>
-                {draft.variations.map((v) => (
+                {draft.variations.map((v, vi) => (
                   <div key={v.id} className="rounded-xl border border-border p-3">
-                    <div className="flex items-center gap-2">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={v.name}
-                        onChange={(e) => set({ variations: draft.variations.map((x) => (x.id === v.id ? { ...x, name: e.target.value } : x)) })}
-                        placeholder="Nombre de la variación"
-                        className="h-9 flex-1"
-                      />
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground">$</span>
-                        <Input
-                          type="number"
-                          value={v.priceDelta}
-                          onChange={(e) => set({ variations: draft.variations.map((x) => (x.id === v.id ? { ...x, priceDelta: Number(e.target.value) } : x)) })}
-                          className="h-9 w-24"
-                        />
-                      </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="mt-2 flex items-center gap-1.5 text-sm font-semibold">
+                        <GripVertical className="h-4 w-4 text-muted-foreground" /> Opción {vi + 1}
+                      </span>
                       <button
                         onClick={() => set({ variations: draft.variations.filter((x) => x.id !== v.id) })}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        title="Quitar variación"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="mt-2 pl-6">
+                    <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px]">
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Nombre de la opción</label>
+                        <Input
+                          value={v.name}
+                          onChange={(e) => set({ variations: draft.variations.map((x) => (x.id === v.id ? { ...x, name: e.target.value } : x)) })}
+                          placeholder="Ej: Doble carne, Tamaño jarra…"
+                          className="h-9"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Precio adicional</label>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm text-muted-foreground">$</span>
+                          <Input
+                            type="number"
+                            value={v.priceDelta}
+                            onChange={(e) => set({ variations: draft.variations.map((x) => (x.id === v.id ? { ...x, priceDelta: Number(e.target.value) } : x)) })}
+                            className="h-9"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">Insumos extra de esta opción</p>
                       <IngredientEditor
                         compact
                         value={v.extraIngredients}
