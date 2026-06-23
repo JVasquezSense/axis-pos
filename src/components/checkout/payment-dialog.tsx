@@ -20,6 +20,7 @@ export function PaymentDialog({
   breakdown,
   table,
   saleType,
+  waiter,
   onComplete,
 }: {
   open: boolean;
@@ -28,6 +29,7 @@ export function PaymentDialog({
   breakdown: PaymentBreakdown;
   table?: number | null;
   saleType?: string;
+  waiter?: string;
   onComplete: () => void;
 }) {
   const [phase, setPhase] = useState<Phase>("processing");
@@ -89,7 +91,9 @@ export function PaymentDialog({
               <Row label="Subtotal" value={formatCurrency(breakdown.subtotal)} />
               {breakdown.discount > 0 && <Row label="Descuento" value={`- ${formatCurrency(breakdown.discount)}`} />}
               <Row label={`IVA (${Math.round(breakdown.taxRate * 100)}%)`} value={formatCurrency(breakdown.tax)} />
-              {breakdown.tip > 0 && <Row label="Propina" value={formatCurrency(breakdown.tip)} />}
+              {breakdown.tip > 0 && (
+                <Row label={`Propina${waiter && waiter !== "Sin asignar" ? ` → ${waiter}` : ""}`} value={formatCurrency(breakdown.tip)} />
+              )}
               <Separator className="my-2" />
               <div className="flex items-center justify-between text-base font-bold">
                 <span>Total</span>

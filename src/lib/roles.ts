@@ -51,7 +51,6 @@ export const ROLE_NAV: Record<Role, string[]> = {
     "menu",
     "inventory",
     "suppliers",
-    "recipes",
     "crm",
     "reports",
     "weborders",
@@ -60,6 +59,6 @@ export const ROLE_NAV: Record<Role, string[]> = {
   ],
   waiter: ["dashboard", "salon", "orders", "kitchen"],
   cashier: ["dashboard", "checkout", "salon", "weborders", "crm"],
-  kitchen: ["dashboard", "kitchen", "recipes", "inventory"],
-  warehouse: ["dashboard", "inventory", "suppliers", "recipes"],
+  kitchen: ["dashboard", "kitchen", "menu", "inventory"],
+  warehouse: ["dashboard", "inventory", "suppliers", "menu"],
 };

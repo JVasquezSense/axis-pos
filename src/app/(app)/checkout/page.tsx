@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CreditCard, Hash, ShoppingBag, SplitSquareHorizontal } from "lucide-react";
+import { CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User } from "lucide-react";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
 import { ORDERS } from "@/mock/datasets";
 import { TABLES } from "@/mock/tables";
@@ -46,6 +46,7 @@ export default function CheckoutPage() {
   const [tipRate, setTipRate] = useState(0.1);
   const [discount, setDiscount] = useState(0);
   const [method, setMethod] = useState<PaymentMethod>("card");
+  const [waiter, setWaiter] = useState("");
   const [payOpen, setPayOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
 
@@ -78,7 +79,7 @@ export default function CheckoutPage() {
 
       {/* Datos de la venta: mesa + tipo */}
       <Card>
-        <CardContent className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+        <CardContent className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-3">
           <div>
             <label className="mb-1.5 block text-sm font-medium">Mesa / origen</label>
             <Select value={table === null ? "none" : String(table)} onValueChange={changeTable}>
@@ -96,6 +97,18 @@ export default function CheckoutPage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Mesero</label>
+            <div className="relative">
+              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Nombre del mesero"
+                value={waiter}
+                onChange={(e) => setWaiter(e.target.value)}
+                className="pl-9"
+              />
+            </div>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Tipo de venta</label>
@@ -256,11 +269,12 @@ export default function CheckoutPage() {
         breakdown={breakdown}
         table={table}
         saleType={st.label}
+        waiter={waiter.trim() || "Sin asignar"}
         onComplete={() => {
           // Cierra el loop: descuenta insumos del inventario y registra el kardex
           const ref = table ? `mesa ${table}` : "mostrador";
           const { affected } = applySale(ref, lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })));
-          recordSale({ total, items: orderSelectors.count(lines), method, saleType: st.label, table });
+          recordSale({ total, items: orderSelectors.count(lines), method, saleType: st.label, table, tip, waiter: waiter.trim() || "Sin asignar" });
           if (table) freeTable(table); // libera la mesa en el salón
           if (usingStore) clear();
           toast.success("Venta registrada correctamente", {

@@ -12,6 +12,8 @@ export interface SaleRecord {
   method: PaymentMethod;
   saleType: string;
   table: number | null;
+  tip: number;
+  waiter: string;
   ts: number;
 }
 
