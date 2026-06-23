@@ -63,6 +63,23 @@ export default function CheckoutPage() {
 
   const breakdown: PaymentBreakdown = { subtotal, tax, taxRate: st.noTax ? 0 : TAX_RATE, discount: effectiveDiscount, tip, total };
 
+  const completeSale = () => {
+    const ref = table ? `mesa ${table}` : "mostrador";
+    const { affected, depletedItemIds } = applySale(ref, lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })));
+    if (depletedItemIds.length > 0) {
+      const affected86: string[] = [];
+      recipes.forEach((rc) => {
+        const uses = rc.ingredients.some((ing) => depletedItemIds.includes(ing.inventoryId));
+        if (uses && rc.productId) { setAvailable(rc.productId, false); affected86.push(rc.name); }
+      });
+      if (affected86.length > 0) toast.warning("86 automático", { description: `Agotado: ${affected86.join(", ")}` });
+    }
+    recordSale({ total, items: orderSelectors.count(lines), method, saleType: st.label, table, tip, waiter: waiter.trim() || "Sin asignar" });
+    if (table) freeTable(table);
+    clear();
+    toast.success("Venta registrada", { description: affected > 0 ? `${st.label} · ${affected} salidas de inventario` : st.label });
+  };
+
   const changeTable = (value: string) => {
     const next = value === "none" ? null : Number(value);
     setTableLocal(next);
@@ -261,7 +278,14 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      <SplitBillDialog open={splitOpen} onOpenChange={setSplitOpen} lines={lines} subtotal={subtotal} total={total} />
+      <SplitBillDialog
+        open={splitOpen}
+        onOpenChange={setSplitOpen}
+        lines={lines}
+        subtotal={subtotal}
+        total={total}
+        onComplete={completeSale}
+      />
 
       <PaymentDialog
         open={payOpen}
@@ -271,31 +295,7 @@ export default function CheckoutPage() {
         table={table}
         saleType={st.label}
         waiter={waiter.trim() || "Sin asignar"}
-        onComplete={() => {
-          // Cierra el loop: descuenta insumos del inventario y registra el kardex
-          const ref = table ? `mesa ${table}` : "mostrador";
-          const { affected, depletedItemIds } = applySale(ref, lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })));
-          // 86 automático: marcar agotados los productos cuyos ingredientes llegaron a 0
-          if (depletedItemIds.length > 0) {
-            const affected86: string[] = [];
-            recipes.forEach((rc) => {
-              const uses = rc.ingredients.some((ing) => depletedItemIds.includes(ing.inventoryId));
-              if (uses && rc.productId) {
-                setAvailable(rc.productId, false);
-                affected86.push(rc.name);
-              }
-            });
-            if (affected86.length > 0) {
-              toast.warning("86 automático", { description: `Agotado: ${affected86.join(", ")}` });
-            }
-          }
-          recordSale({ total, items: orderSelectors.count(lines), method, saleType: st.label, table, tip, waiter: waiter.trim() || "Sin asignar" });
-          if (table) freeTable(table);
-          clear();
-          toast.success("Venta registrada correctamente", {
-            description: affected > 0 ? `${st.label} · ${affected} salidas de inventario` : st.label,
-          });
-        }}
+        onComplete={completeSale}
       />
     </div>
   );

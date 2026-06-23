@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ImagePlus, X } from "lucide-react";
 import type { Category, Product } from "@/types";
 import {
   Dialog,
@@ -14,6 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProductImage } from "@/components/shared/product-image";
+
+function isImageUrl(src: string) {
+  return src.startsWith("data:") || src.startsWith("http") || src.startsWith("/") || src.startsWith("blob:");
+}
 
 export function ProductFormDialog({
   product,
@@ -30,6 +36,18 @@ export function ProductFormDialog({
 }) {
   const [draft, setDraft] = useState<Product | null>(product);
   const [tagInput, setTagInput] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (draft) setDraft({ ...draft, image: result });
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (open) setDraft(product ? structuredClone(product) : null);
@@ -62,12 +80,43 @@ export function ProductFormDialog({
         <div className="space-y-4">
           <div className="flex gap-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Icono</label>
-              <input
-                value={draft.image}
-                onChange={(e) => set({ image: e.target.value.slice(0, 2) })}
-                className="h-10 w-14 rounded-lg border border-border bg-muted text-center text-2xl outline-none focus:border-primary"
-              />
+              <label className="mb-1.5 block text-sm font-medium">Foto / Icono</label>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+              <div className="relative h-16 w-16">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="h-16 w-16 overflow-hidden rounded-xl border border-border bg-muted hover:border-primary transition-colors"
+                  title="Subir foto"
+                >
+                  {isImageUrl(draft.image) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={draft.image} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-1">
+                      <span className="text-2xl leading-none">{draft.image || "🍽️"}</span>
+                      <ImagePlus className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  )}
+                </button>
+                {isImageUrl(draft.image) && (
+                  <button
+                    type="button"
+                    onClick={() => set({ image: "🍽️" })}
+                    className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white shadow"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              {!isImageUrl(draft.image) && (
+                <input
+                  value={draft.image}
+                  onChange={(e) => set({ image: e.target.value.slice(0, 2) })}
+                  className="mt-1 h-7 w-16 rounded border border-border bg-muted text-center text-xs outline-none focus:border-primary"
+                  placeholder="emoji"
+                />
+              )}
             </div>
             <div className="flex-1">
               <label className="mb-1.5 block text-sm font-medium">Nombre</label>

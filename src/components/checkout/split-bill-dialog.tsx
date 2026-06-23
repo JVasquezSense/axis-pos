@@ -28,12 +28,14 @@ export function SplitBillDialog({
   lines,
   subtotal,
   total,
+  onComplete,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   lines: OrderLine[];
   subtotal: number;
   total: number;
+  onComplete?: () => void;
 }) {
   const [people, setPeople] = useState(2);
   const [mode, setMode] = useState<"people" | "items">("people");
@@ -182,8 +184,9 @@ export function SplitBillDialog({
           {paid.length === people ? (
             <Button
               onClick={() => {
-                toast.success("Cuenta dividida y cobrada", { description: `${people} pagos · ${formatCurrency(total)}` });
                 onOpenChange(false);
+                onComplete?.();
+                toast.success("Cuenta dividida y cobrada", { description: `${people} pagos · ${formatCurrency(total)}` });
               }}
             >
               <Check className="h-4 w-4" /> Finalizar

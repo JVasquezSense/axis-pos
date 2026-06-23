@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IngredientEditor } from "./ingredient-editor";
-import { useRecipesStore, emptyVariation } from "@/store/recipes.store";
+import { useRecipesStore, emptyVariation, uid } from "@/store/recipes.store";
 import { computeRecipeCost, STATION, ALLERGENS, foodCostTone, TARGET_FOOD_COST } from "@/lib/recipes";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -34,6 +34,7 @@ export function RecipeEditor({
   const { create, update } = useRecipesStore();
   const categories = useMenuStore((s) => s.categories);
   const products = useMenuStore((s) => s.products);
+  const addProduct = useMenuStore((s) => s.addProduct);
   const [draft, setDraft] = useState<Recipe | null>(recipe);
   const [tagInput, setTagInput] = useState("");
   const isNew = recipe ? !useRecipesStore.getState().recipes.some((r) => r.id === recipe.id) : false;
@@ -51,12 +52,31 @@ export function RecipeEditor({
       toast.error("La receta necesita un nombre");
       return;
     }
+    let finalDraft = { ...draft };
+    if (isNew && !finalDraft.productId) {
+      // Auto-crear el producto vinculado a esta receta
+      const newProduct = {
+        id: uid("p"),
+        name: finalDraft.name,
+        description: finalDraft.tags.join(", "),
+        price: finalDraft.price,
+        category: finalDraft.category,
+        image: finalDraft.emoji,
+        tags: finalDraft.tags,
+        available: finalDraft.status === "active",
+        prepMinutes: finalDraft.prepMinutes,
+        popular: false,
+      };
+      addProduct(newProduct);
+      finalDraft = { ...finalDraft, productId: newProduct.id };
+      toast.success("Producto creado automáticamente", { description: finalDraft.name });
+    }
     if (isNew) {
-      create(draft);
-      toast.success("Receta creada", { description: draft.name });
+      create(finalDraft);
+      toast.success("Receta creada", { description: finalDraft.name });
     } else {
-      update(draft);
-      toast.success("Receta actualizada", { description: draft.name });
+      update(finalDraft);
+      toast.success("Receta actualizada", { description: finalDraft.name });
     }
     onOpenChange(false);
   };
