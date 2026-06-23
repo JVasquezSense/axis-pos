@@ -7,6 +7,7 @@ import {
   LineChart,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -61,6 +62,32 @@ export function ProfitBarChart({ data }: { data: TimeSeriesPoint[] }) {
         <YAxis {...axis} width={44} tickFormatter={(v) => formatCompact(v)} />
         <Tooltip content={<Tip />} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} />
         <Bar dataKey="value" name="Utilidad" fill="hsl(var(--success))" radius={[6, 6, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function LocationBarChart({ data }: { data: { name: string; value: number; avg: number }[] }) {
+  const avg = data[0]?.avg ?? 0;
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <BarChart data={data} margin={{ top: 10, right: 8, left: -4, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+        <XAxis dataKey="name" {...axis} />
+        <YAxis {...axis} width={44} tickFormatter={(v) => formatCompact(v)} />
+        <Tooltip content={<Tip />} cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }} />
+        <ReferenceLine
+          y={avg}
+          stroke="hsl(var(--gold))"
+          strokeDasharray="5 4"
+          strokeWidth={2}
+          label={{ value: "Promedio", position: "right", fill: "hsl(var(--gold))", fontSize: 11 }}
+        />
+        <Bar dataKey="value" name="Ventas" radius={[6, 6, 0, 0]}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={d.value >= avg ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );

@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SalesByHourChart, SalesByDayChart, SalesVsLastYearChart } from "@/components/dashboard/charts-lazy";
+import { DonutChart } from "@/components/reports/charts-lazy";
+import { reportsService } from "@/services/reports.service";
 import { TopProducts, AlertsPanel, LiveWidgets } from "@/components/dashboard/widgets";
 import { DashboardSkeleton } from "@/components/dashboard/skeleton";
 import { QuickActions, type QuickAction } from "@/components/dashboard/quick-actions";
@@ -42,6 +44,7 @@ const ADMIN_ACTIONS: QuickAction[] = [
 
 function AdminDashboard() {
   const { data, loading } = useAsync(() => dashboardService.getSummary());
+  const { data: rep } = useAsync(() => reportsService.getExecutive());
   const records = useSalesStore((s) => s.records);
 
   const exportSummary = () => {
@@ -144,6 +147,29 @@ function AdminDashboard() {
               <SalesVsLastYearChart data={data.salesVsLastYear} />
             </CardContent>
           </Card>
+
+          {rep && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Ventas por canal</CardTitle>
+                  <p className="text-sm text-muted-foreground">Salón, domicilio, web y para llevar</p>
+                </CardHeader>
+                <CardContent>
+                  <DonutChart data={rep.channelMix} />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Medios de pago</CardTitle>
+                  <p className="text-sm text-muted-foreground">Distribución de cobros del periodo</p>
+                </CardHeader>
+                <CardContent>
+                  <DonutChart data={rep.paymentMix} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </>
       )}
     </div>

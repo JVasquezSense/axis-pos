@@ -266,6 +266,9 @@ export interface ReportData {
   profitTrend: TimeSeriesPoint[];
   categoryMix: { name: string; value: number; color: string }[];
   channelMix: { name: string; value: number; color: string }[];
+  paymentMix: { name: string; value: number; color: string }[];
+  salesByLocation: { name: string; value: number; avg: number }[];
+  topDishes: { name: string; units: number; revenue: number; avg: number }[];
   hourlyHeat: TimeSeriesPoint[];
 }
 

@@ -1,18 +1,29 @@
 "use client";
 
-import { BarChart3, Download, Calendar } from "lucide-react";
+import { useState } from "react";
+import { BarChart3, Download, Building2 } from "lucide-react";
 import { reportsService } from "@/services/reports.service";
 import { useAsync } from "@/hooks/use-async";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { RevenueLineChart, ProfitBarChart, DonutChart } from "@/components/reports/charts-lazy";
+import { RevenueLineChart, ProfitBarChart, DonutChart, LocationBarChart } from "@/components/reports/charts-lazy";
+import { cn, formatCurrency } from "@/lib/utils";
+
+const DATE_RANGES = [
+  { id: "today", label: "Hoy" },
+  { id: "week", label: "Semana" },
+  { id: "month", label: "Mes" },
+  { id: "year", label: "Año" },
+];
 
 export default function ReportsPage() {
   const { data, loading } = useAsync(() => reportsService.getExecutive());
+  const [range, setRange] = useState("month");
 
   return (
     <div className="space-y-6 print-area">
@@ -22,9 +33,20 @@ export default function ReportsPage() {
         icon={<BarChart3 className="h-5 w-5" />}
         actions={
           <div className="print-hidden flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <Calendar className="h-4 w-4" /> Mes actual
-            </Button>
+            <div className="inline-flex rounded-lg border border-border p-0.5">
+              {DATE_RANGES.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setRange(r.id)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    range === r.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  )}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
             <Button size="sm" onClick={() => window.print()}>
               <Download className="h-4 w-4" /> PDF
             </Button>
@@ -90,6 +112,57 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
           </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Ventas por sucursal</CardTitle>
+                  <p className="text-sm text-muted-foreground">Comparadas con el promedio de sedes</p>
+                </div>
+                <Badge variant="secondary">{DATE_RANGES.find((r) => r.id === range)?.label}</Badge>
+              </CardHeader>
+              <CardContent>
+                <LocationBarChart data={data.salesByLocation} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Medios de pago</CardTitle>
+                <p className="text-sm text-muted-foreground">Participación por método</p>
+              </CardHeader>
+              <CardContent>
+                <DonutChart data={data.paymentMix} />
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <div>
+                <CardTitle>Platos vs. promedio</CardTitle>
+                <p className="text-sm text-muted-foreground">Ingreso de cada plato comparado con el promedio del top</p>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {data.topDishes.map((d) => {
+                const diff = Math.round(((d.revenue - d.avg) / d.avg) * 100);
+                const above = d.revenue >= d.avg;
+                return (
+                  <div key={d.name} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{d.name}</p>
+                      <p className="text-xs text-muted-foreground">{d.units} unidades</p>
+                    </div>
+                    <span className="text-sm font-semibold">{formatCurrency(d.revenue)}</span>
+                    <Badge variant={above ? "success" : "secondary"} className="w-20 justify-center">
+                      {above ? "+" : ""}{diff}% vs prom.
+                    </Badge>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

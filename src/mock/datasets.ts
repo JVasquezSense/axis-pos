@@ -149,6 +149,26 @@ export const REPORTS: ReportData = {
     { name: "Web", value: 12, color: "hsl(38 92% 50%)" },
     { name: "Para llevar", value: 6, color: "hsl(199 89% 48%)" },
   ],
+  paymentMix: [
+    { name: "Efectivo", value: 38, color: "hsl(142 64% 40%)" },
+    { name: "Tarjeta", value: 32, color: "hsl(199 89% 48%)" },
+    { name: "Nequi", value: 18, color: "hsl(291 64% 52%)" },
+    { name: "Daviplata", value: 8, color: "hsl(0 70% 50%)" },
+    { name: "PSE", value: 4, color: "hsl(243 60% 55%)" },
+  ],
+  salesByLocation: [
+    { name: "Sede Centro", value: 52800000, avg: 44000000 },
+    { name: "Sede Norte", value: 38600000, avg: 44000000 },
+    { name: "Sede Sur", value: 24300000, avg: 44000000 },
+    { name: "Sede Llanograde", value: 12750000, avg: 44000000 },
+  ],
+  topDishes: [
+    { name: "Axis Classic", units: 87, revenue: 2427300, avg: 1755000 },
+    { name: "Bife de Chorizo", units: 41, revenue: 2414900, avg: 1755000 },
+    { name: "Limonada de Coco", units: 134, revenue: 1728600, avg: 1755000 },
+    { name: "Doble Bacon", units: 52, revenue: 1918800, avg: 1755000 },
+    { name: "Brownie con Helado", units: 76, revenue: 1284400, avg: 1755000 },
+  ],
   hourlyHeat: [
     { label: "08", value: 12 }, { label: "10", value: 28 }, { label: "12", value: 72 },
     { label: "14", value: 64 }, { label: "16", value: 32 }, { label: "18", value: 48 },
