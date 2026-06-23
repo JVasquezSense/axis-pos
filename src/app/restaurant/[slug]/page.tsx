@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useWebStore } from "@/store/web.store";
 import { useMenuStore } from "@/store/menu.store";
+import { MyOrdersSheet } from "@/components/website/my-orders-sheet";
 import { cn, formatCurrency } from "@/lib/utils";
 
 export default function RestaurantSitePage() {
@@ -101,6 +102,7 @@ export default function RestaurantSitePage() {
             <ArrowLeft className="h-4 w-4" /> POS
           </Link>
           <ThemeToggle />
+          <MyOrdersSheet />
           <Sheet open={cartOpen} onOpenChange={setCartOpen}>
             <SheetTrigger asChild>
               <Button className="rounded-full px-4">
