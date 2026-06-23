@@ -43,22 +43,12 @@ export const ROLE_LIST = Object.values(ROLES);
 /** Rutas visibles por rol en la navegación */
 export const ROLE_NAV: Record<Role, string[]> = {
   admin: [
-    "dashboard",
-    "salon",
-    "orders",
-    "kitchen",
-    "checkout",
-    "menu",
-    "inventory",
-    "suppliers",
-    "crm",
-    "reports",
-    "weborders",
-    "website",
-    "admin",
+    "dashboard", "salon", "reservations", "orders", "kitchen",
+    "checkout", "shift", "menu", "inventory", "suppliers",
+    "crm", "reports", "weborders", "website", "admin",
   ],
-  waiter: ["dashboard", "salon", "orders", "kitchen"],
-  cashier: ["dashboard", "checkout", "salon", "weborders", "crm"],
+  waiter: ["dashboard", "salon", "reservations", "orders", "kitchen"],
+  cashier: ["dashboard", "checkout", "shift", "salon", "weborders", "crm"],
   kitchen: ["dashboard", "kitchen", "menu", "inventory"],
   warehouse: ["dashboard", "inventory", "suppliers", "menu"],
 };

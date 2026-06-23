@@ -20,8 +20,10 @@ import { PAYMENT_METHODS } from "@/lib/payments";
 import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { useInventoryStore } from "@/store/inventory.store";
+import { useMenuStore } from "@/store/menu.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useSalesStore } from "@/store/sales.store";
+import { useRecipesStore } from "@/store/recipes.store";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const TIP_OPTIONS = [0, 0.05, 0.1, 0.15];
@@ -34,6 +36,8 @@ export default function CheckoutPage() {
   const applySale = useInventoryStore((s) => s.applySale);
   const freeTable = useTablesStore((s) => s.free);
   const recordSale = useSalesStore((s) => s.record);
+  const setAvailable = useMenuStore((s) => s.setAvailable);
+  const recipes = useRecipesStore((s) => s.recipes);
 
   // Si no hay pedido en curso, usar uno de ejemplo (mesa 7) para la demo
   const fallback = ORDERS[1];
@@ -273,9 +277,23 @@ export default function CheckoutPage() {
         onComplete={() => {
           // Cierra el loop: descuenta insumos del inventario y registra el kardex
           const ref = table ? `mesa ${table}` : "mostrador";
-          const { affected } = applySale(ref, lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })));
+          const { affected, depletedItemIds } = applySale(ref, lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })));
+          // 86 automático: marcar agotados los productos cuyos ingredientes llegaron a 0
+          if (depletedItemIds.length > 0) {
+            const affected86: string[] = [];
+            recipes.forEach((rc) => {
+              const uses = rc.ingredients.some((ing) => depletedItemIds.includes(ing.inventoryId));
+              if (uses && rc.productId) {
+                setAvailable(rc.productId, false);
+                affected86.push(rc.name);
+              }
+            });
+            if (affected86.length > 0) {
+              toast.warning("86 automático", { description: `Agotado: ${affected86.join(", ")}` });
+            }
+          }
           recordSale({ total, items: orderSelectors.count(lines), method, saleType: st.label, table, tip, waiter: waiter.trim() || "Sin asignar" });
-          if (table) freeTable(table); // libera la mesa en el salón
+          if (table) freeTable(table);
           if (usingStore) clear();
           toast.success("Venta registrada correctamente", {
             description: affected > 0 ? `${st.label} · ${affected} salidas de inventario` : st.label,

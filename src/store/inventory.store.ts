@@ -27,7 +27,7 @@ interface InventoryState {
    * Registra una venta: descuenta los insumos de cada producto según su receta
    * y genera los movimientos de salida en el kardex. Devuelve cuántas salidas creó.
    */
-  applySale: (reference: string, lines: SaleLine[]) => { affected: number };
+  applySale: (reference: string, lines: SaleLine[]) => { affected: number; depletedItemIds: string[] };
   /** Registra una compra: aumenta el stock y genera entradas en el kardex. */
   addPurchase: (reference: string, lines: { inventoryId: string; quantity: number; unitCost: number }[]) => void;
   reset: () => void;
@@ -73,8 +73,9 @@ export const useInventoryStore = create<InventoryState>()(
           });
         });
 
+        const depletedItemIds = items.filter((i) => i.stock === 0).map((i) => i.id);
         if (moves.length) set({ items, movements: [...get().movements, ...moves] });
-        return { affected };
+        return { affected, depletedItemIds };
       },
 
       addPurchase: (reference, lines) => {

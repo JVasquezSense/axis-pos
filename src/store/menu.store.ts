@@ -16,6 +16,7 @@ interface MenuState {
   addProduct: (p: Product) => void;
   updateProduct: (p: Product) => void;
   removeProduct: (id: string) => void;
+  setAvailable: (id: string, available: boolean) => void;
 }
 
 export const useMenuStore = create<MenuState>()(
@@ -32,6 +33,8 @@ export const useMenuStore = create<MenuState>()(
       addProduct: (p) => set((s) => ({ products: [p, ...s.products] })),
       updateProduct: (p) => set((s) => ({ products: s.products.map((x) => (x.id === p.id ? p : x)) })),
       removeProduct: (id) => set((s) => ({ products: s.products.filter((p) => p.id !== id) })),
+      setAvailable: (id, available) =>
+        set((s) => ({ products: s.products.map((p) => (p.id === id ? { ...p, available } : p)) })),
     }),
     { name: "axis-menu", version: 1 }
   )
