@@ -1,5 +1,6 @@
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+import { AxisAI } from "@/components/ai/axis-ai";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Header />
         <main className="flex-1 px-4 py-6 lg:px-6">{children}</main>
       </div>
+      <AxisAI />
     </div>
   );
 }

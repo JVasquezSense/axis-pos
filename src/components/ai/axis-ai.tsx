@@ -1,0 +1,197 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Sparkles, X, Send, Receipt, Tag, Boxes, Loader2 } from "lucide-react";
+import { useSalesStore } from "@/store/sales.store";
+import { useRecipesStore } from "@/store/recipes.store";
+import { useInventoryStore } from "@/store/inventory.store";
+import { useTablesStore } from "@/store/tables.store";
+import { useKitchenStore } from "@/store/kitchen.store";
+import { buildBrief, buildPricing, buildInventoryForecast, type AiMode } from "@/lib/ai-context";
+import { cn } from "@/lib/utils";
+
+interface Msg {
+  role: "user" | "assistant";
+  content: string;
+}
+
+const QUICK: { mode: AiMode; label: string; icon: React.ElementType; user: string }[] = [
+  { mode: "shift", label: "Resumen de turno", icon: Receipt, user: "Genera el resumen del turno." },
+  { mode: "pricing", label: "Doctor de precios", icon: Tag, user: "Revisa mis precios y food cost." },
+  { mode: "inventory", label: "Predicción de inventario", icon: Boxes, user: "¿Qué insumos se van a agotar?" },
+];
+
+function contextFor(mode: AiMode): string {
+  const sales = useSalesStore.getState().records;
+  const recipes = useRecipesStore.getState().recipes;
+  const inv = useInventoryStore.getState();
+  if (mode === "pricing") return buildPricing(recipes);
+  if (mode === "inventory") return buildInventoryForecast(inv.items, inv.movements);
+  // chat y shift usan el brief general
+  return buildBrief({
+    sales,
+    recipes,
+    inventory: inv.items,
+    movements: inv.movements,
+    tables: useTablesStore.getState().tables,
+    tickets: useKitchenStore.getState().tickets,
+  });
+}
+
+export function AxisAI() {
+  const [mounted, setMounted] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, open]);
+
+  const send = async (mode: AiMode, userText: string) => {
+    if (busy) return;
+    setBusy(true);
+    setMessages((m) => [...m, { role: "user", content: userText }, { role: "assistant", content: "" }]);
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, message: mode === "chat" ? userText : "", context: contextFor(mode) }),
+      });
+      if (!res.body) throw new Error("sin respuesta");
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let acc = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += dec.decode(value, { stream: true });
+        setMessages((m) => {
+          const next = [...m];
+          next[next.length - 1] = { role: "assistant", content: acc };
+          return next;
+        });
+      }
+    } catch {
+      setMessages((m) => {
+        const next = [...m];
+        next[next.length - 1] = { role: "assistant", content: "No pude responder ahora. Inténtalo de nuevo." };
+        return next;
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const t = input.trim();
+    if (!t) return;
+    setInput("");
+    send("chat", t);
+  };
+
+  if (!mounted) return null;
+
+  return (
+    <>
+      {/* Botón flotante */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "fixed bottom-5 right-5 z-50 flex h-14 items-center gap-2 rounded-full bg-gradient-to-br from-primary to-gold px-4 text-primary-foreground shadow-xl transition-transform hover:scale-105 active:scale-95",
+          open && "scale-0"
+        )}
+        aria-label="Axis IA"
+      >
+        <Sparkles className="h-5 w-5" />
+        <span className="pr-1 text-sm font-semibold">Axis IA</span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.96 }}
+            className="fixed bottom-5 right-5 z-50 flex h-[70vh] max-h-[640px] w-[calc(100vw-2.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-primary/10 to-gold/10 p-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-gold text-primary-foreground">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold leading-tight">Axis IA</p>
+                  <p className="text-[11px] leading-tight text-muted-foreground">Copiloto · GLM-4.5</p>
+                </div>
+              </div>
+              <button onClick={() => setOpen(false)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Mensajes */}
+            <div ref={scrollRef} className="scrollbar-thin flex-1 space-y-3 overflow-y-auto p-4">
+              {messages.length === 0 && (
+                <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                  👋 Soy <strong className="text-foreground">Axis IA</strong>. Pregúntame por tus ventas, precios o inventario — leo los datos reales de tu restaurante.
+                </div>
+              )}
+              {messages.map((m, i) => (
+                <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+                  <div
+                    className={cn(
+                      "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm",
+                      m.role === "user" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted"
+                    )}
+                  >
+                    {m.content || <Loader2 className="h-4 w-4 animate-spin" />}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Acciones rápidas */}
+            {messages.length === 0 && (
+              <div className="flex flex-wrap gap-1.5 border-t border-border p-3">
+                {QUICK.map((q) => (
+                  <button
+                    key={q.mode}
+                    onClick={() => send(q.mode, q.user)}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"
+                  >
+                    <q.icon className="h-3.5 w-3.5 text-primary" /> {q.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Input */}
+            <form onSubmit={onSubmit} className="flex items-center gap-2 border-t border-border p-3">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Pregúntale a tu negocio…"
+                className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              />
+              <button
+                type="submit"
+                disabled={busy || !input.trim()}
+                className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
