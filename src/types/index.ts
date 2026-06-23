@@ -215,12 +215,14 @@ export interface PhysicalCount {
 // CRM / Clientes
 // ---------------------------------------------------------------------------
 export type LoyaltyTier = "bronze" | "silver" | "gold" | "platinum";
+export type CustomerKind = "externo" | "interno";
 
 export interface Customer {
   id: string;
   name: string;
   phone: string;
   email: string;
+  kind?: CustomerKind; // externo (cliente) o interno (personal/empresa); por defecto externo
   lastVisit: string;
   totalSpent: number;
   visits: number;

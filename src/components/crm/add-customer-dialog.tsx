@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Customer, LoyaltyTier } from "@/types";
+import type { Customer, LoyaltyTier, CustomerKind } from "@/types";
 import {
   Dialog,
   DialogContent,
@@ -30,10 +30,11 @@ export function AddCustomerDialog({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [tier, setTier] = useState<LoyaltyTier>("bronze");
+  const [kind, setKind] = useState<CustomerKind>("externo");
 
   useEffect(() => {
     if (open) {
-      setName(""); setPhone(""); setEmail(""); setTier("bronze");
+      setName(""); setPhone(""); setEmail(""); setTier("bronze"); setKind("externo");
     }
   }, [open]);
 
@@ -46,6 +47,7 @@ export function AddCustomerDialog({
       name: name.trim(),
       phone: phone.trim(),
       email: email.trim() || "—",
+      kind,
       lastVisit: "Hoy",
       totalSpent: 0,
       visits: 0,
@@ -69,6 +71,24 @@ export function AddCustomerDialog({
           <div>
             <label className="mb-1.5 block text-sm font-medium">Nombre completo</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: María Fernanda López" />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Tipo de cliente</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["externo", "interno"] as CustomerKind[]).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setKind(k)}
+                  className={
+                    "rounded-lg border py-2 text-sm font-medium capitalize transition-colors " +
+                    (kind === k ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted")
+                  }
+                >
+                  {k === "externo" ? "Externo (cliente)" : "Interno (personal)"}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

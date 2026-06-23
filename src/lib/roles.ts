@@ -41,6 +41,7 @@ export const ROLE_NAV: Record<Role, string[]> = {
     "orders",
     "kitchen",
     "checkout",
+    "menu",
     "inventory",
     "recipes",
     "crm",

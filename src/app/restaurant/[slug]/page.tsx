@@ -27,15 +27,17 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useWebStore } from "@/store/web.store";
+import { useMenuStore } from "@/store/menu.store";
 import { cn, formatCurrency } from "@/lib/utils";
-
-const MENU_CATEGORIES = [
-  { id: "popular", name: "Popular", icon: "Star" },
-  ...CATEGORIES.map((c) => ({ id: c.id, name: c.name, icon: c.icon })),
-];
 
 export default function RestaurantSitePage() {
   const { cart, add, increment, decrement, submitOrder } = useWebStore();
+  const categories = useMenuStore((s) => s.categories);
+  const products = useMenuStore((s) => s.products);
+  const MENU_CATEGORIES = useMemo(
+    () => [{ id: "popular", name: "Popular", icon: "Star" }, ...categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon }))],
+    [categories]
+  );
   const [activeCat, setActiveCat] = useState("popular");
   const [query, setQuery] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
@@ -51,11 +53,11 @@ export default function RestaurantSitePage() {
 
   const visible = useMemo(() => {
     if (query.trim()) {
-      return PRODUCTS.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
+      return products.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
     }
-    if (activeCat === "popular") return PRODUCTS.filter((p) => p.popular);
-    return PRODUCTS.filter((p) => p.category === activeCat);
-  }, [query, activeCat]);
+    if (activeCat === "popular") return products.filter((p) => p.popular);
+    return products.filter((p) => p.category === activeCat);
+  }, [products, query, activeCat]);
 
   const placeOrder = () => {
     if (!phone.trim() || phone.replace(/\D/g, "").length < 7) {

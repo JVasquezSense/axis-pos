@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useEffect } from "react";
 import { Plus, Search } from "lucide-react";
 import type { Product } from "@/types";
-import { menuService } from "@/services/menu.service";
-import { useAsync } from "@/hooks/use-async";
+import { useMenuStore } from "@/store/menu.store";
 import { Icon } from "@/components/shared/icon";
 import { ProductImage } from "@/components/shared/product-image";
 import { Badge } from "@/components/ui/badge";
@@ -17,17 +17,20 @@ import { toast } from "sonner";
 import { cn, formatCurrency } from "@/lib/utils";
 
 export default function OrdersPage() {
-  const { data: categories } = useAsync(() => menuService.getCategories());
-  const { data: products, loading } = useAsync(() => menuService.getProducts());
+  const categories = useMenuStore((s) => s.categories);
+  const products = useMenuStore((s) => s.products);
   const addProduct = useOrderStore((s) => s.addProduct);
 
+  const [mounted, setMounted] = useState(false);
   const [activeCat, setActiveCat] = useState("entradas");
   const [query, setQuery] = useState("");
   const [modProduct, setModProduct] = useState<Product | null>(null);
   const [modOpen, setModOpen] = useState(false);
 
+  useEffect(() => setMounted(true), []);
+  const loading = !mounted;
+
   const visible = useMemo(() => {
-    if (!products) return [];
     return products.filter(
       (p) =>
         (query ? p.name.toLowerCase().includes(query.toLowerCase()) : p.category === activeCat)

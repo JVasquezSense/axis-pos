@@ -113,7 +113,10 @@ export default function CrmPage() {
                       <AvatarFallback>{initials(c.name)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{c.name}</p>
+                      <p className="flex items-center gap-1.5 truncate font-medium">
+                        {c.name}
+                        {c.kind === "interno" && <Badge variant="secondary" className="shrink-0">Interno</Badge>}
+                      </p>
                       <p className="text-xs text-muted-foreground">{c.phone}</p>
                     </div>
                     <Badge className={cn(tier.className)}>

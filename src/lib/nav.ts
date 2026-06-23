@@ -13,6 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "orders", label: "Pedidos", href: "/orders", icon: "ClipboardList", group: "Operación" },
   { key: "kitchen", label: "Cocina KDS", href: "/kitchen", icon: "ChefHat", badge: "live", group: "Operación" },
   { key: "checkout", label: "Caja", href: "/checkout", icon: "CreditCard", group: "Operación" },
+  { key: "menu", label: "Menú", href: "/menu", icon: "UtensilsCrossed", group: "Gestión" },
   { key: "inventory", label: "Inventario", href: "/inventory", icon: "Boxes", group: "Gestión" },
   { key: "recipes", label: "Recetas", href: "/recipes", icon: "BookOpen", group: "Gestión" },
   { key: "crm", label: "Clientes", href: "/crm", icon: "Users", group: "Gestión" },
