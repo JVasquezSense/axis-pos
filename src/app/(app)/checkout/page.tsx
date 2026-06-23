@@ -34,6 +34,7 @@ export default function CheckoutPage() {
   const applySale = useInventoryStore((s) => s.applySale);
   const allTables = useTablesStore((s) => s.tables);
   const freeTable = useTablesStore((s) => s.free);
+  const occupyTable = useTablesStore((s) => s.occupy);
   const recordSale = useSalesStore((s) => s.record);
   const setAvailable = useMenuStore((s) => s.setAvailable);
   const recipes = useRecipesStore((s) => s.recipes);
@@ -75,7 +76,10 @@ export default function CheckoutPage() {
       if (affected86.length > 0) toast.warning("86 automático", { description: `Agotado: ${affected86.join(", ")}` });
     }
     recordSale({ total, items: orderSelectors.count(lines), method, saleType: st.label, table, tip, waiter: waiter.trim() || "Sin asignar" });
-    if (table) freeTable(table);
+    if (table) {
+      occupyTable(table, undefined, waiter.trim() || undefined);
+      freeTable(table);
+    }
     clear();
     toast.success("Venta registrada", { description: affected > 0 ? `${st.label} · ${affected} salidas de inventario` : st.label });
   };

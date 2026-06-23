@@ -15,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/shared/empty-state";
-import { TABLES } from "@/mock/tables";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useTablesStore } from "@/store/tables.store";
@@ -23,8 +22,9 @@ import { formatCurrency } from "@/lib/utils";
 
 export function OrderPanel() {
   const router = useRouter();
-  const { lines, tableNumber, increment, decrement, remove, clear, setTable } = useOrderStore();
+  const { lines, tableNumber, increment, decrement, remove, clear, setTable, flushToTable } = useOrderStore();
   const addFromOrder = useKitchenStore((s) => s.addFromOrder);
+  const allTables = useTablesStore((s) => s.tables);
   const occupyTable = useTablesStore((s) => s.occupy);
   const subtotal = orderSelectors.subtotal(lines);
   const tax = Math.round(subtotal * TAX_RATE);
@@ -65,15 +65,19 @@ export function OrderPanel() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <div className="grid grid-cols-4 gap-1 p-1">
-              {TABLES.map((t) => (
+              {allTables.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTable(t.number)}
-                  className={`flex h-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent ${
-                    tableNumber === t.number ? "bg-primary text-primary-foreground" : "bg-muted"
+                  title={t.status === "occupied" ? `Mesa ${t.number} · Ocupada` : `Mesa ${t.number} · ${t.zone}`}
+                  className={`relative flex h-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent ${
+                    tableNumber === t.number ? "bg-primary text-primary-foreground" : t.status === "occupied" ? "bg-amber-500/20 text-amber-700 dark:text-amber-400" : "bg-muted"
                   }`}
                 >
                   {t.number}
+                  {t.status === "occupied" && tableNumber !== t.number && (
+                    <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  )}
                 </button>
               ))}
             </div>
@@ -166,7 +170,9 @@ export function OrderPanel() {
                 const ticket = addFromOrder(lines, tableNumber, tableNumber ? "dine_in" : "takeaway");
                 if (tableNumber) occupyTable(tableNumber, total);
                 toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
-                clear();
+                // flushToTable acumula las líneas en tableOrders[mesa] sin borrarlas del snapshot,
+                // para que Caja pueda recuperar el pedido completo al cobrar.
+                flushToTable();
                 router.push("/kitchen");
               }}
             >

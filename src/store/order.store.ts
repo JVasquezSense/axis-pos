@@ -18,6 +18,12 @@ interface OrderState {
   remove: (lineId: string) => void;
   setTip: (v: number) => void;
   setDiscount: (v: number) => void;
+  /**
+   * Envío a cocina: guarda las líneas actuales en tableOrders sin borrarlas del
+   * snapshot de la mesa, limpia el panel activo y mantiene tableNumber.
+   * Así checkout puede recuperar el total cuando el mesero vaya a cobrar.
+   */
+  flushToTable: () => void;
   clear: () => void;
 }
 
@@ -34,10 +40,13 @@ export const useOrderStore = create<OrderState>()(
   discount: 0,
   setTable: (n) =>
     set((s) => {
-      // Guarda las lines actuales en la mesa anterior
       const saved: Record<string, OrderLine[]> = { ...s.tableOrders };
-      if (s.tableNumber !== null) saved[String(s.tableNumber)] = s.lines;
-      // Carga las lines de la nueva mesa (o vacías si es venta directa)
+      // Solo guarda las líneas actuales si se cambia a una mesa DIFERENTE.
+      // Si es la misma mesa (ej. salon → checkout sobre la mesa activa),
+      // no sobreescribir el snapshot acumulado con las líneas activas vacías.
+      if (s.tableNumber !== null && s.tableNumber !== n) {
+        saved[String(s.tableNumber)] = s.lines;
+      }
       const nextLines = n !== null ? (saved[String(n)] ?? []) : [];
       return { tableNumber: n, tableOrders: saved, lines: nextLines };
     }),
@@ -83,6 +92,25 @@ export const useOrderStore = create<OrderState>()(
   remove: (lineId) => set((s) => ({ lines: s.lines.filter((l) => l.id !== lineId) })),
   setTip: (v) => set({ tip: v }),
   setDiscount: (v) => set({ discount: v }),
+  flushToTable: () =>
+    set((s) => {
+      if (s.tableNumber === null) return { lines: [] };
+      // Acumula las líneas actuales en el snapshot de la mesa (merge por producto+modificadores)
+      const existing = s.tableOrders[String(s.tableNumber)] ?? [];
+      const merged = [...existing];
+      s.lines.forEach((line) => {
+        const sig = `${line.product.id}-${line.modifiers.map((m) => m.id).join(",")}-${line.notes ?? ""}`;
+        const idx = merged.findIndex(
+          (l) => `${l.product.id}-${l.modifiers.map((m) => m.id).join(",")}-${l.notes ?? ""}` === sig
+        );
+        if (idx >= 0) {
+          merged[idx] = { ...merged[idx], quantity: merged[idx].quantity + line.quantity };
+        } else {
+          merged.push(line);
+        }
+      });
+      return { lines: [], tableOrders: { ...s.tableOrders, [String(s.tableNumber)]: merged } };
+    }),
   clear: () =>
     set((s) => {
       const tableOrders = { ...s.tableOrders };
