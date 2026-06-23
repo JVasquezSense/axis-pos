@@ -66,7 +66,7 @@ export function TableDrawer({
   };
 
   const goCheckout = () => {
-    setTable(table.number);
+    setTable(table.mergedInto ?? table.number);
     close(false);
     router.push("/checkout");
   };
@@ -98,6 +98,12 @@ export function TableDrawer({
         <div className="scrollbar-thin flex-1 overflow-y-auto p-6">
           {mode === "idle" && (
             <div className="space-y-5">
+              {table.mergedInto && (
+                <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm">
+                  <Merge className="h-4 w-4 text-primary" />
+                  <span>Unida a la <strong>Mesa {table.mergedInto}</strong>. La cuenta se cobra junta desde allí.</span>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Stat icon={<Users className="h-4 w-4" />} label="Capacidad" value={`${table.capacity} personas`} />
                 <Stat icon={<User className="h-4 w-4" />} label="Comensales" value={table.guests ? `${table.guests}` : "—"} />

@@ -193,7 +193,21 @@ export function RecipeEditor({
                         </button>
                       );
                     })}
+                    <span
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-xs font-medium",
+                        draft.allergensOther ? "border-primary bg-primary/10 text-primary" : "border-dashed border-border text-muted-foreground"
+                      )}
+                    >
+                      ➕ Otros
+                    </span>
                   </div>
+                  <Input
+                    value={draft.allergensOther ?? ""}
+                    onChange={(e) => set({ allergensOther: e.target.value })}
+                    placeholder="Otros alérgenos (ej: sésamo, sulfitos, frutos secos…)"
+                    className="mt-2"
+                  />
                 </Field>
 
                 <Field label="Etiquetas">

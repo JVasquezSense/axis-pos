@@ -36,6 +36,8 @@ export const useTablesStore = create<TablesState>()(
           };
         }),
 
+      // Unir: la mesa destino se vincula a la principal pero SIGUE OCUPADA;
+      // el consumo se suma en la principal y ambas se liberan solo al cobrar.
       mergeTables: (sourceId, targetId) =>
         set((s) => {
           const src = s.tables.find((t) => t.id === sourceId);
@@ -51,9 +53,10 @@ export const useTablesStore = create<TablesState>()(
                   orderTotal: (src.orderTotal ?? 0) + (tgt.orderTotal ?? 0),
                   waiter: src.waiter ?? tgt.waiter,
                   seatedAt: src.seatedAt ?? tgt.seatedAt,
+                  mergedInto: undefined,
                 };
               if (t.id === targetId)
-                return { ...t, status: "available" as const, guests: undefined, waiter: undefined, seatedAt: undefined, orderTotal: undefined };
+                return { ...t, status: "occupied" as const, mergedInto: src.number, orderTotal: 0 };
               return t;
             }),
           };
@@ -74,11 +77,12 @@ export const useTablesStore = create<TablesState>()(
           ),
         })),
 
+      // Liberar: incluye todas las mesas unidas a esta (se pagan juntas)
       free: (number) =>
         set((s) => ({
           tables: s.tables.map((t) =>
-            t.number === number
-              ? { ...t, status: "available", guests: undefined, waiter: undefined, seatedAt: undefined, orderTotal: undefined }
+            t.number === number || t.mergedInto === number
+              ? { ...t, status: "available", guests: undefined, waiter: undefined, seatedAt: undefined, orderTotal: undefined, mergedInto: undefined }
               : t
           ),
         })),

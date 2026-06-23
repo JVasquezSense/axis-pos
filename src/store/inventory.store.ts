@@ -28,6 +28,8 @@ interface InventoryState {
    * y genera los movimientos de salida en el kardex. Devuelve cuántas salidas creó.
    */
   applySale: (reference: string, lines: SaleLine[]) => { affected: number };
+  /** Registra una compra: aumenta el stock y genera entradas en el kardex. */
+  addPurchase: (reference: string, lines: { inventoryId: string; quantity: number; unitCost: number }[]) => void;
   reset: () => void;
 }
 
@@ -73,6 +75,30 @@ export const useInventoryStore = create<InventoryState>()(
 
         if (moves.length) set({ items, movements: [...get().movements, ...moves] });
         return { affected };
+      },
+
+      addPurchase: (reference, lines) => {
+        const items = [...get().items];
+        const moves: InventoryMovement[] = [];
+        lines.forEach((line, n) => {
+          const idx = items.findIndex((i) => i.id === line.inventoryId);
+          if (idx < 0 || line.quantity <= 0) return;
+          const it = items[idx];
+          const newStock = r(it.stock + line.quantity);
+          const cost = line.unitCost > 0 ? line.unitCost : it.cost;
+          items[idx] = { ...it, stock: newStock, cost, status: statusFor(newStock, it.minStock), updatedAt: "Justo ahora" };
+          moves.push({
+            id: `mv-buy-${Date.now()}-${n}`,
+            inventoryId: it.id,
+            date: "Hoy",
+            type: "entrada",
+            quantity: r(line.quantity),
+            balance: newStock,
+            unitCost: cost,
+            reason: `Compra ${reference}`,
+          });
+        });
+        if (moves.length) set({ items, movements: [...get().movements, ...moves] });
       },
 
       reset: () => set({ items: structuredClone(INVENTORY), movements: structuredClone(MOVEMENTS) }),

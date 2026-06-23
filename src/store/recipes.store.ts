@@ -83,6 +83,7 @@ export function emptyRecipe(): Recipe {
     variations: [],
     steps: [],
     allergens: [],
+    allergensOther: "",
     tags: [],
     updatedAt: "Justo ahora",
   };

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Clock, Users } from "lucide-react";
+import { Clock, Users, Link2 } from "lucide-react";
 import type { RestaurantTable } from "@/types";
 import { TABLE_STATUS } from "@/lib/status";
 import { cn, formatElapsed, minutesAgo } from "@/lib/utils";
@@ -49,13 +49,18 @@ export function TableNode({
         <span className="mt-0.5 flex items-center gap-0.5 text-[10px] text-muted-foreground">
           <Users className="h-2.5 w-2.5" /> {table.capacity}
         </span>
-        {table.seatedAt && (
+        {table.seatedAt && !table.mergedInto && (
           <span className={cn("mt-0.5 flex items-center gap-0.5 text-[10px] font-medium", isLong ? "text-destructive" : status.text)}>
             <Clock className="h-2.5 w-2.5" /> {formatElapsed(elapsed)}
           </span>
         )}
+        {table.mergedInto && (
+          <span className="mt-0.5 flex items-center gap-0.5 text-[10px] font-bold text-primary">
+            <Link2 className="h-2.5 w-2.5" /> Mesa {table.mergedInto}
+          </span>
+        )}
       </div>
-      {table.waiter && (
+      {table.waiter && !table.mergedInto && (
         <span className="mt-1 block max-w-[88px] truncate text-center text-[10px] text-muted-foreground">
           {table.waiter}
         </span>

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Calendar, Download, LayoutDashboard } from "lucide-react";
+import { Download, LayoutDashboard } from "lucide-react";
+import { DateRangeFilter, type DateRangeId } from "@/components/shared/date-range";
 import { dashboardService } from "@/services/dashboard.service";
 import { useAsync } from "@/hooks/use-async";
 import { useAppStore } from "@/store/app.store";
@@ -46,6 +47,7 @@ function AdminDashboard() {
   const { data, loading } = useAsync(() => dashboardService.getSummary());
   const { data: rep } = useAsync(() => reportsService.getExecutive());
   const records = useSalesStore((s) => s.records);
+  const [range, setRange] = useState<DateRangeId>("today");
 
   const exportSummary = () => {
     if (!data) return;
@@ -70,9 +72,7 @@ function AdminDashboard() {
         icon={<LayoutDashboard className="h-5 w-5" />}
         actions={
           <>
-            <Button variant="outline" size="sm">
-              <Calendar className="h-4 w-4" /> Hoy
-            </Button>
+            <DateRangeFilter value={range} onChange={setRange} />
             <Button size="sm" onClick={exportSummary}>
               <Download className="h-4 w-4" /> Exportar
             </Button>

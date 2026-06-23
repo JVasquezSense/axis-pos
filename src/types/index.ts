@@ -3,7 +3,7 @@
 // Diseñados para mapear 1:1 con los serializers de Django REST Framework.
 // ============================================================================
 
-export type Role = "admin" | "waiter" | "cashier" | "kitchen";
+export type Role = "admin" | "waiter" | "cashier" | "kitchen" | "warehouse";
 
 export interface RoleConfig {
   id: Role;
@@ -84,6 +84,7 @@ export interface RestaurantTable {
   guests?: number;
   seatedAt?: string; // ISO
   orderTotal?: number;
+  mergedInto?: number; // si está unida, número de la mesa principal
   x: number; // posición % en el mapa
   y: number;
   shape: "round" | "square" | "rect";
@@ -343,8 +344,41 @@ export interface Recipe {
   variations: RecipeVariation[];
   steps: string[];
   allergens: Allergen[];
+  allergensOther?: string; // alérgenos adicionales en texto libre
   tags: string[];
   updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Proveedores y Compras
+// ---------------------------------------------------------------------------
+export interface Supplier {
+  id: string;
+  name: string;
+  contact: string;
+  phone: string;
+  email: string;
+  category: string;
+  nit?: string;
+  active: boolean;
+}
+
+export interface PurchaseLine {
+  inventoryId: string;
+  name: string;
+  unit: string;
+  quantity: number;
+  unitCost: number;
+}
+
+export interface Purchase {
+  id: string;
+  code: string;
+  supplierId: string;
+  supplierName: string;
+  date: string;
+  lines: PurchaseLine[];
+  total: number;
 }
 
 /** Resultado del motor de costeo de una receta. */
