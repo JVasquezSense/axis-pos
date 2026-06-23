@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { UtensilsCrossed, Plus, Search, MoreVertical, Pencil, Trash2, Tag } from "lucide-react";
-import type { Category, Product } from "@/types";
+import { UtensilsCrossed, Plus, Search, MoreVertical, Pencil, Trash2, Tag, BookOpen } from "lucide-react";
+import type { Category, Product, Recipe } from "@/types";
 import { useMenuStore, emptyProduct, uid } from "@/store/menu.store";
+import { useRecipesStore, emptyRecipe } from "@/store/recipes.store";
+import { computeRecipeCost, foodCostTone } from "@/lib/recipes";
+import { RecipeEditor } from "@/components/recipes/recipe-editor";
 import { PageHeader } from "@/components/shared/page-header";
 import { Icon } from "@/components/shared/icon";
 import { ProductImage } from "@/components/shared/product-image";
@@ -34,12 +37,35 @@ const ICON_OPTIONS = ["Salad", "Beef", "Drumstick", "CupSoda", "IceCream", "Pizz
 
 export default function MenuPage() {
   const { categories, products, addCategory, removeCategory, addProduct, updateProduct, removeProduct } = useMenuStore();
+  const recipes = useRecipesStore((s) => s.recipes);
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("all");
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Product | null>(null);
+  const [recipeEditing, setRecipeEditing] = useState<Recipe | null>(null);
+  const [recipeOpen, setRecipeOpen] = useState(false);
+
+  const recipeFor = (pid: string) => recipes.find((r) => r.productId === pid);
+
+  const openRecipe = (p: Product) => {
+    const existing = recipeFor(p.id);
+    if (existing) {
+      setRecipeEditing(existing);
+    } else {
+      // Crea una receta nueva ya vinculada a este producto del menú
+      setRecipeEditing({
+        ...emptyRecipe(),
+        name: p.name,
+        emoji: p.image,
+        category: p.category,
+        price: p.price,
+        productId: p.id,
+      });
+    }
+    setRecipeOpen(true);
+  };
 
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -135,6 +161,9 @@ export default function MenuPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /> Editar</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openRecipe(p)}>
+                    <BookOpen className="h-4 w-4" /> {recipeFor(p.id) ? "Ver receta" : "Crear receta"}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setToDelete(p)} className="text-destructive focus:text-destructive">
                     <Trash2 className="h-4 w-4" /> Eliminar
                   </DropdownMenuItem>
@@ -147,6 +176,22 @@ export default function MenuPage() {
                 {!p.available && <span className="shrink-0 text-[10px] font-medium text-muted-foreground">Agotado</span>}
               </div>
               <p className="line-clamp-1 text-xs text-muted-foreground">{p.description}</p>
+              {(() => {
+                const rc = recipeFor(p.id);
+                if (rc) {
+                  const c = computeRecipeCost(rc);
+                  return (
+                    <button onClick={() => openRecipe(p)} className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium hover:bg-accent">
+                      <BookOpen className="h-3 w-3" /> Food cost <span className={foodCostTone(c.foodCostPct)}>{(c.foodCostPct * 100).toFixed(0)}%</span>
+                    </button>
+                  );
+                }
+                return (
+                  <button onClick={() => openRecipe(p)} className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-primary hover:text-primary">
+                    <Plus className="h-3 w-3" /> Crear receta
+                  </button>
+                );
+              })()}
               <div className="mt-auto flex items-center justify-between pt-2">
                 <span className="text-sm font-bold">{formatCurrency(p.price)}</span>
                 <Button size="icon-sm" variant="ghost" onClick={() => openEdit(p)}>
@@ -162,6 +207,7 @@ export default function MenuPage() {
       )}
 
       <ProductFormDialog product={editing} categories={categories} open={formOpen} onOpenChange={setFormOpen} onSave={save} />
+      <RecipeEditor recipe={recipeEditing} open={recipeOpen} onOpenChange={setRecipeOpen} />
 
       <AddCategoryDialog open={catOpen} onOpenChange={setCatOpen} onCreate={(c) => { addCategory(c); toast.success(`Categoría "${c.name}" creada`); }} />
 

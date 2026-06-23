@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, Sparkles, GripVertical, Wand2 } from "lucide-react";
 import type { Recipe, Allergen, RecipeStation, RecipeStatus, RecipeDifficulty } from "@/types";
-import { CATEGORIES, PRODUCTS } from "@/mock/menu";
+import { useMenuStore } from "@/store/menu.store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,8 @@ export function RecipeEditor({
   onOpenChange: (v: boolean) => void;
 }) {
   const { create, update } = useRecipesStore();
+  const categories = useMenuStore((s) => s.categories);
+  const products = useMenuStore((s) => s.products);
   const [draft, setDraft] = useState<Recipe | null>(recipe);
   const [tagInput, setTagInput] = useState("");
   const isNew = recipe ? !useRecipesStore.getState().recipes.some((r) => r.id === recipe.id) : false;
@@ -111,7 +113,7 @@ export function RecipeEditor({
                     <Select value={draft.category} onValueChange={(v) => set({ category: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {CATEGORIES.map((c) => (
+                        {categories.map((c) => (
                           <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -122,7 +124,7 @@ export function RecipeEditor({
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Sin vincular</SelectItem>
-                        {PRODUCTS.map((p) => (
+                        {products.map((p) => (
                           <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                         ))}
                       </SelectContent>

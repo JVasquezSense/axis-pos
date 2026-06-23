@@ -6,7 +6,7 @@ import { BookOpen, Plus, Search, DollarSign, Percent, Package, Layers } from "lu
 import type { Recipe } from "@/types";
 import { useRecipesStore, emptyRecipe } from "@/store/recipes.store";
 import { computeRecipeCost, STATION } from "@/lib/recipes";
-import { CATEGORIES } from "@/mock/menu";
+import { useMenuStore } from "@/store/menu.store";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 
 export default function RecipesPage() {
   const { recipes, duplicate, remove } = useRecipesStore();
+  const categories = useMenuStore((s) => s.categories);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [station, setStation] = useState("all");
@@ -92,7 +93,7 @@ export default function RecipesPage() {
           <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Categoría" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las categorías</SelectItem>
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
           </SelectContent>
