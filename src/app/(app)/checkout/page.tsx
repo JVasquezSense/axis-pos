@@ -1,11 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User } from "lucide-react";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
-import { ORDERS } from "@/mock/datasets";
-import { TABLES } from "@/mock/tables";
 import { PageHeader } from "@/components/shared/page-header";
 import { Icon } from "@/components/shared/icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,18 +32,14 @@ export default function CheckoutPage() {
   const clear = useOrderStore((s) => s.clear);
   const setStoreTable = useOrderStore((s) => s.setTable);
   const applySale = useInventoryStore((s) => s.applySale);
+  const allTables = useTablesStore((s) => s.tables);
   const freeTable = useTablesStore((s) => s.free);
   const recordSale = useSalesStore((s) => s.record);
   const setAvailable = useMenuStore((s) => s.setAvailable);
   const recipes = useRecipesStore((s) => s.recipes);
 
-  // Si no hay pedido en curso, usar uno de ejemplo (mesa 7) para la demo
-  const fallback = ORDERS[1];
-  const usingStore = storeLines.length > 0;
-  const lines = usingStore ? storeLines : fallback.lines;
-  const initialTable = usingStore ? storeTable : fallback.tableNumber ?? null;
-
-  const [table, setTableLocal] = useState<number | null>(initialTable ?? null);
+  const lines = storeLines;
+  const [table, setTableLocal] = useState<number | null>(storeTable ?? null);
   const [saleType, setSaleType] = useState<SaleTypeId>("dine_in");
   const [tipRate, setTipRate] = useState(0.1);
   const [discount, setDiscount] = useState(0);
@@ -53,6 +47,9 @@ export default function CheckoutPage() {
   const [waiter, setWaiter] = useState("");
   const [payOpen, setPayOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
+
+  // Sincronizar table local cuando el store cambia (ej. navegando desde salón)
+  useEffect(() => { setTableLocal(storeTable ?? null); }, [storeTable]);
 
   const st = SALE_TYPE_MAP[saleType];
 
@@ -69,7 +66,7 @@ export default function CheckoutPage() {
   const changeTable = (value: string) => {
     const next = value === "none" ? null : Number(value);
     setTableLocal(next);
-    if (usingStore) setStoreTable(next);
+    setStoreTable(next); // intercambia lines automáticamente vía store
   };
 
   return (
@@ -94,7 +91,7 @@ export default function CheckoutPage() {
                 <SelectItem value="none">
                   <span className="flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Venta directa</span>
                 </SelectItem>
-                {TABLES.map((t) => (
+                {allTables.map((t) => (
                   <SelectItem key={t.id} value={String(t.number)}>
                     <span className="flex items-center gap-2"><Hash className="h-4 w-4" /> Mesa {t.number} · {t.zone}</span>
                   </SelectItem>
@@ -294,7 +291,7 @@ export default function CheckoutPage() {
           }
           recordSale({ total, items: orderSelectors.count(lines), method, saleType: st.label, table, tip, waiter: waiter.trim() || "Sin asignar" });
           if (table) freeTable(table);
-          if (usingStore) clear();
+          clear();
           toast.success("Venta registrada correctamente", {
             description: affected > 0 ? `${st.label} · ${affected} salidas de inventario` : st.label,
           });

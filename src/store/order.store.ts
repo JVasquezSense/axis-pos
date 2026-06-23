@@ -7,6 +7,7 @@ export const TAX_RATE = 0.08;
 interface OrderState {
   tableNumber: number | null;
   lines: OrderLine[];
+  tableOrders: Record<string, OrderLine[]>; // snapshot por mesa
   tip: number;
   discount: number;
   setTable: (n: number | null) => void;
@@ -25,12 +26,21 @@ const lineTotal = (l: OrderLine) =>
 
 export const useOrderStore = create<OrderState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
   tableNumber: null,
   lines: [],
+  tableOrders: {},
   tip: 0,
   discount: 0,
-  setTable: (n) => set({ tableNumber: n }),
+  setTable: (n) =>
+    set((s) => {
+      // Guarda las lines actuales en la mesa anterior
+      const saved: Record<string, OrderLine[]> = { ...s.tableOrders };
+      if (s.tableNumber !== null) saved[String(s.tableNumber)] = s.lines;
+      // Carga las lines de la nueva mesa (o vacías si es venta directa)
+      const nextLines = n !== null ? (saved[String(n)] ?? []) : [];
+      return { tableNumber: n, tableOrders: saved, lines: nextLines };
+    }),
   addProduct: (product, modifiers = [], notes) =>
     set((state) => {
       const sig = `${product.id}-${modifiers.map((m) => m.id).join(",")}-${notes ?? ""}`;
@@ -73,11 +83,16 @@ export const useOrderStore = create<OrderState>()(
   remove: (lineId) => set((s) => ({ lines: s.lines.filter((l) => l.id !== lineId) })),
   setTip: (v) => set({ tip: v }),
   setDiscount: (v) => set({ discount: v }),
-  clear: () => set({ lines: [], tip: 0, discount: 0, tableNumber: null }),
+  clear: () =>
+    set((s) => {
+      const tableOrders = { ...s.tableOrders };
+      if (s.tableNumber !== null) delete tableOrders[String(s.tableNumber)];
+      return { lines: [], tip: 0, discount: 0, tableNumber: null, tableOrders };
+    }),
     }),
     {
       name: "axis-order",
-      partialize: (s) => ({ lines: s.lines, tableNumber: s.tableNumber, tip: s.tip, discount: s.discount }),
+      partialize: (s) => ({ lines: s.lines, tableNumber: s.tableNumber, tableOrders: s.tableOrders, tip: s.tip, discount: s.discount }),
     }
   )
 );
