@@ -1,6 +1,6 @@
 import type { Recipe } from "@/types";
 import { RECIPES } from "@/mock/recipes";
-import { mockRequest } from "./http";
+import { USE_API, request, mockRequest } from "./http";
 
 /**
  * Capa de API de recetas. La lectura inicial usa mocks; las mutaciones de la
@@ -14,15 +14,21 @@ import { mockRequest } from "./http";
  */
 export const recipesService = {
   async list(): Promise<Recipe[]> {
-    return mockRequest(RECIPES, 600);
+    return USE_API ? request<Recipe[]>("/recipes/") : mockRequest(RECIPES, 600);
   },
   async create(recipe: Recipe): Promise<Recipe> {
-    return mockRequest(recipe, 400);
+    return USE_API
+      ? request<Recipe>("/recipes/", { method: "POST", body: JSON.stringify(recipe) })
+      : mockRequest(recipe, 400);
   },
   async update(recipe: Recipe): Promise<Recipe> {
-    return mockRequest(recipe, 400);
+    return USE_API
+      ? request<Recipe>(`/recipes/${recipe.id}/`, { method: "PATCH", body: JSON.stringify(recipe) })
+      : mockRequest(recipe, 400);
   },
   async remove(id: string): Promise<{ id: string }> {
-    return mockRequest({ id }, 300);
+    return USE_API
+      ? request<{ id: string }>(`/recipes/${id}/`, { method: "DELETE" })
+      : mockRequest({ id }, 300);
   },
 };

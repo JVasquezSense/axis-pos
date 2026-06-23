@@ -1,11 +1,13 @@
 import type { KdsTicket } from "@/types";
 import { KDS_TICKETS } from "@/mock/datasets";
-import { mockRequest } from "./http";
+import { USE_API, request, mockRequest } from "./http";
 
 export const kitchenService = {
   /** GET /api/v1/kitchen/tickets/ */
   async getTickets(): Promise<KdsTicket[]> {
-    return mockRequest(KDS_TICKETS, 500);
+    return USE_API
+      ? request<KdsTicket[]>("/orders/?status=pending,preparing,ready")
+      : mockRequest(KDS_TICKETS, 500);
   },
 
   /**

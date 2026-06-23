@@ -1,10 +1,10 @@
 import type { RestaurantTable } from "@/types";
 import { TABLES } from "@/mock/tables";
-import { mockRequest } from "./http";
+import { USE_API, request, mockRequest } from "./http";
 
 export const salonService = {
   /** GET /api/v1/tables/ */
   async getTables(): Promise<RestaurantTable[]> {
-    return mockRequest(TABLES, 600);
+    return USE_API ? request<RestaurantTable[]>("/tables/") : mockRequest(TABLES, 600);
   },
 };

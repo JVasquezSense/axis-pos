@@ -1,10 +1,10 @@
 import type { Customer } from "@/types";
 import { CUSTOMERS } from "@/mock/datasets";
-import { mockRequest } from "./http";
+import { USE_API, request, mockRequest } from "./http";
 
 export const crmService = {
   /** GET /api/v1/customers/ */
   async getCustomers(): Promise<Customer[]> {
-    return mockRequest(CUSTOMERS, 600);
+    return USE_API ? request<Customer[]>("/customers/") : mockRequest(CUSTOMERS, 600);
   },
 };
