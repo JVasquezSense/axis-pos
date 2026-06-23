@@ -12,7 +12,7 @@ interface SuppliersState {
   updateSupplier: (s: Supplier) => void;
   removeSupplier: (id: string) => void;
   /** Registra una compra: guarda el historial y suma stock al inventario (kardex). */
-  registerPurchase: (supplier: Supplier, lines: PurchaseLine[]) => void;
+  registerPurchase: (supplier: Supplier, lines: PurchaseLine[], invoicePhoto?: string) => void;
 }
 
 export const useSuppliersStore = create<SuppliersState>()(
@@ -24,7 +24,7 @@ export const useSuppliersStore = create<SuppliersState>()(
       addSupplier: (s) => set((st) => ({ suppliers: [s, ...st.suppliers] })),
       updateSupplier: (s) => set((st) => ({ suppliers: st.suppliers.map((x) => (x.id === s.id ? s : x)) })),
       removeSupplier: (id) => set((st) => ({ suppliers: st.suppliers.filter((s) => s.id !== id) })),
-      registerPurchase: (supplier, lines) => {
+      registerPurchase: (supplier, lines, invoicePhoto) => {
         const code = `OC-${get().seq}`;
         const total = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
         const purchase: Purchase = {
@@ -35,6 +35,7 @@ export const useSuppliersStore = create<SuppliersState>()(
           date: "Hoy",
           lines,
           total,
+          ...(invoicePhoto ? { invoicePhoto } : {}),
         };
         set((st) => ({ purchases: [purchase, ...st.purchases].slice(0, 30), seq: st.seq + 1 }));
         // Suma al inventario y genera entradas en el kardex

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Truck, Plus, ShoppingCart, Pencil, Trash2, Phone, Mail, Package, Minus } from "lucide-react";
+import { Truck, Plus, ShoppingCart, Pencil, Trash2, Phone, Mail, Package, Minus, ImagePlus, X, ZoomIn } from "lucide-react";
 import type { Supplier, PurchaseLine } from "@/types";
 import { useSuppliersStore, emptySupplier } from "@/store/suppliers.store";
 import { useInventoryStore } from "@/store/inventory.store";
@@ -105,17 +105,12 @@ export default function SuppliersPage() {
                     <TableHead>Fecha</TableHead>
                     <TableHead className="text-right">Ítems</TableHead>
                     <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-center">Factura</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {purchases.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.code}</TableCell>
-                      <TableCell>{p.supplierName}</TableCell>
-                      <TableCell className="text-muted-foreground">{p.date}</TableCell>
-                      <TableCell className="text-right">{p.lines.length}</TableCell>
-                      <TableCell className="text-right font-semibold">{formatCurrency(p.total)}</TableCell>
-                    </TableRow>
+                    <PurchaseRow key={p.id} purchase={p} />
                   ))}
                 </TableBody>
               </Table>
@@ -129,7 +124,7 @@ export default function SuppliersPage() {
         suppliers={suppliers}
         open={buyOpen}
         onOpenChange={setBuyOpen}
-        onRegister={(supplier, lines) => { registerPurchase(supplier, lines); toast.success("Compra registrada", { description: `${lines.length} insumos sumados al inventario` }); }}
+        onRegister={(supplier, lines, invoicePhoto) => { registerPurchase(supplier, lines, invoicePhoto); toast.success("Compra registrada", { description: `${lines.length} insumos sumados al inventario` }); }}
       />
     </div>
   );
@@ -178,10 +173,34 @@ function SupplierFormDialog({ supplier, open, onOpenChange, onSave }: { supplier
   );
 }
 
-function PurchaseDialog({ suppliers, open, onOpenChange, onRegister }: { suppliers: Supplier[]; open: boolean; onOpenChange: (v: boolean) => void; onRegister: (s: Supplier, lines: PurchaseLine[]) => void }) {
+function PurchaseDialog({
+  suppliers,
+  open,
+  onOpenChange,
+  onRegister,
+}: {
+  suppliers: Supplier[];
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onRegister: (s: Supplier, lines: PurchaseLine[], invoicePhoto?: string) => void;
+}) {
   const inventory = useInventoryStore((s) => s.items);
-  const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
+  const [supplierId, setSupplierId] = useState("");
   const [lines, setLines] = useState<PurchaseLine[]>([]);
+  const [invoicePhoto, setInvoicePhoto] = useState<string | undefined>(undefined);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) { setSupplierId(""); setLines([]); setInvoicePhoto(undefined); }
+  }, [open]);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setInvoicePhoto(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const addLine = () => setLines((l) => [...l, { inventoryId: "", name: "", unit: "", quantity: 1, unitCost: 0 }]);
   const update = (i: number, patch: Partial<PurchaseLine>) => setLines((l) => l.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
@@ -194,40 +213,113 @@ function PurchaseDialog({ suppliers, open, onOpenChange, onRegister }: { supplie
   const valid = supplier && lines.length > 0 && lines.every((l) => l.inventoryId && l.quantity > 0);
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setLines([]); }}>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); }}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Registrar compra</DialogTitle>
           <DialogDescription>Suma stock al inventario y registra la entrada en el kardex.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          {/* Proveedor obligatorio */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium">Proveedor</label>
-            <Select value={supplierId} onValueChange={setSupplierId}>
-              <SelectTrigger><SelectValue placeholder="Selecciona el proveedor" /></SelectTrigger>
-              <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <label className="mb-1.5 block text-sm font-medium">
+              Proveedor <span className="text-destructive">*</span>
+            </label>
+            {suppliers.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border py-3 text-center text-sm text-muted-foreground">
+                Primero vincula un proveedor en la pestaña &quot;Proveedores&quot;
+              </p>
+            ) : (
+              <Select value={supplierId} onValueChange={setSupplierId}>
+                <SelectTrigger className={!supplierId ? "border-destructive/50" : ""}>
+                  <SelectValue placeholder="Selecciona el proveedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.filter((s) => s.active).map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name} · {s.category}</SelectItem>
+                  ))}
+                  {suppliers.some((s) => !s.active) && (
+                    <>
+                      <div className="px-2 py-1 text-[11px] text-muted-foreground">Inactivos</div>
+                      {suppliers.filter((s) => !s.active).map((s) => (
+                        <SelectItem key={s.id} value={s.id} className="opacity-60">{s.name}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
-          <div className="scrollbar-thin max-h-64 space-y-2 overflow-y-auto">
-            {lines.length === 0 && <p className="rounded-lg border border-dashed border-border py-5 text-center text-sm text-muted-foreground">Agrega los insumos comprados</p>}
+          {/* Insumos */}
+          <div className="scrollbar-thin max-h-60 space-y-2 overflow-y-auto">
+            {lines.length === 0 && (
+              <p className="rounded-lg border border-dashed border-border py-5 text-center text-sm text-muted-foreground">
+                Agrega los insumos comprados
+              </p>
+            )}
             {lines.map((l, i) => (
               <div key={i} className="space-y-2 rounded-xl border border-border p-2.5">
                 <div className="flex items-center gap-2">
                   <Select value={l.inventoryId} onValueChange={(v) => pickItem(i, v)}>
                     <SelectTrigger className="h-9 flex-1"><SelectValue placeholder="Insumo" /></SelectTrigger>
-                    <SelectContent>{inventory.map((it) => <SelectItem key={it.id} value={it.id}>{it.name} · {it.unit}</SelectItem>)}</SelectContent>
+                    <SelectContent>
+                      {inventory.map((it) => <SelectItem key={it.id} value={it.id}>{it.name} · {it.unit}</SelectItem>)}
+                    </SelectContent>
                   </Select>
-                  <button onClick={() => setLines((ls) => ls.filter((_, idx) => idx !== i))} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Minus className="h-4 w-4" /></button>
+                  <button
+                    onClick={() => setLines((ls) => ls.filter((_, idx) => idx !== i))}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <div><label className="mb-1 block text-[11px] text-muted-foreground">Cantidad ({l.unit || "—"})</label><Input type="number" min={0} step="0.001" value={l.quantity} onChange={(e) => update(i, { quantity: Number(e.target.value) })} className="h-9" /></div>
-                  <div><label className="mb-1 block text-[11px] text-muted-foreground">Costo unit.</label><Input type="number" min={0} value={l.unitCost} onChange={(e) => update(i, { unitCost: Number(e.target.value) })} className="h-9" /></div>
-                  <div><label className="mb-1 block text-[11px] text-muted-foreground">Subtotal</label><div className="flex h-9 items-center justify-end rounded-lg border border-border bg-muted/40 px-3 text-sm font-semibold">{formatCurrency(l.quantity * l.unitCost)}</div></div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">Cantidad ({l.unit || "—"})</label>
+                    <Input type="number" min={0} step="0.001" value={l.quantity} onChange={(e) => update(i, { quantity: Number(e.target.value) })} className="h-9" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">Costo unit.</label>
+                    <Input type="number" min={0} value={l.unitCost} onChange={(e) => update(i, { unitCost: Number(e.target.value) })} className="h-9" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">Subtotal</label>
+                    <div className="flex h-9 items-center justify-end rounded-lg border border-border bg-muted/40 px-3 text-sm font-semibold">
+                      {formatCurrency(l.quantity * l.unitCost)}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
             <Button variant="outline" size="sm" onClick={addLine}><Plus className="h-4 w-4" /> Agregar insumo</Button>
+          </div>
+
+          {/* Foto de factura (opcional) */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Foto de factura <span className="text-muted-foreground">(opcional)</span></label>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+            {invoicePhoto ? (
+              <div className="relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={invoicePhoto} alt="Factura" className="h-28 w-auto rounded-xl border border-border object-cover" />
+                <button
+                  type="button"
+                  onClick={() => { setInvoicePhoto(undefined); if (fileRef.current) fileRef.current.value = ""; }}
+                  className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white shadow"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="flex h-20 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+              >
+                <ImagePlus className="h-4 w-4" /> Subir foto de la factura
+              </button>
+            )}
           </div>
 
           <div className="flex items-center justify-between border-t border-border pt-3">
@@ -237,11 +329,59 @@ function PurchaseDialog({ suppliers, open, onOpenChange, onRegister }: { supplie
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button disabled={!valid} onClick={() => { if (supplier) { onRegister(supplier, lines); onOpenChange(false); setLines([]); } }}>
+          <Button
+            disabled={!valid}
+            onClick={() => {
+              if (supplier) {
+                onRegister(supplier, lines, invoicePhoto);
+                onOpenChange(false);
+              }
+            }}
+          >
             <Package className="h-4 w-4" /> Registrar e ingresar a inventario
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PurchaseRow({ purchase }: { purchase: import("@/types").Purchase }) {
+  const [photoOpen, setPhotoOpen] = useState(false);
+  return (
+    <>
+      <TableRow>
+        <TableCell className="font-medium">{purchase.code}</TableCell>
+        <TableCell>{purchase.supplierName}</TableCell>
+        <TableCell className="text-muted-foreground">{purchase.date}</TableCell>
+        <TableCell className="text-right">{purchase.lines.length}</TableCell>
+        <TableCell className="text-right font-semibold">{formatCurrency(purchase.total)}</TableCell>
+        <TableCell className="text-center">
+          {purchase.invoicePhoto ? (
+            <button
+              onClick={() => setPhotoOpen(true)}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+            >
+              <ZoomIn className="h-3.5 w-3.5" /> Ver
+            </button>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </TableCell>
+      </TableRow>
+      {purchase.invoicePhoto && photoOpen && (
+        <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
+          <DialogContent className="max-w-lg p-2">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Factura {purchase.code}</DialogTitle>
+              <DialogDescription>{purchase.supplierName} · {purchase.date}</DialogDescription>
+            </DialogHeader>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={purchase.invoicePhoto} alt={`Factura ${purchase.code}`} className="w-full rounded-lg object-contain" />
+            <p className="mt-1 text-center text-xs text-muted-foreground">{purchase.code} · {purchase.supplierName} · {purchase.date}</p>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }

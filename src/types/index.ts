@@ -379,6 +379,7 @@ export interface Purchase {
   date: string;
   lines: PurchaseLine[];
   total: number;
+  invoicePhoto?: string; // base64 o URL de la foto de la factura
 }
 
 /** Resultado del motor de costeo de una receta. */
