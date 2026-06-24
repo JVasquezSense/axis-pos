@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { USE_API } from "@/services/http";
+import { reservationsService } from "@/services/reservations.service";
 
 export type ReservationStatus = "pending" | "confirmed" | "arrived" | "cancelled";
 
@@ -31,11 +33,29 @@ export const useReservationsStore = create<ReservationsState>()(
   persist(
     (set) => ({
       reservations: [],
-      add: (r) => set((s) => ({ reservations: [{ ...r, id: uid() }, ...s.reservations] })),
-      update: (r) => set((s) => ({ reservations: s.reservations.map((x) => (x.id === r.id ? r : x)) })),
-      remove: (id) => set((s) => ({ reservations: s.reservations.filter((r) => r.id !== id) })),
-      setStatus: (id, status) =>
-        set((s) => ({ reservations: s.reservations.map((r) => (r.id === id ? { ...r, status } : r)) })),
+
+      add: (r) => {
+        const newRes = { ...r, id: uid() };
+        set((s) => ({ reservations: [newRes, ...s.reservations] }));
+        if (USE_API) reservationsService.create(r).then((saved) =>
+          set((s) => ({ reservations: s.reservations.map((x) => (x.id === newRes.id ? saved : x)) }))
+        ).catch(console.error);
+      },
+
+      update: (r) => {
+        set((s) => ({ reservations: s.reservations.map((x) => (x.id === r.id ? r : x)) }));
+        if (USE_API) reservationsService.update(r).catch(console.error);
+      },
+
+      remove: (id) => {
+        set((s) => ({ reservations: s.reservations.filter((r) => r.id !== id) }));
+        if (USE_API) reservationsService.remove(id).catch(console.error);
+      },
+
+      setStatus: (id, status) => {
+        set((s) => ({ reservations: s.reservations.map((r) => (r.id === id ? { ...r, status } : r)) }));
+        if (USE_API) reservationsService.setStatus(id, status).catch(console.error);
+      },
     }),
     { name: "axis-reservations", version: 1 }
   )

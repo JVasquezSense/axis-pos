@@ -1,8 +1,13 @@
+"use client";
+
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { AxisAI } from "@/components/ai/axis-ai";
+import { useAppInit } from "@/hooks/use-app-init";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  useAppInit();
+
   return (
     <div className="flex min-h-screen bg-muted/30">
       <Sidebar />

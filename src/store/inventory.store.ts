@@ -5,6 +5,8 @@ import { INVENTORY } from "@/mock/datasets";
 import { MOVEMENTS } from "@/mock/kardex";
 import { effectiveQty } from "@/lib/recipes";
 import { useRecipesStore } from "./recipes.store";
+import { USE_API } from "@/services/http";
+import { inventoryService } from "@/services/inventory.service";
 
 const r = (n: number) => Math.round(n * 100) / 100;
 
@@ -23,12 +25,7 @@ interface InventoryState {
   items: InventoryItem[];
   movements: InventoryMovement[];
   addItem: (item: InventoryItem) => void;
-  /**
-   * Registra una venta: descuenta los insumos de cada producto según su receta
-   * y genera los movimientos de salida en el kardex. Devuelve cuántas salidas creó.
-   */
   applySale: (reference: string, lines: SaleLine[]) => { affected: number; depletedItemIds: string[] };
-  /** Registra una compra: aumenta el stock y genera entradas en el kardex. */
   addPurchase: (reference: string, lines: { inventoryId: string; quantity: number; unitCost: number }[]) => void;
   reset: () => void;
 }
@@ -36,10 +33,15 @@ interface InventoryState {
 export const useInventoryStore = create<InventoryState>()(
   persist(
     (set, get) => ({
-      items: structuredClone(INVENTORY),
-      movements: structuredClone(MOVEMENTS),
+      items: USE_API ? [] : structuredClone(INVENTORY),
+      movements: USE_API ? [] : structuredClone(MOVEMENTS),
 
-      addItem: (item) => set((s) => ({ items: [item, ...s.items] })),
+      addItem: (item) => {
+        set((s) => ({ items: [item, ...s.items] }));
+        if (USE_API) inventoryService.createItem(item).then((saved) =>
+          set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }))
+        ).catch(console.error);
+      },
 
       applySale: (reference, lines) => {
         const recipes = useRecipesStore.getState().recipes;
@@ -70,6 +72,10 @@ export const useInventoryStore = create<InventoryState>()(
               reason: `Venta ${reference}`,
             });
             affected++;
+            // Sincroniza el stock al backend en background
+            if (USE_API) {
+              inventoryService.adjustStock(it.id, newStock, `Venta ${reference}`).catch(console.error);
+            }
           });
         });
 
