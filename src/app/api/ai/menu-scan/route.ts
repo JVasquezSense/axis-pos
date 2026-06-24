@@ -56,6 +56,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const apiKey = process.env.GLM_API_KEY;
   const baseUrl = process.env.GLM_BASE_URL ?? "https://open.bigmodel.cn/api/paas/v4";
+  const visionModel = process.env.GLM_VISION_MODEL ?? "glm-4v";
 
   if (!apiKey) {
     return Response.json({
@@ -70,7 +71,7 @@ export async function POST(req: Request): Promise<Response> {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "glm-4v-flash",
+        model: visionModel,
         stream: false,
         temperature: 0.1,
         max_tokens: 4000,
