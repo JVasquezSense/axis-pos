@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Sparkles, GripVertical, Wand2, Loader2, ImagePlus, X } from "lucide-react";
-import type { Recipe, Allergen, RecipeStation, RecipeStatus, RecipeDifficulty } from "@/types";
+import { Plus, Trash2, Sparkles, GripVertical, Wand2, Loader2, X } from "lucide-react";
+import type { Recipe, Allergen, RecipeStation, RecipeStatus, RecipeDifficulty, RecipeIngredient, InventoryItem } from "@/types";
 import { useMenuStore } from "@/store/menu.store";
+import { useInventoryStore } from "@/store/inventory.store";
+import { INVENTORY } from "@/mock/datasets";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,7 @@ export function RecipeEditor({
   const [draft, setDraft] = useState<Recipe | null>(recipe);
   const [tagInput, setTagInput] = useState("");
   const [describingAI, setDescribingAI] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const isNew = recipe ? !useRecipesStore.getState().recipes.some((r) => r.id === recipe.id) : false;
 
@@ -47,7 +50,8 @@ export function RecipeEditor({
   }, [open, recipe]);
 
   if (!draft) return null;
-  const set = (patch: Partial<Recipe>) => setDraft({ ...draft, ...patch });
+  // Functional updater evita stale closure en handlers async
+  const set = (patch: Partial<Recipe>) => setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
   const cost = computeRecipeCost(draft);
 
   const isImageUrl = (src: string) =>
@@ -85,6 +89,103 @@ export function RecipeEditor({
       toast.error("No se pudo conectar con la IA");
     } finally {
       setDescribingAI(false);
+    }
+  };
+
+  const generateWithAI = async () => {
+    if (!draft.name.trim()) { toast.error("Escribe el nombre primero"); return; }
+    setGeneratingAI(true);
+    try {
+      const storeItems = useInventoryStore.getState().items;
+      const allItems = storeItems.length > 0 ? storeItems : INVENTORY;
+
+      const res = await fetch("/api/ai/generate-recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name,
+          categories: categories.map((c) => ({ id: c.id, name: c.name })),
+          inventoryItems: allItems.map((i) => ({ id: i.id, name: i.name, unit: i.unit })),
+        }),
+      });
+      const data = await res.json();
+      if (data.error) { toast.error(data.error); return; }
+
+      // Crear insumos nuevos en inventario
+      const addInventoryItem = useInventoryStore.getState().addItem;
+      let newItemsCount = 0;
+
+      const ingredients: RecipeIngredient[] = ((data.ingredients as { name: string; unit: string; quantity: number; waste?: number; existingId?: string | null }[]) ?? []).map((ing) => {
+        let inventoryId: string = ing.existingId ?? "";
+        // Verificar que el id existe realmente
+        if (inventoryId && !allItems.find((i) => i.id === inventoryId)) inventoryId = "";
+        if (!inventoryId) {
+          const newItem: InventoryItem = {
+            id: uid("inv"),
+            name: ing.name,
+            category: "general",
+            stock: 10,
+            unit: ing.unit ?? "und",
+            minStock: 2,
+            cost: 0,
+            supplier: "",
+            status: "normal",
+            updatedAt: "Justo ahora",
+          };
+          addInventoryItem(newItem);
+          inventoryId = newItem.id;
+          newItemsCount++;
+        }
+        return {
+          id: uid("ing"),
+          inventoryId,
+          name: ing.name,
+          unit: ing.unit ?? "und",
+          quantity: Number(ing.quantity) || 1,
+          waste: Number(ing.waste) || 0,
+        };
+      });
+
+      // Mapear categoría: el AI puede devolver id o nombre, buscar coincidencia
+      let category = String(data.category ?? "");
+      if (categories.length && !categories.find((c) => c.id === category)) {
+        const byName = categories.find((c) => c.name.toLowerCase() === category.toLowerCase());
+        category = byName?.id ?? categories[0].id;
+      }
+
+      const VALID_STATIONS = ["grill", "fry", "cold", "bar", "pastry"] as const;
+      const VALID_DIFFS = ["easy", "medium", "hard"] as const;
+      const VALID_ALLERGENS = ["gluten", "lacteos", "huevo", "mani", "mariscos", "soya", "pescado"] as const;
+
+      setDraft((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          description: String(data.description ?? prev.description ?? ""),
+          emoji: String(data.emoji ?? prev.emoji),
+          price: Number(data.price) || prev.price,
+          category,
+          prepMinutes: Number(data.prepMinutes) || prev.prepMinutes,
+          difficulty: VALID_DIFFS.includes(data.difficulty as RecipeDifficulty) ? (data.difficulty as RecipeDifficulty) : prev.difficulty,
+          station: VALID_STATIONS.includes(data.station as RecipeStation) ? (data.station as RecipeStation) : prev.station,
+          allergens: Array.isArray(data.allergens) ? (data.allergens as string[]).filter((a) => VALID_ALLERGENS.includes(a as Allergen)) as Allergen[] : prev.allergens,
+          tags: Array.isArray(data.tags) ? data.tags.map(String) : prev.tags,
+          steps: Array.isArray(data.steps) ? data.steps.map(String).filter(Boolean) : prev.steps,
+          variations: Array.isArray(data.variations)
+            ? (data.variations as { name: string; priceDelta: number }[]).map((v) => ({ ...emptyVariation(), name: String(v.name ?? ""), priceDelta: Number(v.priceDelta) || 0 }))
+            : prev.variations,
+          ingredients,
+        };
+      });
+
+      const desc = newItemsCount > 0
+        ? `${newItemsCount} insumo${newItemsCount > 1 ? "s" : ""} nuevo${newItemsCount > 1 ? "s" : ""} creado${newItemsCount > 1 ? "s" : ""} en inventario`
+        : "Insumos del inventario existente";
+      toast.success("Receta generada con IA", { description: desc });
+    } catch {
+      toast.error("No se pudo conectar con la IA");
+    } finally {
+      setGeneratingAI(false);
     }
   };
 
@@ -206,9 +307,30 @@ export function RecipeEditor({
 
               {/* GENERAL */}
               <TabsContent value="general" className="space-y-4">
-                <Field label="Nombre del producto">
-                  <Input value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ej: Axis Classic" />
-                </Field>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Nombre del producto</label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={draft.name}
+                      onChange={(e) => set({ name: e.target.value })}
+                      placeholder="Ej: Axis Classic"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={generateWithAI}
+                      disabled={generatingAI || !draft.name.trim()}
+                      className="shrink-0 border-primary/40 text-primary hover:bg-primary/5"
+                      title="Genera descripción, insumos, precio, categoría, pasos y más con IA"
+                    >
+                      {generatingAI
+                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generando…</>
+                        : <><Sparkles className="h-3.5 w-3.5" /> Generar con IA</>}
+                    </Button>
+                  </div>
+                </div>
 
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">

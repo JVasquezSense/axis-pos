@@ -6,6 +6,7 @@ import { CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User } from "luci
 import { useEmployeesStore } from "@/store/employees.store";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
 import { PageHeader } from "@/components/shared/page-header";
+import { ProductImage } from "@/components/shared/product-image";
 import { Icon } from "@/components/shared/icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -194,9 +195,7 @@ export default function CheckoutPage() {
           <CardContent className="space-y-2">
             {lines.map((l) => (
               <div key={l.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted text-xl">
-                  {l.product.image}
-                </div>
+                <ProductImage emoji={l.product.image} category={l.product.category} size="sm" className="h-11 w-11 shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm font-medium">{l.product.name}</p>
                   <p className="text-xs text-muted-foreground">

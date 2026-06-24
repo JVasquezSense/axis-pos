@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { Minus, Plus, Trash2, ShoppingCart, Send, Hash, ChevronDown, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ProductImage } from "@/components/shared/product-image";
 import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
@@ -106,9 +107,7 @@ export function OrderPanel() {
                   className="rounded-xl border border-border p-3"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-xl">
-                      {l.product.image}
-                    </div>
+                    <ProductImage emoji={l.product.image} category={l.product.category} size="sm" className="h-10 w-10 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-medium leading-tight">{l.product.name}</p>

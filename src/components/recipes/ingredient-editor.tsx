@@ -7,8 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { emptyIngredient } from "@/store/recipes.store";
+import { useInventoryStore } from "@/store/inventory.store";
 import { ingredientCost } from "@/lib/recipes";
 import { formatCurrency } from "@/lib/utils";
+
+const UNIT_DEFAULTS: Record<string, number> = {
+  kg: 0.2, g: 200, lb: 0.4, oz: 6,
+  L: 0.2, ml: 200, cl: 20,
+  und: 1, pza: 1, paq: 1, bolsa: 1, caja: 1, lata: 1,
+  porcion: 1, taza: 0.5,
+};
+
+function suggestQty(unit: string): number {
+  const lower = unit.toLowerCase();
+  return UNIT_DEFAULTS[unit] ?? UNIT_DEFAULTS[lower] ?? 1;
+}
 
 /** Editor de la lista de insumos consumidos (selecciona qué se gasta). */
 export function IngredientEditor({
@@ -20,13 +33,17 @@ export function IngredientEditor({
   onChange: (next: RecipeIngredient[]) => void;
   compact?: boolean;
 }) {
+  const storeItems = useInventoryStore((s) => s.items);
+  const items = storeItems.length > 0 ? storeItems : INVENTORY;
+
   const update = (id: string, patch: Partial<RecipeIngredient>) =>
     onChange(value.map((ing) => (ing.id === id ? { ...ing, ...patch } : ing)));
 
   const pickItem = (id: string, inventoryId: string) => {
-    const item = INVENTORY.find((i) => i.id === inventoryId);
+    const item = items.find((i) => i.id === inventoryId);
     if (!item) return;
-    update(id, { inventoryId, name: item.name, unit: item.unit });
+    const qty = suggestQty(item.unit);
+    update(id, { inventoryId, name: item.name, unit: item.unit, quantity: qty });
   };
 
   return (
@@ -46,7 +63,7 @@ export function IngredientEditor({
                 <SelectValue placeholder="Selecciona el insumo del inventario" />
               </SelectTrigger>
               <SelectContent>
-                {INVENTORY.map((i) => (
+                {items.map((i) => (
                   <SelectItem key={i.id} value={i.id}>
                     {i.name} <span className="text-muted-foreground">· {i.unit}</span>
                   </SelectItem>
@@ -65,8 +82,18 @@ export function IngredientEditor({
           {/* Fila 2: cantidad + merma + costo (anchos cómodos) */}
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                Cantidad{ing.unit ? ` (${ing.unit})` : ""}
+              <label className="mb-1 flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+                <span>Cantidad{ing.unit ? ` (${ing.unit})` : ""}</span>
+                {ing.inventoryId && (
+                  <button
+                    type="button"
+                    onClick={() => update(ing.id, { quantity: suggestQty(ing.unit) })}
+                    className="text-[10px] text-primary underline-offset-2 hover:underline"
+                    title="Restaurar cantidad sugerida"
+                  >
+                    sugerida: {suggestQty(ing.unit)}
+                  </button>
+                )}
               </label>
               <Input
                 type="number"

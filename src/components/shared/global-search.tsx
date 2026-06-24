@@ -8,6 +8,7 @@ import { ROLE_NAV } from "@/lib/roles";
 import { PRODUCTS } from "@/mock/menu";
 import { useAppStore } from "@/store/app.store";
 import { Icon } from "@/components/shared/icon";
+import { ProductImage } from "@/components/shared/product-image";
 import { cn, formatCurrency } from "@/lib/utils";
 
 export function GlobalSearch() {
@@ -86,7 +87,7 @@ export function GlobalSearch() {
                   onClick={() => go("/orders")}
                   className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-accent"
                 >
-                  <span className="text-lg">{p.image}</span>
+                  <ProductImage emoji={p.image} category={p.category} size="sm" className="h-7 w-7 shrink-0" />
                   <span className="flex-1 truncate">{p.name}</span>
                   <span className="text-xs text-muted-foreground">{formatCurrency(p.price)}</span>
                 </button>

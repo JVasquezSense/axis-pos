@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle, ChefHat, Info, Package, Armchair, Clock, ChevronRight } from "lucide-react";
 import type { DashboardData, AlertItem } from "@/types";
+import { ProductImage } from "@/components/shared/product-image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
@@ -38,9 +39,7 @@ export function TopProducts({ data }: { data: DashboardData["topProducts"] }) {
             transition={{ delay: i * 0.05 }}
             className="flex items-center gap-3"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-xl">
-              {p.image}
-            </div>
+            <ProductImage emoji={p.image} category={p.category} size="sm" className="h-10 w-10 shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-sm font-medium">{p.name}</p>

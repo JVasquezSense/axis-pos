@@ -470,9 +470,7 @@ function CartSheet({
             )}
             {cart.map((l: any) => (
               <div key={l.product.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted text-2xl">
-                  {l.product.image}
-                </div>
+                <ProductImage emoji={l.product.image} category={l.product.category} size="sm" className="h-12 w-12 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{l.product.name}</p>
                   <p className="text-xs text-muted-foreground">{formatCurrency(l.product.price)}</p>

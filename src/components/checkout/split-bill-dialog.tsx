@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Minus, Plus, Check, Users, UtensilsCrossed, Receipt } from "lucide-react";
 import type { OrderLine } from "@/types";
+import { ProductImage } from "@/components/shared/product-image";
 import {
   Dialog,
   DialogContent,
@@ -133,7 +134,7 @@ export function SplitBillDialog({
                   <div key={line.id} className="rounded-xl border border-border p-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="flex items-center gap-2 text-sm">
-                        <span className="text-lg">{line.product.image}</span>
+                        <ProductImage emoji={line.product.image} category={line.product.category} size="sm" className="h-8 w-8 shrink-0" />
                         <span className="font-medium">{line.quantity}× {line.product.name}</span>
                       </span>
                       <span className="text-sm font-semibold">{formatCurrency(orderSelectors.lineTotal(line))}</span>

@@ -120,7 +120,16 @@ export const useOrderStore = create<OrderState>()(
     }),
     {
       name: "axis-order",
-      partialize: (s) => ({ lines: s.lines, tableNumber: s.tableNumber, tableOrders: s.tableOrders, tip: s.tip, discount: s.discount }),
+      version: 1,
+      partialize: (s) => ({
+        lines: Array.isArray(s.lines) ? s.lines : [],
+        tableNumber: s.tableNumber,
+        tableOrders: Object.fromEntries(
+          Object.entries(s.tableOrders).filter(([, v]) => Array.isArray(v))
+        ),
+        tip: s.tip,
+        discount: s.discount,
+      }),
     }
   )
 );
