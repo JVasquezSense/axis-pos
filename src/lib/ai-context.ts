@@ -5,6 +5,7 @@
  */
 import type { Recipe, InventoryItem, InventoryMovement, RestaurantTable, KdsTicket } from "@/types";
 import type { Reservation } from "@/store/reservations.store";
+import type { Employee } from "@/store/employees.store";
 import type { Purchase, Supplier } from "@/types";
 import { computeRecipeCost } from "@/lib/recipes";
 import { liveDayTotals, type SaleRecord } from "@/store/sales.store";
@@ -30,6 +31,7 @@ interface Stores {
   reservations?: Reservation[];
   purchases?: Purchase[];
   suppliers?: Supplier[];
+  employees?: Employee[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -68,7 +70,7 @@ export function buildBrief(s: Stores): string {
   }, {});
   const methodStr = Object.entries(byMethod).map(([m, v]) => `${m}:${k(v)}`).join(", ");
 
-  // Mesero con más propinas
+  // Meseros: cruce planilla vs ventas
   const byWaiter = s.sales.reduce<Record<string, { tip: number; sales: number }>>((acc, r) => {
     if (!r.waiter || r.waiter === "Sin asignar") return acc;
     acc[r.waiter] = acc[r.waiter] ?? { tip: 0, sales: 0 };
@@ -77,6 +79,9 @@ export function buildBrief(s: Stores): string {
     return acc;
   }, {});
   const topWaiter = Object.entries(byWaiter).sort(([, a], [, b]) => b.tip - a.tip)[0];
+  const activeWaiters = (s.employees ?? []).filter((e) => e.role === "mesero" && e.active);
+  const workingSet = new Set(Object.keys(byWaiter));
+  const notWorkingToday = activeWaiters.filter((e) => !workingSet.has(e.name));
 
   // Food cost alto
   const highFC = s.recipes
@@ -123,7 +128,13 @@ export function buildBrief(s: Stores): string {
     `Hoy: ventas ${k(d.sales)}, ${d.orders} pedidos, ticket prom. ${k(d.avg)}`,
     methodStr ? `Métodos de pago: ${methodStr}` : "",
     `Mesas: ${occ}/${s.tables.length} ocupadas · Cocina: ${active} pedidos activos`,
-    topWaiter ? `Mejor mesero: ${topWaiter[0]} (propinas ${k(topWaiter[1].tip)}, ventas ${k(topWaiter[1].sales)})` : "",
+    topWaiter ? `Mejor mesero hoy: ${topWaiter[0]} (propinas ${k(topWaiter[1].tip)}, ventas ${k(topWaiter[1].sales)})` : "",
+    activeWaiters.length > 0 && notWorkingToday.length > 0
+      ? `Meseros activos sin ventas hoy: ${notWorkingToday.map((e) => e.name).join(", ")}`
+      : "",
+    activeWaiters.length > 0
+      ? `Planilla meseros: ${activeWaiters.length} activos (${workingSet.size} con ventas hoy)`
+      : "",
     s.sales.length > 0 ? `Ventas por tipo: ${topProductsFromSales(s.sales)}` : "",
     highFC ? `Food cost alto (>35%): ${highFC}` : `Food cost: todo bajo control`,
     s.recipes.length > 0 ? `Recetas: ${s.recipes.length} platos, food cost promedio ${avgFC}%` : "",
@@ -193,10 +204,9 @@ export function buildInventoryForecast(
     .join("\n");
 }
 
-/** Análisis de meseros: propinas, ventas, pedidos. */
-export function buildWaiterStats(records: SaleRecord[]): string {
-  if (records.length === 0) return "Sin ventas registradas en la sesión.";
-
+/** Análisis de meseros: propinas, ventas, pedidos. Cruza empleados registrados con ventas del turno. */
+export function buildWaiterStats(records: SaleRecord[], employees?: Employee[]): string {
+  // Estadísticas de ventas por mesero
   const stats: Record<string, { sales: number; tip: number; orders: number; tables: Set<number> }> = {};
   records.forEach((r) => {
     const w = r.waiter || "Sin asignar";
@@ -207,19 +217,59 @@ export function buildWaiterStats(records: SaleRecord[]): string {
     if (r.table) stats[w].tables.add(r.table);
   });
 
-  const rows = Object.entries(stats)
+  const totalTips = records.reduce((s, r) => s + r.tip, 0);
+
+  // Meseros registrados en el sistema
+  const registeredWaiters = (employees ?? []).filter((e) => e.role === "mesero");
+  const activeWaiters = registeredWaiters.filter((e) => e.active);
+  const inactiveWaiters = registeredWaiters.filter((e) => !e.active);
+
+  // Cruce: activos SIN ventas = posiblemente no están trabajando hoy
+  const workingNames = new Set(Object.keys(stats).filter((n) => n !== "Sin asignar"));
+  const notWorking = activeWaiters.filter((e) => !workingNames.has(e.name));
+  const working = activeWaiters.filter((e) => workingNames.has(e.name));
+
+  // Tabla de rendimiento (solo los que tienen ventas)
+  const perfRows = Object.entries(stats)
+    .filter(([w]) => w !== "Sin asignar")
     .sort(([, a], [, b]) => b.sales - a.sales)
-    .map(([w, d]) =>
-      `${w}|ventas:${k(d.sales)}|propinas:${k(d.tip)}|pedidos:${d.orders}|mesas:${d.tables.size}`
-    )
+    .map(([w, d], i) => {
+      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "  ";
+      return `${medal} ${w}|ventas:${k(d.sales)}|propinas:${k(d.tip)}|pedidos:${d.orders}|mesas:${d.tables.size}`;
+    })
     .join("\n");
 
-  const totalTips = records.reduce((s, r) => s + r.tip, 0);
+  const unassigned = stats["Sin asignar"];
+
   return [
-    `Mesero|ventas|propinas|pedidos|mesas_atendidas`,
-    rows,
+    registeredWaiters.length > 0
+      ? `Planilla de meseros: ${activeWaiters.length} activos, ${inactiveWaiters.length} inactivos`
+      : "Sin meseros registrados en el sistema (agregar en sección Empleados).",
+
+    working.length > 0
+      ? `Trabajando hoy (con ventas): ${working.map((e) => e.name).join(", ")}`
+      : "",
+
+    notWorking.length > 0
+      ? `Activos SIN ventas hoy (posiblemente no están): ${notWorking.map((e) => e.name).join(", ")}`
+      : "",
+
+    inactiveWaiters.length > 0
+      ? `Inactivos (no operan): ${inactiveWaiters.map((e) => e.name).join(", ")}`
+      : "",
+
+    records.length > 0
+      ? `\nRendimiento del turno:\nMesero|ventas|propinas|pedidos|mesas_atendidas\n${perfRows}`
+      : "\nSin ventas registradas en este turno.",
+
+    unassigned
+      ? `\nVentas sin mesero asignado: ${k(unassigned.sales)} (${unassigned.orders} pedidos) — asignar meseros en caja`
+      : "",
+
     `\nTotal propinas del turno: ${k(totalTips)}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** Ingeniería de menú: popularidad × margen (matriz BCG). */

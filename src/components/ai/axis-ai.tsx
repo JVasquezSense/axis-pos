@@ -13,6 +13,7 @@ import { useTablesStore } from "@/store/tables.store";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useReservationsStore } from "@/store/reservations.store";
 import { useSuppliersStore } from "@/store/suppliers.store";
+import { useEmployeesStore } from "@/store/employees.store";
 import {
   buildBrief,
   buildPricing,
@@ -82,6 +83,7 @@ function contextFor(mode: AiMode): string {
   const tickets = useKitchenStore.getState().tickets;
   const reservations = useReservationsStore.getState().reservations;
   const { purchases, suppliers } = useSuppliersStore.getState();
+  const employees = useEmployeesStore.getState().employees;
 
   switch (mode) {
     case "pricing":
@@ -89,14 +91,14 @@ function contextFor(mode: AiMode): string {
     case "inventory":
       return buildInventoryForecast(inv.items, inv.movements, purchases, suppliers);
     case "waiter":
-      return buildWaiterStats(sales);
+      return buildWaiterStats(sales, employees);
     case "menu_eng":
       return buildMenuEngineering(recipes, sales);
     case "reservations":
       return buildReservationsBrief(reservations);
     default:
       // chat y shift: brief completo con todos los datos
-      return buildBrief({ sales, recipes, inventory: inv.items, movements: inv.movements, tables, tickets, reservations, purchases, suppliers });
+      return buildBrief({ sales, recipes, inventory: inv.items, movements: inv.movements, tables, tickets, reservations, purchases, suppliers, employees });
   }
 }
 
