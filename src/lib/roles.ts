@@ -45,10 +45,10 @@ export const ROLE_NAV: Record<Role, string[]> = {
   admin: [
     "dashboard", "salon", "reservations", "orders", "kitchen",
     "checkout", "shift", "menu", "inventory", "suppliers",
-    "crm", "reports", "weborders", "website", "admin",
+    "employees", "audit", "crm", "reports", "weborders", "website", "admin",
   ],
   waiter: ["dashboard", "salon", "reservations", "orders", "kitchen"],
-  cashier: ["dashboard", "checkout", "shift", "salon", "weborders", "crm"],
+  cashier: ["dashboard", "checkout", "shift", "salon", "weborders", "crm", "employees"],
   kitchen: ["dashboard", "kitchen", "menu", "inventory"],
   warehouse: ["dashboard", "inventory", "suppliers", "menu"],
 };

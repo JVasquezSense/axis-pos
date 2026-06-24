@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User } from "lucide-react";
+import { useEmployeesStore } from "@/store/employees.store";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Icon } from "@/components/shared/icon";
@@ -38,6 +39,7 @@ export default function CheckoutPage() {
   const recordSale = useSalesStore((s) => s.record);
   const setAvailable = useMenuStore((s) => s.setAvailable);
   const recipes = useRecipesStore((s) => s.recipes);
+  const waiters = useEmployeesStore((s) => s.employees.filter((e) => e.role === "mesero" && e.active));
 
   const lines = storeLines;
   const [table, setTableLocal] = useState<number | null>(storeTable ?? null);
@@ -122,15 +124,33 @@ export default function CheckoutPage() {
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Mesero</label>
-            <div className="relative">
-              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Nombre del mesero"
-                value={waiter}
-                onChange={(e) => setWaiter(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+            {waiters.length > 0 ? (
+              <Select value={waiter || "__none__"} onValueChange={(v) => setWaiter(v === "__none__" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar mesero" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    <span className="flex items-center gap-2"><User className="h-4 w-4" /> Sin asignar</span>
+                  </SelectItem>
+                  {waiters.map((w) => (
+                    <SelectItem key={w.id} value={w.name}>
+                      <span className="flex items-center gap-2"><User className="h-4 w-4" /> {w.name}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Nombre del mesero"
+                  value={waiter}
+                  onChange={(e) => setWaiter(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            )}
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Tipo de venta</label>

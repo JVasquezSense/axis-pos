@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -31,7 +31,13 @@ import { useMenuStore } from "@/store/menu.store";
 import { MyOrdersSheet } from "@/components/website/my-orders-sheet";
 import { cn, formatCurrency } from "@/lib/utils";
 
-export default function RestaurantSitePage() {
+export default function RestaurantSitePage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const resolvedParams = use(params);
+  const slug = resolvedParams.slug;
   const { cart, add, increment, decrement, submitOrder } = useWebStore();
   const categories = useMenuStore((s) => s.categories);
   const products = useMenuStore((s) => s.products);
@@ -219,6 +225,7 @@ export default function RestaurantSitePage() {
                   product={p}
                   qty={qtyOf(p.id)}
                   index={i}
+                  slug={slug}
                   onAdd={() => {
                     add(p);
                     toast.success(`${p.name} añadido`);
@@ -267,6 +274,7 @@ function MenuCard({
   product: p,
   qty,
   index,
+  slug,
   onAdd,
   onInc,
   onDec,
@@ -274,6 +282,7 @@ function MenuCard({
   product: Product;
   qty: number;
   index: number;
+  slug: string;
   onAdd: () => void;
   onInc: () => void;
   onDec: () => void;
@@ -289,7 +298,8 @@ function MenuCard({
         !p.available && "opacity-60"
       )}
     >
-      {/* Imagen */}
+      {/* Imagen — clickeable abre detalle */}
+      <Link href={`/restaurant/${slug}/product/${p.id}`} className="block">
       <div className="relative h-36 w-full overflow-hidden sm:h-40">
         <ProductImage emoji={p.image} category={p.category} size="lg" className="h-full w-full rounded-none" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
@@ -331,6 +341,7 @@ function MenuCard({
           )}
         </div>
       </div>
+      </Link>
     </motion.div>
   );
 }
@@ -554,8 +565,16 @@ function OrderConfirmation({ orderId, onClose }: { orderId: string; onClose: () 
 
         {needsReceipt ? (
           <div className="mt-5 text-left">
+            <div className="mb-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">
+              <p className="text-center text-sm font-bold text-destructive">
+                SIN COMPROBANTE TU PEDIDO NO SERA PROCESADO
+              </p>
+              <p className="mt-0.5 text-center text-xs text-destructive/80">
+                El restaurante requiere evidencia del pago para despachar tu orden.
+              </p>
+            </div>
             <p className="mb-2 text-sm font-semibold">Sube tu comprobante de pago</p>
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/40 p-6 text-center transition-colors hover:border-primary hover:bg-primary/5">
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary bg-primary/5 p-6 text-center transition-colors hover:border-primary hover:bg-primary/10">
               {uploading ? (
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
               ) : (
@@ -586,8 +605,19 @@ function OrderConfirmation({ orderId, onClose }: { orderId: string; onClose: () 
           </>
         )}
 
-        <Button className="mt-5 w-full" variant={needsReceipt ? "outline" : "default"} onClick={onClose}>
-          {needsReceipt ? "Lo haré más tarde" : "Seguir explorando"}
+        {needsReceipt && (
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Si cierras sin subir el comprobante, deberás contactar directamente al restaurante
+            para que procesen tu pedido manualmente.
+          </p>
+        )}
+        <Button
+          className="mt-2 w-full"
+          variant={needsReceipt ? "ghost" : "default"}
+          size={needsReceipt ? "sm" : "default"}
+          onClick={onClose}
+        >
+          {needsReceipt ? "Cerrar de todas formas (pedido en riesgo)" : "Seguir explorando"}
         </Button>
       </motion.div>
     </motion.div>

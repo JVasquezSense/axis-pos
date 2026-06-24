@@ -86,12 +86,32 @@ export function buildBrief(s: Stores): string {
     .map((r) => `${r.n} ${r.fc}%`)
     .join(", ");
 
-  // Inventario bajo
-  const crit = s.inventory
-    .filter((i) => i.status !== "normal")
-    .slice(0, 5)
-    .map((i) => `${i.name} ${i.stock}${i.unit}`)
-    .join(", ");
+  // Inventario completo por estado
+  const invCrit = s.inventory.filter((i) => i.status === "critical");
+  const invLow = s.inventory.filter((i) => i.status === "low");
+  const invNormal = s.inventory.filter((i) => i.status === "normal");
+  const invLines = [
+    invCrit.length > 0 ? `CRÍTICO(${invCrit.length}): ${invCrit.map((i) => `${i.name} ${i.stock}${i.unit}`).join(", ")}` : "",
+    invLow.length > 0 ? `Bajo(${invLow.length}): ${invLow.map((i) => `${i.name} ${i.stock}${i.unit}`).join(", ")}` : "",
+    `Normal: ${invNormal.length} ítems`,
+  ].filter(Boolean).join(" | ");
+
+  // Proveedores completos
+  const activeSupp = (s.suppliers ?? []).filter((sup) => sup.active);
+  const suppStr = activeSupp.length > 0
+    ? activeSupp.map((sup) => `${sup.name}(${sup.category}${sup.phone ? " ☎" + sup.phone : ""}${sup.email ? " ✉" + sup.email : ""})`).join("; ")
+    : "";
+
+  // Compras recientes
+  const recentPurchases = (s.purchases ?? []).slice(0, 5);
+  const purchStr = recentPurchases.length > 0
+    ? recentPurchases.map((p) => `${p.code} ${p.supplierName} ${k(p.total)}`).join(", ")
+    : "";
+
+  // Recetas: count + avg food cost
+  const avgFC = s.recipes.length > 0
+    ? Math.round(s.recipes.reduce((sum, r) => sum + computeRecipeCost(r).foodCostPct * 100, 0) / s.recipes.length)
+    : 0;
 
   // Reservaciones del día
   const todayRes = (s.reservations ?? []).filter(
@@ -106,7 +126,10 @@ export function buildBrief(s: Stores): string {
     topWaiter ? `Mejor mesero: ${topWaiter[0]} (propinas ${k(topWaiter[1].tip)}, ventas ${k(topWaiter[1].sales)})` : "",
     s.sales.length > 0 ? `Ventas por tipo: ${topProductsFromSales(s.sales)}` : "",
     highFC ? `Food cost alto (>35%): ${highFC}` : `Food cost: todo bajo control`,
-    crit ? `Inventario bajo/crítico: ${crit}` : `Inventario: sin críticos`,
+    s.recipes.length > 0 ? `Recetas: ${s.recipes.length} platos, food cost promedio ${avgFC}%` : "",
+    `Inventario (${s.inventory.length} ítems): ${invLines}`,
+    suppStr ? `Proveedores activos (${activeSupp.length}): ${suppStr}` : "",
+    purchStr ? `Últimas compras: ${purchStr}` : "",
     todayRes.length > 0
       ? `Reservaciones hoy: ${todayRes.length} (${todayRes.reduce((s, r) => s + r.guests, 0)} comensales)`
       : "",
