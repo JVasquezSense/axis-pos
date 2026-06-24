@@ -19,3 +19,10 @@ export const TABLES: RestaurantTable[] = [
 ];
 
 export const ZONES = ["Todas", "Terraza", "Salón principal", "Barra"];
+
+import type { SalonZone } from "@/types";
+export const DEFAULT_ZONES: SalonZone[] = [
+  { id: "z-terraza", name: "Terraza", yStart: 0 },
+  { id: "z-salon", name: "Salón principal", yStart: 33 },
+  { id: "z-barra", name: "Barra", yStart: 66 },
+];

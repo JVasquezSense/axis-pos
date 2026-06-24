@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Armchair, Plus } from "lucide-react";
-import type { RestaurantTable, TableStatus } from "@/types";
+import { Armchair, Plus, LayoutGrid, Layers } from "lucide-react";
+import type { RestaurantTable, TableStatus, SalonZone } from "@/types";
 import { useTablesStore } from "@/store/tables.store";
+import { useAppStore } from "@/store/app.store";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,34 +13,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TableMap } from "@/components/salon/table-map";
 import { TableDrawer } from "@/components/salon/table-drawer";
 import { AddTableDialog, type NewTableData } from "@/components/salon/add-table-dialog";
+import { ZonesDialog } from "@/components/salon/zones-dialog";
 import { TABLE_STATUS } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
-const ZONE_Y: Record<string, number> = {
-  Terraza: 18,
-  "Salón principal": 48,
-  Barra: 78,
-};
-
-/**
- * Encuentra una posición libre en el mapa para la zona dada, evitando que la
- * nueva mesa se superponga con las existentes. Prueba primero la fila de la zona
- * y, si está llena, recorre todo el lienzo hasta hallar un hueco.
- */
-function nextPosition(tables: RestaurantTable[], zone: string) {
-  const baseY = ZONE_Y[zone] ?? 48;
-  // Dos mesas chocan si están muy cerca en X y en Y (nodo ~6% ancho · ~16% alto)
+function nextPosition(tables: RestaurantTable[], zones: SalonZone[], zone: string) {
+  const zoneObj = [...zones].sort((a, b) => a.yStart - b.yStart).find((z) => z.name === zone);
+  const baseY = zoneObj ? zoneObj.yStart + 10 : 48;
   const free = (x: number, y: number) =>
     !tables.some((t) => Math.abs(t.x - x) < 10 && Math.abs(t.y - y) < 16);
 
   const xs = [12, 32, 52, 74, 90];
-  const yBands = [baseY, baseY + 18, baseY - 15];
+  const yBands = [baseY, baseY + 10, baseY - 10];
   for (const y of yBands) {
-    if (y < 7 || y > 93) continue;
+    if (y < 5 || y > 95) continue;
     for (const x of xs) if (free(x, y)) return { x, y };
   }
-
-  // Último recurso: barrido fino de todo el lienzo
   for (let y = 10; y <= 90; y += 5) {
     for (let x = 10; x <= 92; x += 5) {
       if (free(x, y)) return { x, y };
@@ -49,24 +38,36 @@ function nextPosition(tables: RestaurantTable[], zone: string) {
 }
 
 export default function SalonPage() {
+  const role = useAppStore((s) => s.role);
+  const isAdmin = role === "admin";
+
   const tables = useTablesStore((s) => s.tables);
+  const zones = useTablesStore((s) => s.zones);
   const addTableStore = useTablesStore((s) => s.addTable);
+  const repositionTable = useTablesStore((s) => s.repositionTable);
   const moveTable = useTablesStore((s) => s.moveOccupancy);
   const mergeTable = useTablesStore((s) => s.mergeTables);
+  const addZone = useTablesStore((s) => s.addZone);
+  const updateZone = useTablesStore((s) => s.updateZone);
+  const removeZone = useTablesStore((s) => s.removeZone);
+
   const [mounted, setMounted] = useState(false);
   const [selected, setSelected] = useState<RestaurantTable | null>(null);
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [zonesOpen, setZonesOpen] = useState(false);
+  const [layoutMode, setLayoutMode] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
   const select = (t: RestaurantTable) => {
+    if (layoutMode) return;
     setSelected(t);
     setOpen(true);
   };
 
   const createTable = (form: NewTableData) => {
-    const pos = nextPosition(tables, form.zone);
+    const pos = nextPosition(tables, zones, form.zone);
     const newTable: RestaurantTable = {
       id: `t-${Date.now()}`,
       number: form.number,
@@ -89,18 +90,43 @@ export default function SalonPage() {
     {} as Record<TableStatus, number>
   );
 
+  const tablesByZone = tables.reduce((acc, t) => {
+    acc[t.zone] = (acc[t.zone] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
   const nextNumber = tables.length ? Math.max(...tables.map((t) => t.number)) + 1 : 1;
+
+  const sortedZones = [...zones].sort((a, b) => a.yStart - b.yStart);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Salón"
-        description={`Mapa interactivo · ${tables.length} mesas · 3 zonas`}
+        description={`Mapa interactivo · ${tables.length} mesas · ${zones.length} zona${zones.length !== 1 ? "s" : ""}`}
         icon={<Armchair className="h-5 w-5" />}
         actions={
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" /> Nueva mesa
-          </Button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <>
+                <Button
+                  size="sm"
+                  variant={layoutMode ? "default" : "outline"}
+                  onClick={() => setLayoutMode((v) => !v)}
+                  className={cn(layoutMode && "bg-primary text-primary-foreground")}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  {layoutMode ? "Salir de edición" : "Editar layout"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setZonesOpen(true)}>
+                  <Layers className="h-4 w-4" /> Zonas
+                </Button>
+              </>
+            )}
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4" /> Nueva mesa
+            </Button>
+          </div>
         }
       />
 
@@ -119,7 +145,13 @@ export default function SalonPage() {
       {!mounted ? (
         <Skeleton className="h-[560px] w-full rounded-2xl" />
       ) : (
-        <TableMap tables={tables} onSelect={select} />
+        <TableMap
+          tables={tables}
+          zones={sortedZones}
+          onSelect={select}
+          layoutMode={layoutMode && isAdmin}
+          onReposition={repositionTable}
+        />
       )}
 
       <TableDrawer
@@ -130,13 +162,27 @@ export default function SalonPage() {
         onMove={moveTable}
         onMerge={mergeTable}
       />
+
       <AddTableDialog
         open={addOpen}
         onOpenChange={setAddOpen}
         onCreate={createTable}
         suggestedNumber={nextNumber}
         existingNumbers={tables.map((t) => t.number)}
+        zones={sortedZones.map((z) => z.name)}
       />
+
+      {isAdmin && (
+        <ZonesDialog
+          open={zonesOpen}
+          onOpenChange={setZonesOpen}
+          zones={zones}
+          tablesByZone={tablesByZone}
+          onAdd={addZone}
+          onUpdate={updateZone}
+          onDelete={removeZone}
+        />
+      )}
     </div>
   );
 }

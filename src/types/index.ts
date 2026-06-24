@@ -74,6 +74,12 @@ export interface DashboardData {
 // ---------------------------------------------------------------------------
 export type TableStatus = "available" | "occupied" | "reserved" | "billing";
 
+export interface SalonZone {
+  id: string;
+  name: string;
+  yStart: number; // % from top of canvas (0–100)
+}
+
 export interface RestaurantTable {
   id: string;
   number: number;

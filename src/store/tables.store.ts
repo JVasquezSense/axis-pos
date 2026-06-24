@@ -1,23 +1,29 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { RestaurantTable } from "@/types";
-import { TABLES } from "@/mock/tables";
+import type { RestaurantTable, SalonZone } from "@/types";
+import { TABLES, DEFAULT_ZONES } from "@/mock/tables";
 import { USE_API } from "@/services/http";
 import { salonService } from "@/services/salon.service";
 
 interface TablesState {
   tables: RestaurantTable[];
+  zones: SalonZone[];
   addTable: (t: RestaurantTable) => void;
+  repositionTable: (id: string, x: number, y: number) => void;
   moveOccupancy: (sourceId: string, targetId: string) => void;
   mergeTables: (sourceId: string, targetId: string) => void;
   occupy: (number: number, total?: number, waiter?: string) => void;
   free: (number: number) => void;
+  addZone: (zone: SalonZone) => void;
+  updateZone: (zone: SalonZone) => void;
+  removeZone: (id: string) => void;
 }
 
 export const useTablesStore = create<TablesState>()(
   persist(
     (set, get) => ({
       tables: USE_API ? [] : structuredClone(TABLES),
+      zones: structuredClone(DEFAULT_ZONES),
 
       addTable: (t) => {
         set((s) => ({ tables: [...s.tables, t] }));
@@ -25,6 +31,26 @@ export const useTablesStore = create<TablesState>()(
           set((s) => ({ tables: s.tables.map((x) => (x.id === t.id ? saved : x)) }))
         ).catch(console.error);
       },
+
+      repositionTable: (id, x, y) =>
+        set((s) => ({
+          tables: s.tables.map((t) =>
+            t.id === id ? { ...t, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } : t
+          ),
+        })),
+
+      addZone: (zone) =>
+        set((s) => ({
+          zones: [...s.zones, zone].sort((a, b) => a.yStart - b.yStart),
+        })),
+
+      updateZone: (zone) =>
+        set((s) => ({
+          zones: s.zones.map((z) => (z.id === zone.id ? zone : z)).sort((a, b) => a.yStart - b.yStart),
+        })),
+
+      removeZone: (id) =>
+        set((s) => ({ zones: s.zones.filter((z) => z.id !== id) })),
 
       moveOccupancy: (sourceId, targetId) =>
         set((s) => {

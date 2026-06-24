@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ZONES } from "@/mock/tables";
 import { cn } from "@/lib/utils";
 
 export interface NewTableData {
@@ -35,14 +34,15 @@ export function AddTableDialog({
   onCreate,
   suggestedNumber,
   existingNumbers,
+  zones,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreate: (data: NewTableData) => void;
   suggestedNumber: number;
   existingNumbers: number[];
+  zones: string[];
 }) {
-  const zones = ZONES.filter((z) => z !== "Todas");
   const [number, setNumber] = useState(suggestedNumber);
   const [capacity, setCapacity] = useState(4);
   const [zone, setZone] = useState(zones[0]);
