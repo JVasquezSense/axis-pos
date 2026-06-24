@@ -6,12 +6,16 @@
 export const runtime = "nodejs";
 
 function extractJson(text: string): string {
-  const md = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (md) return md[1].trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start >= 0 && end > start) return text.slice(start, end + 1);
-  return text.trim();
+  // Quitar BOM y caracteres de control raros
+  let t = text.replace(/^﻿/, "").trim();
+  // Bloque markdown ```json ... ```
+  const md = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (md) t = md[1].trim();
+  // Extraer desde el primer { hasta el último }
+  const start = t.indexOf("{");
+  const end = t.lastIndexOf("}");
+  if (start >= 0 && end > start) return t.slice(start, end + 1);
+  return t;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -48,43 +52,28 @@ export async function POST(req: Request): Promise<Response> {
     ? inventoryItems.map((i) => `id="${i.id}" nombre="${i.name}" unidad="${i.unit}"`).join("\n")
     : "(inventario vacío, crea todos como nuevos)";
 
-  const prompt = `Eres chef y consultor de restaurantes. Genera la ficha técnica completa para este plato: "${name.trim()}"
+  const prompt = `Plato: "${name.trim()}"
 
-Responde ÚNICAMENTE con JSON válido (sin markdown, sin texto extra). Usa esta estructura exacta:
+Genera la ficha técnica completa. Devuelve SOLO este JSON (sin texto extra):
+
 {
-  "description": "descripción apetitosa ≤180 chars para la carta",
-  "emoji": "un solo emoji representativo del plato",
-  "price": 28000,
-  "category": "id_exacto_de_la_lista",
-  "prepMinutes": 20,
-  "difficulty": "easy",
-  "station": "grill",
-  "allergens": ["gluten"],
-  "tags": ["clasica","popular"],
-  "steps": ["Paso 1...","Paso 2...","Paso 3..."],
-  "variations": [{"name":"Doble proteína","priceDelta":8000}],
-  "ingredients": [
-    {"name":"Carne molida","unit":"kg","quantity":0.2,"waste":0.05,"existingId":"id_si_coincide_o_null"}
-  ]
+  "description": "<descripcion apetitosa max 180 chars>",
+  "emoji": "<un emoji>",
+  "price": <numero COP entre 8000 y 150000>,
+  "category": "<id de categoria>",
+  "prepMinutes": <numero>,
+  "difficulty": "<easy|medium|hard>",
+  "station": "<grill|fry|cold|bar|pastry>",
+  "allergens": ["<solo de: gluten lacteos huevo mani mariscos soya pescado>"],
+  "tags": ["<etiqueta>"],
+  "steps": ["<paso 1>", "<paso 2>", "<paso 3>"],
+  "variations": [{"name": "<nombre>", "priceDelta": <numero COP>}],
+  "ingredients": [{"name": "<nombre>", "unit": "<kg|g|L|ml|und>", "quantity": <numero>, "waste": <0.0 a 0.3>, "existingId": "<id o null>"}]
 }
 
-CATEGORÍAS disponibles (usa el id exacto sin paréntesis):
-${categoryList}
+Categorias (usa el id exacto): ${categoryList}
 
-INVENTARIO existente (pon el id en "existingId" solo si el nombre coincide exactamente):
-${inventoryList}
-
-Reglas:
-- price: pesos colombianos (COP), rango 8000–150000, realista para restaurante
-- prepMinutes: tiempo real de preparación en minutos
-- difficulty: "easy" | "medium" | "hard"
-- station: "grill" | "fry" | "cold" | "bar" | "pastry"
-- allergens: solo de ["gluten","lacteos","huevo","mani","mariscos","soya","pescado"]
-- steps: 3 a 6 pasos claros de cocina
-- variations: 1 a 3 opciones típicas (tamaño, proteína, sin gluten, etc.)
-- ingredients: todos los ingredientes principales con unidades estándar (kg, g, L, ml, und)
-- waste: merma como fracción 0–0.3
-- existingId: null si no hay coincidencia en el inventario`;
+Inventario (usa existingId solo si el nombre coincide exacto): ${inventoryList}`;
 
   let upstream: Response;
   try {
@@ -94,9 +83,15 @@ Reglas:
       body: JSON.stringify({
         model,
         stream: false,
-        temperature: 0.7,
-        max_tokens: 800,
-        messages: [{ role: "user", content: prompt }],
+        temperature: 0.5,
+        max_tokens: 2000,
+        messages: [
+          {
+            role: "system",
+            content: "Eres un asistente de restaurante. SOLO respondes con JSON válido, sin texto adicional, sin markdown, sin explicaciones.",
+          },
+          { role: "user", content: prompt },
+        ],
       }),
     });
   } catch {
@@ -115,7 +110,8 @@ Reglas:
   try {
     parsed = JSON.parse(extractJson(content));
   } catch {
-    return Response.json({ error: "La IA no devolvió JSON válido", raw: content.slice(0, 300) }, { status: 502 });
+    console.error("[generate-recipe] JSON parse error. Raw content:", content);
+    return Response.json({ error: `La IA no devolvió JSON válido. Respuesta: ${content.slice(0, 200)}` }, { status: 502 });
   }
 
   return Response.json(parsed);
