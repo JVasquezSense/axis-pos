@@ -5,32 +5,63 @@
  */
 export const runtime = "nodejs";
 
-type Mode = "chat" | "pricing" | "shift" | "inventory";
+type Mode = "chat" | "pricing" | "shift" | "inventory" | "waiter" | "menu_eng" | "reservations";
 
 const SYSTEM_BASE =
-  "Eres Axis IA, copiloto de un restaurante (POS Axis). Responde SIEMPRE en español, breve, concreto y accionable. Moneda COP. Usa solo los datos provistos; si faltan, dilo. No inventes cifras.";
+  "Eres Axis IA, copiloto de restaurante integrado al POS Axis. " +
+  "Responde SIEMPRE en español, de forma breve, concreta y accionable. " +
+  "Moneda COP. Usa solo los datos provistos; si faltan, indícalo. " +
+  "No inventes cifras. Sé directo como un gerente experimentado de restaurantes.";
 
 const MODE_PROMPT: Record<Mode, string> = {
-  chat: "Responde la pregunta del usuario con base en el contexto.",
+  chat: "Responde la pregunta del usuario con base en el contexto del negocio.",
+
   pricing:
-    "Actúa como 'doctor de precios'. Señala los platos con food cost por encima del 30% y recomienda el nuevo precio (usa el sugerido). Máximo 5 recomendaciones en viñetas, cada una de una línea.",
+    "Actúa como 'doctor de precios'. Identifica los platos con food cost por encima del 30%, " +
+    "explica brevemente por qué son problemáticos y recomienda el precio ajustado. " +
+    "Máximo 5 recomendaciones en viñetas de una línea. Incluye el impacto en margen.",
+
   shift:
-    "Escribe un resumen de turno ejecutivo para el dueño (3-4 frases): ventas, ticket promedio, lo más vendido y 1-2 alertas. Tono claro y directo.",
+    "Escribe un resumen ejecutivo del turno para el dueño (4-5 frases): " +
+    "total de ventas, ticket promedio, método de pago dominante, mesero destacado si hay datos, " +
+    "y 1-2 alertas operativas (inventario crítico, food cost alto, etc.). Tono directo y claro.",
+
   inventory:
-    "Predice qué insumos se agotarán pronto (menos días restantes), explica el riesgo y sugiere qué comprar y a qué proveedor. Máximo 5 viñetas de una línea.",
+    "Analiza el inventario: identifica los insumos que se agotarán primero (menos días restantes), " +
+    "calcula el riesgo operativo, sugiere qué comprar urgente y a qué proveedor. " +
+    "Luego menciona brevemente los proveedores activos disponibles. Máximo 6 viñetas de una línea.",
+
+  waiter:
+    "Analiza el desempeño de los meseros en este turno: " +
+    "quién generó más ventas, quién obtuvo más propinas, cuántas mesas atendió cada uno. " +
+    "Destaca al mejor mesero y señala si alguno necesita atención. " +
+    "Si todos dicen 'Sin asignar', indica que el sistema necesita registrar meseros en caja. " +
+    "Máximo 5 viñetas de una línea.",
+
+  menu_eng:
+    "Aplica ingeniería de menú usando la matriz BCG (popularidad × margen): " +
+    "Explica brevemente cada cuadrante, luego da recomendaciones concretas: " +
+    "qué platos promover, cuáles ajustar en precio, cuáles retirar. " +
+    "Sé específico con nombres de platos. Máximo 6 viñetas accionables.",
+
+  reservations:
+    "Analiza las reservaciones: resume el día de hoy (hora pico, total comensales esperados, mesas comprometidas), " +
+    "menciona reservaciones pendientes de confirmar si las hay, " +
+    "y da 1-2 recomendaciones operativas para preparar el servicio. " +
+    "Si no hay reservaciones, sugiere cómo implementar el sistema.",
 };
 
 function fallback(mode: Mode): string {
-  return (
-    "⚠️ Axis IA en modo demo (configura GLM_API_KEY para respuestas con IA real).\n\n" +
-    (mode === "pricing"
-      ? "Revisa los platos con food cost > 30% y ajústalos al precio sugerido."
-      : mode === "shift"
-        ? "Resumen no disponible sin IA: revisa Ventas del día, ticket promedio y alertas en el dashboard."
-        : mode === "inventory"
-          ? "Revisa Inventario → Kardex: los insumos con menos días restantes son prioridad de compra."
-          : "Pregúntame sobre ventas, precios o inventario una vez configurada la clave.")
-  );
+  const msgs: Record<Mode, string> = {
+    pricing: "Revisa los platos con food cost > 30% en Menú & Recetas y ajústalos al precio sugerido.",
+    shift: "Sin IA: revisa Ventas del día, ticket promedio y alertas en el dashboard.",
+    inventory: "Revisa Inventario → Kardex: los insumos con menos días restantes son prioridad de compra.",
+    waiter: "Ve a Cierre de turno para ver el ranking de propinas por mesero.",
+    menu_eng: "Sin IA: en Menú & Recetas filtra por food cost para identificar platos problemáticos.",
+    reservations: "Ve a Reservaciones para ver el listado del día.",
+    chat: "Pregúntame sobre ventas, precios, inventario o meseros una vez configurada la clave.",
+  };
+  return `⚠️ Axis IA en modo demo (configura GLM_API_KEY para respuestas reales).\n\n${msgs[mode]}`;
 }
 
 export async function POST(req: Request) {
@@ -45,7 +76,13 @@ export async function POST(req: Request) {
   const baseUrl = process.env.GLM_BASE_URL ?? "https://open.bigmodel.cn/api/paas/v4";
   const model = process.env.GLM_MODEL ?? "glm-4.5-air";
 
-  const userContent = `${body.context ?? ""}\n\nTarea: ${MODE_PROMPT[mode]}${body.message ? `\nPregunta: ${body.message}` : ""}`.trim();
+  const userContent = [
+    body.context ? `--- DATOS DEL NEGOCIO ---\n${body.context}\n--- FIN DATOS ---` : "",
+    `Tarea: ${MODE_PROMPT[mode]}`,
+    body.message ? `Pregunta del usuario: ${body.message}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   if (!apiKey) {
     return new Response(fallback(mode), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
@@ -59,9 +96,9 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         model,
         stream: true,
-        temperature: 0.5,
-        max_tokens: 600,
-        thinking: { type: "disabled" }, // sin cadena de razonamiento → menos tokens
+        temperature: 0.4,
+        max_tokens: 800,
+        thinking: { type: "disabled" },
         messages: [
           { role: "system", content: SYSTEM_BASE },
           { role: "user", content: userContent },
@@ -69,7 +106,9 @@ export async function POST(req: Request) {
       }),
     });
   } catch {
-    return new Response("No se pudo conectar con la IA.\n\n" + fallback(mode), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    return new Response("No se pudo conectar con la IA.\n\n" + fallback(mode), {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   }
 
   if (!upstream.ok || !upstream.body) {
@@ -79,7 +118,6 @@ export async function POST(req: Request) {
     });
   }
 
-  // Transforma el SSE (formato OpenAI) en texto plano: solo el contenido final.
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   const reader = upstream.body.getReader();
@@ -108,7 +146,7 @@ export async function POST(req: Request) {
           const delta = json.choices?.[0]?.delta?.content;
           if (delta) controller.enqueue(encoder.encode(delta));
         } catch {
-          /* fragmento incompleto, se ignora */
+          /* fragmento incompleto */
         }
       }
     },

@@ -4,13 +4,21 @@
  * cifras redondeadas y formato terso (no JSON verboso), solo lo relevante por modo.
  */
 import type { Recipe, InventoryItem, InventoryMovement, RestaurantTable, KdsTicket } from "@/types";
+import type { Reservation } from "@/store/reservations.store";
+import type { Purchase, Supplier } from "@/types";
 import { computeRecipeCost } from "@/lib/recipes";
 import { liveDayTotals, type SaleRecord } from "@/store/sales.store";
-import { DASHBOARD } from "@/mock/datasets";
 
 const k = (n: number) => `$${Math.round(n / 1000)}k`; // miles, compacto
 
-export type AiMode = "chat" | "pricing" | "shift" | "inventory";
+export type AiMode =
+  | "chat"
+  | "pricing"
+  | "shift"
+  | "inventory"
+  | "waiter"
+  | "menu_eng"
+  | "reservations";
 
 interface Stores {
   sales: SaleRecord[];
@@ -19,30 +27,92 @@ interface Stores {
   movements: InventoryMovement[];
   tables: RestaurantTable[];
   tickets: KdsTicket[];
+  reservations?: Reservation[];
+  purchases?: Purchase[];
+  suppliers?: Supplier[];
 }
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function topByKey<T>(arr: T[], key: (x: T) => number, n = 5): T[] {
+  return [...arr].sort((a, b) => key(b) - key(a)).slice(0, n);
+}
+
+/** Top productos REALES desde SaleRecords (aproximado por total / items). */
+function topProductsFromSales(records: SaleRecord[]): string {
+  // Agrupamos por tipo de venta como proxy de "plato"
+  // (sin items detallados, usamos método+tipo como agrupador)
+  const byType = records.reduce<Record<string, number>>((acc, r) => {
+    acc[r.saleType] = (acc[r.saleType] ?? 0) + r.total;
+    return acc;
+  }, {});
+  return Object.entries(byType)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4)
+    .map(([t, v]) => `${t}: ${k(v)}`)
+    .join(", ");
+}
+
+// ─── Builders ────────────────────────────────────────────────────────────────
 
 /** Resumen general del negocio (chat / resumen de turno). */
 export function buildBrief(s: Stores): string {
   const d = liveDayTotals(s.sales);
   const occ = s.tables.filter((t) => t.status === "occupied" || t.status === "billing").length;
   const active = s.tickets.filter((t) => t.status !== "ready").length;
-  const top = DASHBOARD.topProducts.slice(0, 5).map((p) => `${p.name} ${p.units}u/${k(p.revenue)}`).join(", ");
+
+  // Ventas reales de la sesión por método
+  const byMethod = s.sales.reduce<Record<string, number>>((acc, r) => {
+    acc[r.method] = (acc[r.method] ?? 0) + r.total;
+    return acc;
+  }, {});
+  const methodStr = Object.entries(byMethod).map(([m, v]) => `${m}:${k(v)}`).join(", ");
+
+  // Mesero con más propinas
+  const byWaiter = s.sales.reduce<Record<string, { tip: number; sales: number }>>((acc, r) => {
+    if (!r.waiter || r.waiter === "Sin asignar") return acc;
+    acc[r.waiter] = acc[r.waiter] ?? { tip: 0, sales: 0 };
+    acc[r.waiter].tip += r.tip;
+    acc[r.waiter].sales += r.total;
+    return acc;
+  }, {});
+  const topWaiter = Object.entries(byWaiter).sort(([, a], [, b]) => b.tip - a.tip)[0];
+
+  // Food cost alto
   const highFC = s.recipes
     .map((r) => ({ n: r.name, fc: Math.round(computeRecipeCost(r).foodCostPct * 100) }))
     .filter((r) => r.fc > 35)
-    .slice(0, 5)
+    .slice(0, 4)
     .map((r) => `${r.n} ${r.fc}%`)
     .join(", ");
-  const crit = s.inventory.filter((i) => i.status !== "normal").map((i) => `${i.name} ${i.stock}${i.unit}`).join(", ");
+
+  // Inventario bajo
+  const crit = s.inventory
+    .filter((i) => i.status !== "normal")
+    .slice(0, 5)
+    .map((i) => `${i.name} ${i.stock}${i.unit}`)
+    .join(", ");
+
+  // Reservaciones del día
+  const todayRes = (s.reservations ?? []).filter(
+    (r) => r.date === new Date().toISOString().slice(0, 10) && r.status !== "cancelled"
+  );
 
   return [
-    `Negocio: Demo Burger (es-CO, COP)`,
-    `Hoy: ventas ${k(d.sales)}, ${d.orders} pedidos, ticket ${k(d.avg)}`,
-    `Mesas ocupadas: ${occ}/${s.tables.length} · Cocina activa: ${active}`,
-    `Top platos: ${top}`,
+    `Restaurante: Axis POS (es-CO, COP)`,
+    `Hoy: ventas ${k(d.sales)}, ${d.orders} pedidos, ticket prom. ${k(d.avg)}`,
+    methodStr ? `Métodos de pago: ${methodStr}` : "",
+    `Mesas: ${occ}/${s.tables.length} ocupadas · Cocina: ${active} pedidos activos`,
+    topWaiter ? `Mejor mesero: ${topWaiter[0]} (propinas ${k(topWaiter[1].tip)}, ventas ${k(topWaiter[1].sales)})` : "",
+    s.sales.length > 0 ? `Ventas por tipo: ${topProductsFromSales(s.sales)}` : "",
     highFC ? `Food cost alto (>35%): ${highFC}` : `Food cost: todo bajo control`,
     crit ? `Inventario bajo/crítico: ${crit}` : `Inventario: sin críticos`,
-  ].join("\n");
+    todayRes.length > 0
+      ? `Reservaciones hoy: ${todayRes.length} (${todayRes.reduce((s, r) => s + r.guests, 0)} comensales)`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** Recetas con food cost para el "doctor de precios". */
@@ -50,18 +120,23 @@ export function buildPricing(recipes: Recipe[]): string {
   const rows = recipes
     .map((r) => {
       const c = computeRecipeCost(r);
-      return { n: r.name, price: r.price, fc: Math.round(c.foodCostPct * 100), sug: c.suggestedPrice };
+      return { n: r.name, price: r.price, fc: Math.round(c.foodCostPct * 100), sug: c.suggestedPrice, cat: r.category };
     })
     .sort((a, b) => b.fc - a.fc)
-    .slice(0, 12)
-    .map((r) => `${r.n}|${k(r.price)}|${r.fc}%|${k(r.sug)}`)
+    .slice(0, 14)
+    .map((r) => `${r.n}|${r.cat}|${k(r.price)}|${r.fc}%|sugerido:${k(r.sug)}`)
     .join("\n");
-  return `Objetivo food cost: 30%.\nPlato|precio|foodcost|sugerido\n${rows}`;
+  return `Objetivo food cost: 30%.\nPlato|categoría|precio|foodcost|sugerido\n${rows}`;
 }
 
-/** Pronóstico de inventario: velocidad de consumo y días restantes (Fase 2). */
-export function buildInventoryForecast(inventory: InventoryItem[], movements: InventoryMovement[]): string {
-  const PERIOD = 20; // días que cubre el kardex aprox.
+/** Pronóstico de inventario: velocidad de consumo y días restantes. */
+export function buildInventoryForecast(
+  inventory: InventoryItem[],
+  movements: InventoryMovement[],
+  purchases?: Purchase[],
+  suppliers?: Supplier[]
+): string {
+  const PERIOD = 20;
   const outBy: Record<string, number> = {};
   movements.forEach((m) => {
     if (m.type === "salida") outBy[m.inventoryId] = (outBy[m.inventoryId] ?? 0) + Math.abs(m.quantity);
@@ -74,7 +149,129 @@ export function buildInventoryForecast(inventory: InventoryItem[], movements: In
     })
     .sort((a, b) => a.days - b.days)
     .slice(0, 10)
-    .map((r) => `${r.n}|${r.stock}${r.unit}|${r.daily}/día|${r.days}d|${r.sup}`)
+    .map((r) => `${r.n}|${r.stock}${r.unit}|${r.daily}/día|${r.days}d|proveedor:${r.sup}`)
     .join("\n");
-  return `Insumo|stock|uso|días_restantes|proveedor\n${rows}`;
+
+  // Compras recientes
+  const purchaseSummary = purchases && purchases.length > 0
+    ? purchases.slice(0, 5).map((p) => `${p.code} ${p.supplierName} ${k(p.total)}`).join(", ")
+    : "";
+  const supplierList = suppliers && suppliers.length > 0
+    ? suppliers.filter((s) => s.active).map((s) => `${s.name}(${s.category})`).join(", ")
+    : "";
+
+  return [
+    `Insumo|stock|uso_diario|días_restantes|proveedor`,
+    rows,
+    purchaseSummary ? `\nÚltimas compras: ${purchaseSummary}` : "",
+    supplierList ? `Proveedores activos: ${supplierList}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** Análisis de meseros: propinas, ventas, pedidos. */
+export function buildWaiterStats(records: SaleRecord[]): string {
+  if (records.length === 0) return "Sin ventas registradas en la sesión.";
+
+  const stats: Record<string, { sales: number; tip: number; orders: number; tables: Set<number> }> = {};
+  records.forEach((r) => {
+    const w = r.waiter || "Sin asignar";
+    stats[w] = stats[w] ?? { sales: 0, tip: 0, orders: 0, tables: new Set() };
+    stats[w].sales += r.total;
+    stats[w].tip += r.tip;
+    stats[w].orders += 1;
+    if (r.table) stats[w].tables.add(r.table);
+  });
+
+  const rows = Object.entries(stats)
+    .sort(([, a], [, b]) => b.sales - a.sales)
+    .map(([w, d]) =>
+      `${w}|ventas:${k(d.sales)}|propinas:${k(d.tip)}|pedidos:${d.orders}|mesas:${d.tables.size}`
+    )
+    .join("\n");
+
+  const totalTips = records.reduce((s, r) => s + r.tip, 0);
+  return [
+    `Mesero|ventas|propinas|pedidos|mesas_atendidas`,
+    rows,
+    `\nTotal propinas del turno: ${k(totalTips)}`,
+  ].join("\n");
+}
+
+/** Ingeniería de menú: popularidad × margen (matriz BCG). */
+export function buildMenuEngineering(recipes: Recipe[], records: SaleRecord[]): string {
+  if (recipes.length === 0) return "Sin recetas registradas.";
+
+  // Sin historial de ventas por producto, usamos food cost como proxy del margen
+  const items = recipes.map((r) => {
+    const c = computeRecipeCost(r);
+    const margin = c.margin; // precio - costo por porción
+    const fc = Math.round(c.foodCostPct * 100);
+    // Popularidad: recetas con food cost > 30% se consideran "menos rentables"
+    // Usamos precio como proxy de demanda si no hay ventas por producto
+    return {
+      n: r.name,
+      cat: r.category,
+      price: r.price,
+      fc,
+      margin: Math.round(margin),
+      cost: Math.round(c.costPerPortion),
+      sug: Math.round(c.suggestedPrice),
+    };
+  });
+
+  // Umbral de margen: mediana
+  const margins = items.map((i) => i.margin).sort((a, b) => a - b);
+  const medianMargin = margins[Math.floor(margins.length / 2)] ?? 0;
+  // Umbral food cost: 30%
+  const FCT = 30;
+
+  const stars = items.filter((i) => i.margin >= medianMargin && i.fc <= FCT);
+  const cows = items.filter((i) => i.margin >= medianMargin && i.fc > FCT);
+  const puzzles = items.filter((i) => i.margin < medianMargin && i.fc <= FCT);
+  const dogs = items.filter((i) => i.margin < medianMargin && i.fc > FCT);
+
+  const fmt = (arr: typeof items) =>
+    arr.map((i) => `${i.n}(${i.cat})|FC:${i.fc}%|margen:${k(i.margin)}`).join(", ") || "ninguno";
+
+  return [
+    `Ingeniería de menú — umbral margen: ${k(medianMargin)}, food cost: ${FCT}%`,
+    ``,
+    `⭐ ESTRELLAS (alto margen, bajo costo): ${fmt(stars)}`,
+    `🐄 VACAS (alto margen, costo alto): ${fmt(cows)}`,
+    `❓ PUZZLES (bajo margen, bajo costo — potencial): ${fmt(puzzles)}`,
+    `🐕 PERROS (bajo margen, costo alto — revisar): ${fmt(dogs)}`,
+    ``,
+    `Total platos: ${items.length} | Margen mediano: ${k(medianMargin)} | Food cost prom: ${Math.round(items.reduce((s, i) => s + i.fc, 0) / (items.length || 1))}%`,
+  ].join("\n");
+}
+
+/** Briefing de reservaciones (hoy + próximas). */
+export function buildReservationsBrief(reservations: Reservation[]): string {
+  if (reservations.length === 0) return "Sin reservaciones registradas.";
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todayRes = reservations
+    .filter((r) => r.date === today && r.status !== "cancelled")
+    .sort((a, b) => a.time.localeCompare(b.time));
+  const upcoming = reservations
+    .filter((r) => r.date > today && r.status !== "cancelled")
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+    .slice(0, 5);
+
+  const todayStr = todayRes.length > 0
+    ? todayRes.map((r) => `${r.time} ${r.name} x${r.guests} mesa${r.tableNumber} [${r.status}]${r.notes ? " nota:" + r.notes : ""}`).join("\n")
+    : "Sin reservaciones hoy";
+  const upStr = upcoming.length > 0
+    ? upcoming.map((r) => `${r.date} ${r.time} ${r.name} x${r.guests}`).join("\n")
+    : "Sin próximas reservaciones";
+  const totalGuests = todayRes.reduce((s, r) => s + r.guests, 0);
+
+  return [
+    `Reservaciones HOY (${today}): ${todayRes.length} — ${totalGuests} comensales esperados`,
+    todayStr,
+    `\nPróximas reservaciones:`,
+    upStr,
+  ].join("\n");
 }

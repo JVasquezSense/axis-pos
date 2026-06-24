@@ -2,13 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sparkles, X, Send, Receipt, Tag, Boxes, Loader2 } from "lucide-react";
+import {
+  Sparkles, X, Send, Receipt, Tag, Boxes, Loader2,
+  Users, ChefHat, CalendarClock, ChevronDown, ChevronUp,
+} from "lucide-react";
 import { useSalesStore } from "@/store/sales.store";
 import { useRecipesStore } from "@/store/recipes.store";
 import { useInventoryStore } from "@/store/inventory.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useKitchenStore } from "@/store/kitchen.store";
-import { buildBrief, buildPricing, buildInventoryForecast, type AiMode } from "@/lib/ai-context";
+import { useReservationsStore } from "@/store/reservations.store";
+import { useSuppliersStore } from "@/store/suppliers.store";
+import {
+  buildBrief,
+  buildPricing,
+  buildInventoryForecast,
+  buildWaiterStats,
+  buildMenuEngineering,
+  buildReservationsBrief,
+  type AiMode,
+} from "@/lib/ai-context";
 import { cn } from "@/lib/utils";
 
 interface Msg {
@@ -16,27 +29,75 @@ interface Msg {
   content: string;
 }
 
-const QUICK: { mode: AiMode; label: string; icon: React.ElementType; user: string }[] = [
-  { mode: "shift", label: "Resumen de turno", icon: Receipt, user: "Genera el resumen del turno." },
-  { mode: "pricing", label: "Doctor de precios", icon: Tag, user: "Revisa mis precios y food cost." },
-  { mode: "inventory", label: "Predicción de inventario", icon: Boxes, user: "¿Qué insumos se van a agotar?" },
+const QUICK: { mode: AiMode; label: string; icon: React.ElementType; user: string; desc: string }[] = [
+  {
+    mode: "shift",
+    label: "Resumen de turno",
+    icon: Receipt,
+    user: "Genera el resumen ejecutivo del turno.",
+    desc: "Ventas, ticket, alertas",
+  },
+  {
+    mode: "pricing",
+    label: "Doctor de precios",
+    icon: Tag,
+    user: "Revisa mis precios y food cost.",
+    desc: "Detecta platos con margen bajo",
+  },
+  {
+    mode: "inventory",
+    label: "Inventario",
+    icon: Boxes,
+    user: "¿Qué insumos se van a agotar pronto?",
+    desc: "Predicción y reorden",
+  },
+  {
+    mode: "waiter",
+    label: "Mis meseros",
+    icon: Users,
+    user: "¿Cómo van mis meseros en propinas y ventas?",
+    desc: "Ranking propinas y ventas",
+  },
+  {
+    mode: "menu_eng",
+    label: "Ingeniería de menú",
+    icon: ChefHat,
+    user: "Clasifica mis platos en la matriz BCG de rentabilidad.",
+    desc: "Estrellas, vacas, puzzles, perros",
+  },
+  {
+    mode: "reservations",
+    label: "Reservaciones",
+    icon: CalendarClock,
+    user: "Dame el briefing de las reservaciones de hoy.",
+    desc: "Resumen del día y próximas",
+  },
 ];
 
 function contextFor(mode: AiMode): string {
   const sales = useSalesStore.getState().records;
   const recipes = useRecipesStore.getState().recipes;
   const inv = useInventoryStore.getState();
-  if (mode === "pricing") return buildPricing(recipes);
-  if (mode === "inventory") return buildInventoryForecast(inv.items, inv.movements);
-  // chat y shift usan el brief general
-  return buildBrief({
-    sales,
-    recipes,
-    inventory: inv.items,
-    movements: inv.movements,
-    tables: useTablesStore.getState().tables,
-    tickets: useKitchenStore.getState().tickets,
-  });
+  const tables = useTablesStore.getState().tables;
+  const tickets = useKitchenStore.getState().tickets;
+  const reservations = useReservationsStore.getState().reservations;
+  const { purchases, suppliers } = useSuppliersStore.getState();
+
+  switch (mode) {
+    case "pricing":
+      return buildPricing(recipes);
+    case "inventory":
+      return buildInventoryForecast(inv.items, inv.movements, purchases, suppliers);
+    case "waiter":
+      return buildWaiterStats(sales);
+    case "menu_eng":
+      return buildMenuEngineering(recipes, sales);
+    case "reservations":
+      return buildReservationsBrief(reservations);
+    default:
+      // chat y shift: brief completo con todos los datos
+      return buildBrief({ sales, recipes, inventory: inv.items, movements: inv.movements, tables, tickets, reservations, purchases, suppliers });
+  }
 }
 
 export function AxisAI() {
@@ -45,6 +106,7 @@ export function AxisAI() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [showAllQuick, setShowAllQuick] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setMounted(true), []);
@@ -60,7 +122,11 @@ export function AxisAI() {
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, message: mode === "chat" ? userText : "", context: contextFor(mode) }),
+        body: JSON.stringify({
+          mode,
+          message: mode === "chat" ? userText : "",
+          context: contextFor(mode),
+        }),
       });
       if (!res.body) throw new Error("sin respuesta");
       const reader = res.body.getReader();
@@ -95,6 +161,8 @@ export function AxisAI() {
     send("chat", t);
   };
 
+  const visibleQuick = showAllQuick ? QUICK : QUICK.slice(0, 3);
+
   if (!mounted) return null;
 
   return (
@@ -118,7 +186,7 @@ export function AxisAI() {
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.96 }}
-            className="fixed bottom-5 right-5 z-50 flex h-[70vh] max-h-[640px] w-[calc(100vw-2.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+            className="fixed bottom-5 right-5 z-50 flex h-[72vh] max-h-[680px] w-[calc(100vw-2.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-primary/10 to-gold/10 p-4">
@@ -131,24 +199,41 @@ export function AxisAI() {
                   <p className="text-[11px] leading-tight text-muted-foreground">Copiloto · GLM-4.5</p>
                 </div>
               </div>
-              <button onClick={() => setOpen(false)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                {messages.length > 0 && (
+                  <button
+                    onClick={() => setMessages([])}
+                    className="rounded-lg px-2 py-1.5 text-[11px] text-muted-foreground hover:bg-muted"
+                  >
+                    Nueva consulta
+                  </button>
+                )}
+                <button onClick={() => setOpen(false)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             {/* Mensajes */}
             <div ref={scrollRef} className="scrollbar-thin flex-1 space-y-3 overflow-y-auto p-4">
               {messages.length === 0 && (
                 <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                  👋 Soy <strong className="text-foreground">Axis IA</strong>. Pregúntame por tus ventas, precios o inventario — leo los datos reales de tu restaurante.
+                  👋 Soy <strong className="text-foreground">Axis IA</strong>. Pregúntame por tus ventas, meseros, precios, inventario o reservaciones — leo los datos reales de tu negocio.
                 </div>
               )}
               {messages.map((m, i) => (
                 <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+                  {m.role === "assistant" && (
+                    <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-gold text-primary-foreground">
+                      <Sparkles className="h-3 w-3" />
+                    </div>
+                  )}
                   <div
                     className={cn(
                       "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm",
-                      m.role === "user" ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted"
+                      m.role === "user"
+                        ? "rounded-br-sm bg-primary text-primary-foreground"
+                        : "rounded-bl-sm bg-muted"
                     )}
                   >
                     {m.content || <Loader2 className="h-4 w-4 animate-spin" />}
@@ -159,17 +244,53 @@ export function AxisAI() {
 
             {/* Acciones rápidas */}
             {messages.length === 0 && (
-              <div className="flex flex-wrap gap-1.5 border-t border-border p-3">
-                {QUICK.map((q) => (
+              <div className="border-t border-border px-3 pb-1 pt-2">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Consultas rápidas
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {visibleQuick.map((q) => (
+                    <button
+                      key={q.mode}
+                      onClick={() => send(q.mode, q.user)}
+                      disabled={busy}
+                      title={q.desc}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted hover:border-primary/40 disabled:opacity-50"
+                    >
+                      <q.icon className="h-3.5 w-3.5 text-primary" /> {q.label}
+                    </button>
+                  ))}
                   <button
-                    key={q.mode}
-                    onClick={() => send(q.mode, q.user)}
-                    disabled={busy}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"
+                    onClick={() => setShowAllQuick((v) => !v)}
+                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted"
                   >
-                    <q.icon className="h-3.5 w-3.5 text-primary" /> {q.label}
+                    {showAllQuick ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    {showAllQuick ? "Menos" : "Más"}
                   </button>
-                ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ejemplos de preguntas libres */}
+            {messages.length === 0 && (
+              <div className="px-3 pb-2">
+                <p className="mb-1 text-[10px] text-muted-foreground">También puedes preguntar:</p>
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    "¿Cuál es mi horario pico?",
+                    "¿Qué plato retiraría?",
+                    "¿Cómo mejorar mi ticket promedio?",
+                    "¿Qué insumo comprar hoy?",
+                  ].map((ex) => (
+                    <button
+                      key={ex}
+                      onClick={() => { setInput(ex); }}
+                      className="rounded-lg border border-border/60 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                      {ex}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -178,13 +299,13 @@ export function AxisAI() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Pregúntale a tu negocio…"
+                placeholder="Pregunta sobre tu negocio…"
                 className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
               />
               <button
                 type="submit"
                 disabled={busy || !input.trim()}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </button>
