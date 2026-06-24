@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   UtensilsCrossed, Plus, Search, MoreVertical, Pencil, Trash2, Tag, BookOpen,
-  DollarSign, Percent, Package, Layers,
+  DollarSign, Percent, Package, Layers, ScanLine,
 } from "lucide-react";
 import type { Category, Product, Recipe } from "@/types";
 import { useMenuStore, emptyProduct, uid } from "@/store/menu.store";
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductFormDialog } from "@/components/menu/product-form-dialog";
+import { MenuScanDialog } from "@/components/menu/menu-scan-dialog";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const ICON_OPTIONS = ["Salad", "Beef", "Drumstick", "CupSoda", "IceCream", "Pizza", "Coffee", "Soup", "Fish", "Cookie"];
@@ -76,6 +77,7 @@ function CartaTab() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Product | null>(null);
   const [recipeEditing, setRecipeEditing] = useState<Recipe | null>(null);
   const [recipeOpen, setRecipeOpen] = useState(false);
@@ -123,6 +125,9 @@ function CartaTab() {
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => setCatOpen(true)}>
           <Tag className="h-4 w-4" /> Categoría
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setScanOpen(true)}>
+          <ScanLine className="h-4 w-4" /> Importar desde foto
         </Button>
         <Button size="sm" onClick={openNew}>
           <Plus className="h-4 w-4" /> Producto
@@ -220,6 +225,12 @@ function CartaTab() {
       <ProductFormDialog product={editing} categories={categories} open={formOpen} onOpenChange={setFormOpen} onSave={save} />
       <RecipeEditor recipe={recipeEditing} open={recipeOpen} onOpenChange={setRecipeOpen} />
       <AddCategoryDialog open={catOpen} onOpenChange={setCatOpen} onCreate={(c) => { addCategory(c); toast.success(`Categoría "${c.name}" creada`); }} />
+      <MenuScanDialog
+        open={scanOpen}
+        onOpenChange={setScanOpen}
+        categories={categories}
+        onImport={(products) => { products.forEach(addProduct); }}
+      />
 
       <Dialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
         <DialogContent className="max-w-sm">
