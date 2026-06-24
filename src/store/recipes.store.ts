@@ -76,6 +76,7 @@ export function emptyRecipe(): Recipe {
     id: uid("r"),
     name: "",
     emoji: "🍽️",
+    description: "",
     category: "hamburguesas",
     productId: undefined,
     status: "draft",

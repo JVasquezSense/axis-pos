@@ -338,6 +338,7 @@ export interface Recipe {
   id: string;
   name: string;
   emoji: string;
+  description?: string; // descripción para el menú / carta web
   category: string; // id de categoría del menú
   productId?: string; // producto del menú vinculado
   status: RecipeStatus;

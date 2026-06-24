@@ -107,8 +107,12 @@ function CartaTab() {
   );
 
   const openNew = () => {
-    setEditing(emptyProduct(activeCat === "all" ? categories[0]?.id ?? "" : activeCat));
-    setFormOpen(true);
+    // Crear producto = abrir RecipeEditor (crea el producto automáticamente al guardar)
+    setRecipeEditing({
+      ...emptyRecipe(),
+      category: activeCat === "all" ? (categories[0]?.id ?? "") : activeCat,
+    });
+    setRecipeOpen(true);
   };
   const save = (p: Product) => {
     if (products.some((x) => x.id === p.id)) {

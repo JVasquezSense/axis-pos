@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Sparkles, GripVertical, Wand2 } from "lucide-react";
+import { Plus, Trash2, Sparkles, GripVertical, Wand2, Loader2, ImagePlus, X } from "lucide-react";
 import type { Recipe, Allergen, RecipeStation, RecipeStatus, RecipeDifficulty } from "@/types";
 import { useMenuStore } from "@/store/menu.store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -35,8 +35,11 @@ export function RecipeEditor({
   const categories = useMenuStore((s) => s.categories);
   const products = useMenuStore((s) => s.products);
   const addProduct = useMenuStore((s) => s.addProduct);
+  const updateProduct = useMenuStore((s) => s.updateProduct);
   const [draft, setDraft] = useState<Recipe | null>(recipe);
   const [tagInput, setTagInput] = useState("");
+  const [describingAI, setDescribingAI] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const isNew = recipe ? !useRecipesStore.getState().recipes.some((r) => r.id === recipe.id) : false;
 
   useEffect(() => {
@@ -47,6 +50,44 @@ export function RecipeEditor({
   const set = (patch: Partial<Recipe>) => setDraft({ ...draft, ...patch });
   const cost = computeRecipeCost(draft);
 
+  const isImageUrl = (src: string) =>
+    src.startsWith("data:") || src.startsWith("http") || src.startsWith("/") || src.startsWith("blob:");
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => set({ emoji: ev.target?.result as string });
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const suggestDescription = async () => {
+    if (!draft.name.trim()) { toast.error("Agrega un nombre primero"); return; }
+    setDescribingAI(true);
+    try {
+      const res = await fetch("/api/ai/describe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name,
+          ingredients: draft.ingredients.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
+          allergens: draft.allergens,
+          tags: draft.tags,
+          station: draft.station,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) { toast.error(data.error); return; }
+      set({ description: data.description });
+      toast.success("Descripción generada");
+    } catch {
+      toast.error("No se pudo conectar con la IA");
+    } finally {
+      setDescribingAI(false);
+    }
+  };
+
   const save = () => {
     if (!draft.name.trim()) {
       toast.error("La receta necesita un nombre");
@@ -54,11 +95,10 @@ export function RecipeEditor({
     }
     let finalDraft = { ...draft };
     if (isNew && !finalDraft.productId) {
-      // Auto-crear el producto vinculado a esta receta
       const newProduct = {
         id: uid("p"),
         name: finalDraft.name,
-        description: finalDraft.tags.join(", "),
+        description: finalDraft.description ?? "",
         price: finalDraft.price,
         category: finalDraft.category,
         image: finalDraft.emoji,
@@ -69,11 +109,25 @@ export function RecipeEditor({
       };
       addProduct(newProduct);
       finalDraft = { ...finalDraft, productId: newProduct.id };
-      toast.success("Producto creado automáticamente", { description: finalDraft.name });
+    } else if (!isNew && finalDraft.productId) {
+      // Sincroniza campos básicos del producto si ya existe
+      const existing = products.find((p) => p.id === finalDraft.productId);
+      if (existing) {
+        updateProduct({
+          ...existing,
+          name: finalDraft.name,
+          description: finalDraft.description ?? existing.description,
+          price: finalDraft.price,
+          image: finalDraft.emoji,
+          tags: finalDraft.tags,
+          available: finalDraft.status === "active",
+          prepMinutes: finalDraft.prepMinutes,
+        });
+      }
     }
     if (isNew) {
       create(finalDraft);
-      toast.success("Receta creada", { description: finalDraft.name });
+      toast.success("Producto y receta creados", { description: finalDraft.name });
     } else {
       update(finalDraft);
       toast.success("Receta actualizada", { description: finalDraft.name });
@@ -95,14 +149,42 @@ export function RecipeEditor({
       <DialogContent className="max-w-4xl gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-border p-5">
           <div className="flex items-center gap-3">
-            <input
-              value={draft.emoji}
-              onChange={(e) => set({ emoji: e.target.value.slice(0, 2) })}
-              className="h-12 w-12 rounded-xl border border-border bg-muted text-center text-2xl outline-none focus:border-primary"
-            />
+            {/* Foto / emoji del plato */}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                title="Subir foto"
+                className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted text-2xl transition-colors hover:border-primary"
+              >
+                {isImageUrl(draft.emoji) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={draft.emoji} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  draft.emoji || "🍽️"
+                )}
+              </button>
+              {isImageUrl(draft.emoji) ? (
+                <button
+                  type="button"
+                  onClick={() => set({ emoji: "🍽️" })}
+                  className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white shadow"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              ) : (
+                <input
+                  value={draft.emoji}
+                  onChange={(e) => set({ emoji: e.target.value.slice(0, 2) })}
+                  className="absolute -bottom-1 -right-1 h-5 w-10 rounded border border-border bg-background text-center text-[10px] outline-none focus:border-primary"
+                  placeholder="emoji"
+                />
+              )}
+            </div>
             <div className="flex-1">
-              <DialogTitle>{isNew ? "Nueva receta" : "Editar receta"}</DialogTitle>
-              <DialogDescription>Ficha técnica · costeo y consumo de inventario</DialogDescription>
+              <DialogTitle>{isNew ? "Nuevo producto" : "Editar producto"}</DialogTitle>
+              <DialogDescription>Ficha técnica · costeo · carta</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -124,9 +206,32 @@ export function RecipeEditor({
 
               {/* GENERAL */}
               <TabsContent value="general" className="space-y-4">
-                <Field label="Nombre de la receta">
+                <Field label="Nombre del producto">
                   <Input value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ej: Axis Classic" />
                 </Field>
+
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="text-sm font-medium">Descripción (carta)</label>
+                    <button
+                      type="button"
+                      onClick={suggestDescription}
+                      disabled={describingAI}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                    >
+                      {describingAI
+                        ? <><Loader2 className="h-3 w-3 animate-spin" /> Generando…</>
+                        : <><Sparkles className="h-3 w-3" /> Sugerir con IA</>}
+                    </button>
+                  </div>
+                  <textarea
+                    value={draft.description ?? ""}
+                    onChange={(e) => set({ description: e.target.value })}
+                    placeholder="Descripción apetitosa que verá el cliente en el menú…"
+                    rows={2}
+                    className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Categoría">
