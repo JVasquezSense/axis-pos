@@ -75,7 +75,7 @@ export const useSuppliersStore = create<SuppliersState>()(
         }
       },
     }),
-    { name: "axis-suppliers", version: 1 }
+    { name: "axis-suppliers", version: 2 }
   )
 );
 

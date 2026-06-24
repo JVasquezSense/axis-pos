@@ -75,6 +75,6 @@ export const useKitchenStore = create<KitchenState>()(
           ),
         })),
     }),
-    { name: "axis-kitchen", version: 1 }
+    { name: "axis-kitchen", version: 2 }
   )
 );

@@ -62,7 +62,7 @@ export const useMenuStore = create<MenuState>()(
         }
       },
     }),
-    { name: "axis-menu", version: 1 }
+    { name: "axis-menu", version: 2 }
   )
 );
 

@@ -57,7 +57,7 @@ export const useReservationsStore = create<ReservationsState>()(
         if (USE_API) reservationsService.setStatus(id, status).catch(console.error);
       },
     }),
-    { name: "axis-reservations", version: 1 }
+    { name: "axis-reservations", version: 2 }
   )
 );
 

@@ -40,7 +40,7 @@ export const useSalesStore = create<SalesState>()(
 
       reset: () => set({ records: [] }),
     }),
-    { name: "axis-sales", version: 1 }
+    { name: "axis-sales", version: 2 }
   )
 );
 

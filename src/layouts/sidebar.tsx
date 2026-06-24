@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar, role } = useAppStore();
-  const allowed = ROLE_NAV[role];
+  const allowed = ROLE_NAV[role] ?? ROLE_NAV["admin"];
   const items = NAV_ITEMS.filter((i) => allowed.includes(i.key));
 
   return (

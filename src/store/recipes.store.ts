@@ -55,7 +55,7 @@ export const useRecipesStore = create<RecipesState>()(
           return { recipes: next };
         }),
     }),
-    { name: "axis-recipes", version: 1, partialize: (s) => ({ recipes: s.recipes }) }
+    { name: "axis-recipes", version: 2, partialize: (s) => ({ recipes: s.recipes }) }
   )
 );
 

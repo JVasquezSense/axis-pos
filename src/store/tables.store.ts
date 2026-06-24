@@ -104,6 +104,6 @@ export const useTablesStore = create<TablesState>()(
         }
       },
     }),
-    { name: "axis-tables", version: 1 }
+    { name: "axis-tables", version: 2 }
   )
 );

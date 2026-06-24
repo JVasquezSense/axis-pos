@@ -17,6 +17,14 @@ import { useSuppliersStore } from "@/store/suppliers.store";
 import { useReservationsStore } from "@/store/reservations.store";
 import { useSalesStore } from "@/store/sales.store";
 
+/** Garantiza que la respuesta sea un array aunque venga en formato paginado {count, results}. */
+function arr<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (data && typeof data === "object" && "results" in data && Array.isArray((data as { results: unknown }).results))
+    return (data as { results: T[] }).results;
+  return [];
+}
+
 /**
  * Hidrata todos los stores desde el backend cuando USE_API=true.
  * Llamar una sola vez desde el AppShell.
@@ -26,27 +34,27 @@ export function useAppInit() {
     if (!USE_API) return;
 
     // Menú
-    menuService.getCategories().then((categories) => useMenuStore.setState({ categories })).catch(console.error);
-    menuService.getProducts().then((products) => useMenuStore.setState({ products })).catch(console.error);
+    menuService.getCategories().then((r) => useMenuStore.setState({ categories: arr(r) })).catch(console.error);
+    menuService.getProducts().then((r) => useMenuStore.setState({ products: arr(r) })).catch(console.error);
 
     // Inventario
-    inventoryService.getItems().then((items) => useInventoryStore.setState({ items })).catch(console.error);
-    inventoryService.getMovements().then((movements) => useInventoryStore.setState({ movements })).catch(console.error);
+    inventoryService.getItems().then((r) => useInventoryStore.setState({ items: arr(r) })).catch(console.error);
+    inventoryService.getMovements().then((r) => useInventoryStore.setState({ movements: arr(r) })).catch(console.error);
 
     // Recetas
-    recipesService.list().then((recipes) => useRecipesStore.setState({ recipes })).catch(console.error);
+    recipesService.list().then((r) => useRecipesStore.setState({ recipes: arr(r) })).catch(console.error);
 
     // Mesas
-    salonService.getTables().then((tables) => useTablesStore.setState({ tables })).catch(console.error);
+    salonService.getTables().then((r) => useTablesStore.setState({ tables: arr(r) })).catch(console.error);
 
     // Proveedores
-    suppliersService.getSuppliers().then((suppliers) => useSuppliersStore.setState({ suppliers })).catch(console.error);
-    suppliersService.getPurchases().then((purchases) => useSuppliersStore.setState({ purchases })).catch(console.error);
+    suppliersService.getSuppliers().then((r) => useSuppliersStore.setState({ suppliers: arr(r) })).catch(console.error);
+    suppliersService.getPurchases().then((r) => useSuppliersStore.setState({ purchases: arr(r) })).catch(console.error);
 
     // Reservaciones
-    reservationsService.getAll().then((reservations) => useReservationsStore.setState({ reservations })).catch(console.error);
+    reservationsService.getAll().then((r) => useReservationsStore.setState({ reservations: arr(r) })).catch(console.error);
 
     // Ventas del día (para Axis IA y dashboard)
-    salesService.getAll().then((records) => useSalesStore.setState({ records })).catch(console.error);
+    salesService.getAll().then((r) => useSalesStore.setState({ records: arr(r) })).catch(console.error);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }

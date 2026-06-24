@@ -110,6 +110,6 @@ export const useInventoryStore = create<InventoryState>()(
 
       reset: () => set({ items: structuredClone(INVENTORY), movements: structuredClone(MOVEMENTS) }),
     }),
-    { name: "axis-inventory", version: 1, storage: createJSONStorage(() => localStorage) }
+    { name: "axis-inventory", version: 2, storage: createJSONStorage(() => localStorage) }
   )
 );
