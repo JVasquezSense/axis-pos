@@ -126,7 +126,7 @@ export function MenuScanDialog({
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
           {/* Tabs modo */}
           <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1 w-fit">
-            {([["text", <FileText className="h-4 w-4" />, "Pegar texto"], ["image", <ImagePlus className="h-4 w-4" />, "Subir foto"]] as const).map(([m, icon, label]) => (
+            {([ { m: "text" as const, icon: <FileText key="icon-text" className="h-4 w-4" />, label: "Pegar texto" }, { m: "image" as const, icon: <ImagePlus key="icon-image" className="h-4 w-4" />, label: "Subir foto" }]).map(({ m, icon, label }) => (
               <button
                 key={m}
                 onClick={() => { setMode(m); setDrafts([]); setError(null); }}
@@ -179,7 +179,7 @@ export function MenuScanDialog({
               <div className="flex flex-1 flex-col gap-2">
                 <p className="text-sm text-muted-foreground">Foto clara de la carta física, digital o pizarrón.</p>
                 <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Nota: requiere un modelo de visión. Si falla, usa la pestaña "Pegar texto".
+                  Nota: requiere un modelo de visión. Si falla, usa la pestaña &ldquo;Pegar texto&rdquo;.
                 </p>
               </div>
             </div>
