@@ -56,7 +56,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const apiKey = process.env.GLM_API_KEY;
   const baseUrl = process.env.GLM_BASE_URL ?? "https://open.bigmodel.cn/api/paas/v4";
-  const visionModel = process.env.GLM_VISION_MODEL ?? "glm-4v";
+  const visionModel = process.env.GLM_VISION_MODEL ?? "glm-5-turbo";
 
   if (!apiKey) {
     return Response.json({
