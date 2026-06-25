@@ -23,6 +23,9 @@ export const inventoryService = {
       ? request<InventoryItem>(`/inventory/${item.id}/`, { method: "PATCH", body: JSON.stringify(item) })
       : mockRequest(item, 200);
   },
+  async deleteItem(id: string): Promise<void> {
+    if (USE_API) await request<void>(`/inventory/${id}/`, { method: "DELETE" });
+  },
   /** Ajuste de stock post-venta: envía el nuevo nivel al backend para sync. */
   async adjustStock(id: string, newStock: number, reason: string): Promise<InventoryItem> {
     return USE_API

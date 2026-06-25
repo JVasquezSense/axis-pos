@@ -36,12 +36,14 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
     ).catch(console.error);
   },
 
-  repositionTable: (id, x, y) =>
+  repositionTable: (id, x, y) => {
+    const rx = Math.round(x * 10) / 10;
+    const ry = Math.round(y * 10) / 10;
     set((s) => ({
-      tables: s.tables.map((t) =>
-        t.id === id ? { ...t, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } : t
-      ),
-    })),
+      tables: s.tables.map((t) => (t.id === id ? { ...t, x: rx, y: ry } : t)),
+    }));
+    if (USE_API) salonService.updateTable({ id, x: rx, y: ry }).catch(console.error);
+  },
 
   addZone: (zone) =>
     set((s) => ({
@@ -96,6 +98,12 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
           return { ...t, status: "occupied" as const, mergedInto: src.number, orderTotal: 0 };
         return t;
       });
+      if (USE_API) {
+        const merged = next.find((t) => t.id === sourceId);
+        const sub = next.find((t) => t.id === targetId);
+        if (merged) salonService.updateTable({ id: merged.id, status: "occupied", waiter: merged.waiter ?? "" }).catch(console.error);
+        if (sub) salonService.updateTable({ id: sub.id, status: "occupied" }).catch(console.error);
+      }
       return { tables: next };
     }),
 

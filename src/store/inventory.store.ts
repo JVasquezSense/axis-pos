@@ -26,6 +26,7 @@ interface InventoryState {
   load: () => Promise<void>;
   addItem: (item: InventoryItem) => void;
   updateItem: (item: InventoryItem) => void;
+  deleteItem: (id: string) => void;
   applySale: (reference: string, lines: SaleLine[]) => { affected: number; depletedItemIds: string[] };
   addPurchase: (reference: string, lines: { inventoryId: string; quantity: number; unitCost: number }[]) => void;
   reset: () => void;
@@ -54,6 +55,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   updateItem: (item) => {
     set((s) => ({ items: s.items.map((x) => (x.id === item.id ? item : x)) }));
     if (USE_API) inventoryService.updateItem(item).catch(console.error);
+  },
+
+  deleteItem: (id) => {
+    set((s) => ({ items: s.items.filter((x) => x.id !== id) }));
+    if (USE_API) inventoryService.deleteItem(id).catch(console.error);
   },
 
   applySale: (reference, lines) => {
