@@ -565,8 +565,12 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
       setUsers((prev) => [...prev, u]);
       resetForm();
       toast.success("Usuario creado", { description: u.email });
-    } catch {
-      toast.error("Error al crear usuario");
+    } catch (err) {
+      let msg = "Error al crear usuario";
+      if (err instanceof Error) {
+        try { msg = (JSON.parse(err.message) as { error?: string }).error ?? msg; } catch { msg = err.message; }
+      }
+      toast.error(msg);
     } finally {
       setCreating(false);
     }
