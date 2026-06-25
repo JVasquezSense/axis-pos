@@ -52,7 +52,8 @@ export default function SalonPage() {
   const removeZone = useTablesStore((s) => s.removeZone);
 
   const [mounted, setMounted] = useState(false);
-  const [selected, setSelected] = useState<RestaurantTable | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = tables.find((t) => t.id === selectedId) ?? null;
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [zonesOpen, setZonesOpen] = useState(false);
@@ -62,7 +63,7 @@ export default function SalonPage() {
 
   const select = (t: RestaurantTable) => {
     if (layoutMode) return;
-    setSelected(t);
+    setSelectedId(t.id);
     setOpen(true);
   };
 

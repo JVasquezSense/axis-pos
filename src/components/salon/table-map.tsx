@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useMotionValue } from "framer-motion";
+import { motion } from "framer-motion";
 import { Clock, Users, Link2, GripVertical } from "lucide-react";
 import type { RestaurantTable, SalonZone } from "@/types";
 import { TABLE_STATUS } from "@/lib/status";
@@ -35,41 +35,37 @@ function TableNode({
   const status = TABLE_STATUS[table.status];
   const elapsed = table.seatedAt ? minutesAgo(new Date(table.seatedAt)) : 0;
   const isLong = elapsed > 90;
-  const dragX = useMotionValue(0);
-  const dragY = useMotionValue(0);
 
   const handleDragEnd = (_: unknown, info: { offset: { x: number; y: number } }) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const newX = clamp(table.x + (info.offset.x / rect.width) * 100, 4, 96);
     const newY = clamp(table.y + (info.offset.y / rect.height) * 100, 4, 96);
-    dragX.set(0);
-    dragY.set(0);
     onReposition(table.id, newX, newY);
   };
 
   return (
     <motion.div
-      key={table.id}
+      // key includes position so framer resets internal x/y on reposition
+      key={`${table.id}-${Math.round(table.x * 10)}-${Math.round(table.y * 10)}`}
       initial={{ opacity: 0, scale: 0.85 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.03, type: "spring", stiffness: 260, damping: 22 }}
       drag={layoutMode}
       dragMomentum={false}
       dragElastic={0}
-      dragConstraints={containerRef}
+      // No dragConstraints: the ref-based constraint miscalculates bounds when
+      // translateX/Y: "-50%" is in use; clamp in handleDragEnd is enough.
       style={{
         left: `${table.x}%`,
         top: `${table.y}%`,
-        x: dragX,
-        y: dragY,
         position: "absolute",
         translateX: "-50%",
         translateY: "-50%",
         cursor: layoutMode ? "grab" : "pointer",
         zIndex: layoutMode ? 20 : 10,
       }}
-      whileHover={layoutMode ? { scale: 1.08 } : { scale: 1.05, y: -2 }}
+      whileHover={layoutMode ? { scale: 1.08 } : { scale: 1.05 }}
       whileDrag={{ scale: 1.1, zIndex: 50, cursor: "grabbing" }}
       onDragEnd={handleDragEnd}
       onClick={layoutMode ? undefined : onClick}
