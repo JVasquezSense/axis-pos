@@ -539,14 +539,17 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [editingUser, setEditingUser] = useState<TenantUser | null>(null);
 
-  // form
+  // form fields
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("cashier");
+
+  const isEdit = !!editingUser;
 
   const prevId = useState<string | null>(null);
   if (tenant && tenant.id !== prevId[0]) {
@@ -555,30 +558,53 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
     saasService.getUsers(tenant.id).then((u) => { setUsers(u); setLoading(false); }).catch(() => setLoading(false));
   }
 
-  const resetForm = () => { setUsername(""); setEmail(""); setPassword(""); setRole("cashier"); };
+  const resetForm = () => {
+    setUsername(""); setEmail(""); setPassword(""); setRole("cashier");
+    setEditingUser(null); setShowPass(false);
+  };
 
-  const handleCreate = async () => {
-    if (!tenant || !username.trim() || !email.trim() || !password) return;
-    setCreating(true);
+  const startEdit = (u: TenantUser) => {
+    setEditingUser(u);
+    setUsername(u.username);
+    setEmail(u.email);
+    setPassword("");
+    setRole(u.role);
+  };
+
+  const apiError = (err: unknown, fallback: string) => {
+    if (err instanceof Error) {
+      try { return (JSON.parse(err.message) as { error?: string }).error ?? fallback; } catch { return err.message; }
+    }
+    return fallback;
+  };
+
+  const handleSave = async () => {
+    if (!tenant) return;
+    setSaving(true);
     try {
-      const u = await saasService.createUser(tenant.id, { username: username.trim(), email: email.trim(), password, role });
-      setUsers((prev) => [...prev, u]);
-      resetForm();
-      toast.success("Usuario creado", { description: u.email });
-    } catch (err) {
-      let msg = "Error al crear usuario";
-      if (err instanceof Error) {
-        try { msg = (JSON.parse(err.message) as { error?: string }).error ?? msg; } catch { msg = err.message; }
+      if (isEdit && editingUser) {
+        const payload: Record<string, string> = { username: username.trim(), email: email.trim(), role };
+        if (password) payload.password = password;
+        const updated = await saasService.updateUser(tenant.id, editingUser.id, payload);
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+        toast.success("Usuario actualizado", { description: updated.email });
+      } else {
+        const created = await saasService.createUser(tenant.id, { username: username.trim(), email: email.trim(), password, role });
+        setUsers((prev) => [...prev, created]);
+        toast.success("Usuario creado", { description: created.email });
       }
-      toast.error(msg);
+      resetForm();
+    } catch (err) {
+      toast.error(apiError(err, isEdit ? "Error al actualizar usuario" : "Error al crear usuario"));
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   };
 
   const handleDelete = async (userId: number) => {
     if (!tenant) return;
     setDeleting(userId);
+    if (editingUser?.id === userId) resetForm();
     try {
       await saasService.deleteUser(tenant.id, userId);
       setUsers((prev) => prev.filter((u) => u.id !== userId));
@@ -589,6 +615,10 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
       setDeleting(null);
     }
   };
+
+  const canSave = isEdit
+    ? username.trim().length > 0 && email.trim().length > 0 && (password === "" || password.length >= 8)
+    : username.trim().length > 0 && email.trim().length > 0 && password.length >= 8;
 
   return (
     <Dialog open={!!tenant} onOpenChange={(v) => { if (!v) { onClose(); resetForm(); } }}>
@@ -602,7 +632,7 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
         </DialogHeader>
 
         {/* User list */}
-        <div className="max-h-48 overflow-y-auto rounded-lg border border-border">
+        <div className="max-h-44 overflow-y-auto rounded-lg border border-border">
           {loading ? (
             <div className="space-y-2 p-3">
               {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
@@ -613,22 +643,25 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
             <Table>
               <TableBody>
                 {users.map((u) => (
-                  <TableRow key={u.id}>
+                  <TableRow key={u.id} className={editingUser?.id === u.id ? "bg-primary/5" : undefined}>
                     <TableCell className="font-medium">{u.username}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{u.email}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{ROLE_LABELS[u.role] ?? u.role}</Badge>
                     </TableCell>
-                    <TableCell className="w-8">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive"
-                        disabled={deleting === u.id}
-                        onClick={() => handleDelete(u.id)}
-                      >
-                        {deleting === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                      </Button>
+                    <TableCell className="w-16">
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(u)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+                          disabled={deleting === u.id}
+                          onClick={() => handleDelete(u.id)}
+                        >
+                          {deleting === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -637,9 +670,16 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
           )}
         </div>
 
-        {/* Create form */}
+        {/* Create / Edit form */}
         <div className="space-y-3 rounded-lg border border-dashed border-border p-4">
-          <p className="text-sm font-semibold">Nuevo usuario</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">{isEdit ? `Editando: ${editingUser?.username}` : "Nuevo usuario"}</p>
+            {isEdit && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={resetForm}>
+                Cancelar edición
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">Usuario</label>
@@ -652,20 +692,19 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Contraseña</label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                Contraseña {isEdit && <span className="text-muted-foreground/60">(dejar vacío para no cambiar)</span>}
+              </label>
               <div className="relative">
                 <Input
                   type={showPass ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="mínimo 8 caracteres"
+                  placeholder={isEdit ? "Nueva contraseña (opcional)" : "mínimo 8 caracteres"}
                   className="pr-9"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((v) => !v)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
+                <button type="button" onClick={() => setShowPass((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
@@ -682,14 +721,9 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
               </Select>
             </div>
           </div>
-          <Button
-            size="sm"
-            className="w-full"
-            disabled={!username.trim() || !email.trim() || password.length < 8 || creating}
-            onClick={handleCreate}
-          >
-            {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-            Crear usuario
+          <Button size="sm" className="w-full" disabled={!canSave || saving} onClick={handleSave}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : isEdit ? <Pencil className="mr-2 h-4 w-4" /> : <UserPlus className="mr-2 h-4 w-4" />}
+            {isEdit ? "Guardar cambios" : "Crear usuario"}
           </Button>
         </div>
 

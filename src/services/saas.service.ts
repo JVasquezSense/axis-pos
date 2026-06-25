@@ -35,6 +35,11 @@ export const saasService = {
       ? request<TenantUser>(`/admin/tenants/${tenantId}/users/`, { method: "POST", body: JSON.stringify(data) })
       : mockRequest({ id: Date.now(), ...data, is_active: true } as unknown as TenantUser, 300);
   },
+  async updateUser(tenantId: string, userId: number, data: { username?: string; email?: string; password?: string; role?: string }): Promise<TenantUser> {
+    return USE_API
+      ? request<TenantUser>(`/admin/tenants/${tenantId}/users/${userId}/`, { method: "PATCH", body: JSON.stringify(data) })
+      : mockRequest({ id: userId, ...data } as unknown as TenantUser, 200);
+  },
   async deleteUser(tenantId: string, userId: number): Promise<void> {
     if (USE_API) await request<void>(`/admin/tenants/${tenantId}/users/${userId}/`, { method: "DELETE" });
   },
