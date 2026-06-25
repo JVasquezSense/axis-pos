@@ -1,4 +1,4 @@
-import type { Tenant, TenantFeatures, SaasMetrics } from "@/types";
+import type { Tenant, TenantFeatures, TenantUser, SaasMetrics } from "@/types";
 import { TENANTS, SAAS_METRICS } from "@/mock/datasets";
 import { USE_API, request, mockRequest } from "./http";
 
@@ -26,5 +26,16 @@ export const saasService = {
     return USE_API
       ? request<Tenant>(`/admin/tenants/${id}/features/`, { method: "PATCH", body: JSON.stringify({ features }) })
       : mockRequest({} as Tenant, 200);
+  },
+  async getUsers(tenantId: string): Promise<TenantUser[]> {
+    return USE_API ? request<TenantUser[]>(`/admin/tenants/${tenantId}/users/`) : mockRequest([], 300);
+  },
+  async createUser(tenantId: string, data: { username: string; email: string; password: string; role: string }): Promise<TenantUser> {
+    return USE_API
+      ? request<TenantUser>(`/admin/tenants/${tenantId}/users/`, { method: "POST", body: JSON.stringify(data) })
+      : mockRequest({ id: Date.now(), ...data, is_active: true } as unknown as TenantUser, 300);
+  },
+  async deleteUser(tenantId: string, userId: number): Promise<void> {
+    if (USE_API) await request<void>(`/admin/tenants/${tenantId}/users/${userId}/`, { method: "DELETE" });
   },
 };
