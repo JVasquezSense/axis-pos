@@ -9,6 +9,7 @@ import { useTablesStore } from "@/store/tables.store";
 import { useSuppliersStore } from "@/store/suppliers.store";
 import { useSalesStore } from "@/store/sales.store";
 import { useReservationsStore } from "@/store/reservations.store";
+import { useEmployeesStore } from "@/store/employees.store";
 
 /**
  * Carga inicial de todos los stores desde la API de Django.
@@ -24,6 +25,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadSuppliers = useSuppliersStore((s) => s.load);
   const loadSales = useSalesStore((s) => s.load);
   const loadReservations = useReservationsStore((s) => s.load);
+  const loadEmployees = useEmployeesStore((s) => s.load);
 
   useEffect(() => {
     if (loaded.current || !USE_API) return;
@@ -37,6 +39,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loadSuppliers(),
       loadSales(),
       loadReservations(),
+      loadEmployees(),
     ]).catch(console.error);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

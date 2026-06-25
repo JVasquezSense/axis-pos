@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { USE_API } from "@/services/http";
+import { employeesService } from "@/services/employees.service";
 
 export type EmployeeRole = "mesero" | "cocinero" | "cajero" | "admin" | "almacen";
 
@@ -13,6 +15,7 @@ export interface Employee {
 
 interface EmployeesState {
   employees: Employee[];
+  load: () => Promise<void>;
   add: (e: Omit<Employee, "id">) => void;
   update: (e: Employee) => void;
   remove: (id: string) => void;
@@ -41,8 +44,38 @@ export const EMPLOYEE_ROLE_COLORS: Record<EmployeeRole, string> = {
 
 export const useEmployeesStore = create<EmployeesState>()((set) => ({
   employees: [],
-  add: (e) => set((s) => ({ employees: [{ ...e, id: uid() }, ...s.employees] })),
-  update: (e) => set((s) => ({ employees: s.employees.map((x) => (x.id === e.id ? e : x)) })),
-  remove: (id) => set((s) => ({ employees: s.employees.filter((e) => e.id !== id) })),
-  toggle: (id) => set((s) => ({ employees: s.employees.map((e) => (e.id === id ? { ...e, active: !e.active } : e)) })),
+
+  load: async () => {
+    if (!USE_API) return;
+    const employees = await employeesService.getAll();
+    set({ employees });
+  },
+
+  add: (e) => {
+    const newEmp = { ...e, id: uid() };
+    set((s) => ({ employees: [newEmp, ...s.employees] }));
+    if (USE_API) employeesService.create(e).then((saved) =>
+      set((s) => ({ employees: s.employees.map((x) => (x.id === newEmp.id ? saved : x)) }))
+    ).catch(console.error);
+  },
+
+  update: (e) => {
+    set((s) => ({ employees: s.employees.map((x) => (x.id === e.id ? e : x)) }));
+    if (USE_API) employeesService.update(e).catch(console.error);
+  },
+
+  remove: (id) => {
+    set((s) => ({ employees: s.employees.filter((e) => e.id !== id) }));
+    if (USE_API) employeesService.remove(id).catch(console.error);
+  },
+
+  toggle: (id) => {
+    set((s) => ({
+      employees: s.employees.map((e) => (e.id === id ? { ...e, active: !e.active } : e)),
+    }));
+    if (USE_API) {
+      const emp = useEmployeesStore.getState().employees.find((e) => e.id === id);
+      if (emp) employeesService.update(emp).catch(console.error);
+    }
+  },
 }));
