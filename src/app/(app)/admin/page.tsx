@@ -7,9 +7,9 @@ import {
   Pencil, Trash2, ToggleLeft, TrendingUp, TrendingDown,
   CheckCircle, ShoppingBag, ChefHat, Boxes, BookOpen,
   LayoutDashboard, CalendarDays, Users, Truck, UserCheck,
-  BarChart3, Smartphone, Loader2,
+  BarChart3, Smartphone, Loader2, UserPlus, Eye, EyeOff,
 } from "lucide-react";
-import type { Tenant, TenantFeatures, TenantPlan, TenantStatus } from "@/types";
+import type { Tenant, TenantFeatures, TenantPlan, TenantStatus, TenantUser } from "@/types";
 import { saasService } from "@/services/saas.service";
 import { useAsync } from "@/hooks/use-async";
 import { PageHeader } from "@/components/shared/page-header";
@@ -68,6 +68,7 @@ export default function AdminPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTenant, setEditTenant] = useState<Tenant | null>(null);
   const [featuresTenant, setFeaturesTenant] = useState<Tenant | null>(null);
+  const [usersTenant, setUsersTenant] = useState<Tenant | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -183,6 +184,7 @@ export default function AdminPage() {
                   tenant={t}
                   onEdit={() => setEditTenant(t)}
                   onFeatures={() => setFeaturesTenant(t)}
+                  onUsers={() => setUsersTenant(t)}
                   onDelete={() => setDeleteTarget(t)}
                 />
               ))}
@@ -213,6 +215,10 @@ export default function AdminPage() {
         onClose={() => setFeaturesTenant(null)}
         onUpdate={handleFeaturesUpdate}
       />
+      <UsersDialog
+        tenant={usersTenant}
+        onClose={() => setUsersTenant(null)}
+      />
 
       {/* Delete confirm */}
       <Dialog open={!!deleteTarget} onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}>
@@ -240,11 +246,12 @@ export default function AdminPage() {
 // ─── TenantRow ────────────────────────────────────────────────────────────────
 
 function TenantRow({
-  tenant, onEdit, onFeatures, onDelete,
+  tenant, onEdit, onFeatures, onUsers, onDelete,
 }: {
   tenant: Tenant;
   onEdit: () => void;
   onFeatures: () => void;
+  onUsers: () => void;
   onDelete: () => void;
 }) {
   const status = TENANT_STATUS[tenant.status];
@@ -295,6 +302,9 @@ function TenantRow({
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onFeatures}>
               <ToggleLeft className="mr-2 h-4 w-4" /> Funcionalidades
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onUsers}>
+              <UserPlus className="mr-2 h-4 w-4" /> Usuarios
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
@@ -509,6 +519,178 @@ function FeaturesDialog({
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Guardar
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── UsersDialog ──────────────────────────────────────────────────────────────
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  cashier: "Cajero",
+  waiter: "Mesero",
+  kitchen: "Cocina",
+  warehouse: "Almacén",
+};
+
+function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () => void }) {
+  const [users, setUsers] = useState<TenantUser[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
+
+  // form
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("cashier");
+
+  const prevId = useState<string | null>(null);
+  if (tenant && tenant.id !== prevId[0]) {
+    prevId[1](tenant.id);
+    setLoading(true);
+    saasService.getUsers(tenant.id).then((u) => { setUsers(u); setLoading(false); }).catch(() => setLoading(false));
+  }
+
+  const resetForm = () => { setUsername(""); setEmail(""); setPassword(""); setRole("cashier"); };
+
+  const handleCreate = async () => {
+    if (!tenant || !username.trim() || !email.trim() || !password) return;
+    setCreating(true);
+    try {
+      const u = await saasService.createUser(tenant.id, { username: username.trim(), email: email.trim(), password, role });
+      setUsers((prev) => [...prev, u]);
+      resetForm();
+      toast.success("Usuario creado", { description: u.email });
+    } catch {
+      toast.error("Error al crear usuario");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (userId: number) => {
+    if (!tenant) return;
+    setDeleting(userId);
+    try {
+      await saasService.deleteUser(tenant.id, userId);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      toast.success("Usuario eliminado");
+    } catch {
+      toast.error("Error al eliminar usuario");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  return (
+    <Dialog open={!!tenant} onOpenChange={(v) => { if (!v) { onClose(); resetForm(); } }}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <span className="text-xl">{tenant?.logo}</span>
+            {tenant?.name} · Usuarios
+          </DialogTitle>
+          <DialogDescription>Gestiona los usuarios de este restaurante.</DialogDescription>
+        </DialogHeader>
+
+        {/* User list */}
+        <div className="max-h-48 overflow-y-auto rounded-lg border border-border">
+          {loading ? (
+            <div className="space-y-2 p-3">
+              {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : users.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Sin usuarios creados</p>
+          ) : (
+            <Table>
+              <TableBody>
+                {users.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.username}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{u.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{ROLE_LABELS[u.role] ?? u.role}</Badge>
+                    </TableCell>
+                    <TableCell className="w-8">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive"
+                        disabled={deleting === u.id}
+                        onClick={() => handleDelete(u.id)}
+                      >
+                        {deleting === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        {/* Create form */}
+        <div className="space-y-3 rounded-lg border border-dashed border-border p-4">
+          <p className="text-sm font-semibold">Nuevo usuario</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Usuario</label>
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ej: maria.gomez" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Email</label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@resto.co" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Contraseña</label>
+              <div className="relative">
+                <Input
+                  type={showPass ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="mínimo 8 caracteres"
+                  className="pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Rol</label>
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(ROLE_LABELS).map(([v, l]) => (
+                    <SelectItem key={v} value={v}>{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={!username.trim() || !email.trim() || password.length < 8 || creating}
+            onClick={handleCreate}
+          >
+            {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+            Crear usuario
+          </Button>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { onClose(); resetForm(); }}>Cerrar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
