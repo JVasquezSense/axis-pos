@@ -617,8 +617,8 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
   };
 
   const canSave = isEdit
-    ? username.trim().length > 0 && email.trim().length > 0 && (password === "" || password.length >= 8)
-    : username.trim().length > 0 && email.trim().length > 0 && password.length >= 8;
+    ? email.trim().length > 0 && (password === "" || password.length >= 8)
+    : email.trim().length > 0 && password.length >= 8;
 
   return (
     <Dialog open={!!tenant} onOpenChange={(v) => { if (!v) { onClose(); resetForm(); } }}>
@@ -682,12 +682,12 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Usuario</label>
-              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ej: maria.gomez" />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Email <span className="text-destructive">*</span></label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@resto.co" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Email</label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@resto.co" />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Nombre <span className="text-muted-foreground/60">(opcional)</span></label>
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ej: María Gómez" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
