@@ -179,17 +179,23 @@ export const REPORTS: ReportData = {
 // ---------------------------------------------------------------------------
 // Super Admin SaaS
 // ---------------------------------------------------------------------------
+const ALL_FEATURES = {
+  pos: true, kitchen: true, inventory: true, recipes: true,
+  salon: true, reservations: true, crm: true, suppliers: true,
+  employees: true, reports: true, website: true, web_orders: true,
+};
+
 export const TENANTS: Tenant[] = [
-  { id: "rt1", name: "Demo Burger", logo: "🍔", plan: "growth", status: "active", mrr: 349000, locations: 3, users: 18, ordersMonth: 4280, joinedAt: "Mar 2024", city: "Medellín" },
-  { id: "rt2", name: "Sushi Zen", logo: "🍣", plan: "enterprise", status: "active", mrr: 890000, locations: 7, users: 52, ordersMonth: 9120, joinedAt: "Ene 2024", city: "Bogotá" },
-  { id: "rt3", name: "Pizza Nostra", logo: "🍕", plan: "growth", status: "active", mrr: 349000, locations: 4, users: 24, ordersMonth: 5640, joinedAt: "May 2024", city: "Cali" },
-  { id: "rt4", name: "Taco Loco", logo: "🌮", plan: "starter", status: "trial", mrr: 0, locations: 1, users: 6, ordersMonth: 980, joinedAt: "Jun 2024", city: "Barranquilla" },
-  { id: "rt5", name: "Café Aroma", logo: "☕", plan: "starter", status: "active", mrr: 129000, locations: 1, users: 8, ordersMonth: 1820, joinedAt: "Abr 2024", city: "Medellín" },
-  { id: "rt6", name: "Parrilla Real", logo: "🥩", plan: "enterprise", status: "active", mrr: 890000, locations: 5, users: 41, ordersMonth: 7350, joinedAt: "Feb 2024", city: "Bogotá" },
-  { id: "rt7", name: "Veggie Garden", logo: "🥗", plan: "growth", status: "past_due", mrr: 349000, locations: 2, users: 12, ordersMonth: 2140, joinedAt: "Mar 2024", city: "Pereira" },
-  { id: "rt8", name: "Dulce Tentación", logo: "🍰", plan: "starter", status: "churned", mrr: 0, locations: 1, users: 4, ordersMonth: 0, joinedAt: "Dic 2023", city: "Bucaramanga" },
-  { id: "rt9", name: "Mariscos del Puerto", logo: "🦐", plan: "growth", status: "active", mrr: 349000, locations: 2, users: 16, ordersMonth: 3210, joinedAt: "May 2024", city: "Cartagena" },
-  { id: "rt10", name: "Pollo Brasa", logo: "🍗", plan: "enterprise", status: "active", mrr: 890000, locations: 9, users: 68, ordersMonth: 11200, joinedAt: "Nov 2023", city: "Bogotá" },
+  { id: "rt1", name: "Demo Burger", logo: "🍔", plan: "growth", status: "active", mrr: 349000, locations: 3, users: 18, ordersMonth: 4280, joinedAt: "Mar 2024", city: "Medellín", features: ALL_FEATURES },
+  { id: "rt2", name: "Sushi Zen", logo: "🍣", plan: "enterprise", status: "active", mrr: 890000, locations: 7, users: 52, ordersMonth: 9120, joinedAt: "Ene 2024", city: "Bogotá", features: ALL_FEATURES },
+  { id: "rt3", name: "Pizza Nostra", logo: "🍕", plan: "growth", status: "active", mrr: 349000, locations: 4, users: 24, ordersMonth: 5640, joinedAt: "May 2024", city: "Cali", features: ALL_FEATURES },
+  { id: "rt4", name: "Taco Loco", logo: "🌮", plan: "starter", status: "trial", mrr: 0, locations: 1, users: 6, ordersMonth: 980, joinedAt: "Jun 2024", city: "Barranquilla", features: { ...ALL_FEATURES, recipes: false, crm: false } },
+  { id: "rt5", name: "Café Aroma", logo: "☕", plan: "starter", status: "active", mrr: 129000, locations: 1, users: 8, ordersMonth: 1820, joinedAt: "Abr 2024", city: "Medellín", features: { ...ALL_FEATURES, kitchen: false, web_orders: false } },
+  { id: "rt6", name: "Parrilla Real", logo: "🥩", plan: "enterprise", status: "active", mrr: 890000, locations: 5, users: 41, ordersMonth: 7350, joinedAt: "Feb 2024", city: "Bogotá", features: ALL_FEATURES },
+  { id: "rt7", name: "Veggie Garden", logo: "🥗", plan: "growth", status: "past_due", mrr: 349000, locations: 2, users: 12, ordersMonth: 2140, joinedAt: "Mar 2024", city: "Pereira", features: ALL_FEATURES },
+  { id: "rt8", name: "Dulce Tentación", logo: "🍰", plan: "starter", status: "churned", mrr: 0, locations: 1, users: 4, ordersMonth: 0, joinedAt: "Dic 2023", city: "Bucaramanga", features: ALL_FEATURES },
+  { id: "rt9", name: "Mariscos del Puerto", logo: "🦐", plan: "growth", status: "active", mrr: 349000, locations: 2, users: 16, ordersMonth: 3210, joinedAt: "May 2024", city: "Cartagena", features: ALL_FEATURES },
+  { id: "rt10", name: "Pollo Brasa", logo: "🍗", plan: "enterprise", status: "active", mrr: 890000, locations: 9, users: 68, ordersMonth: 11200, joinedAt: "Nov 2023", city: "Bogotá", features: ALL_FEATURES },
 ];
 
 export const SAAS_METRICS: SaasMetrics = {

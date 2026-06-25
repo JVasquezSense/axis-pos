@@ -1,14 +1,30 @@
-import type { Tenant, SaasMetrics } from "@/types";
+import type { Tenant, TenantFeatures, SaasMetrics } from "@/types";
 import { TENANTS, SAAS_METRICS } from "@/mock/datasets";
 import { USE_API, request, mockRequest } from "./http";
 
 export const saasService = {
-  /** GET /api/v1/admin/tenants/ */
   async getTenants(): Promise<Tenant[]> {
     return USE_API ? request<Tenant[]>("/admin/tenants/") : mockRequest(TENANTS, 650);
   },
-  /** GET /api/v1/admin/metrics/ */
   async getMetrics(): Promise<SaasMetrics> {
     return USE_API ? request<SaasMetrics>("/admin/metrics/") : mockRequest(SAAS_METRICS, 700);
+  },
+  async createTenant(data: Omit<Tenant, "id" | "mrr" | "users" | "ordersMonth" | "joinedAt">): Promise<Tenant> {
+    return USE_API
+      ? request<Tenant>("/admin/tenants/", { method: "POST", body: JSON.stringify(data) })
+      : mockRequest({ ...data, id: `t-${Date.now()}`, mrr: 0, users: 1, ordersMonth: 0, joinedAt: new Date().toISOString() } as Tenant, 300);
+  },
+  async updateTenant(id: string, data: Partial<Tenant>): Promise<Tenant> {
+    return USE_API
+      ? request<Tenant>(`/admin/tenants/${id}/`, { method: "PATCH", body: JSON.stringify(data) })
+      : mockRequest(data as Tenant, 200);
+  },
+  async deleteTenant(id: string): Promise<void> {
+    if (USE_API) await request<void>(`/admin/tenants/${id}/`, { method: "DELETE" });
+  },
+  async updateFeatures(id: string, features: Partial<TenantFeatures>): Promise<Tenant> {
+    return USE_API
+      ? request<Tenant>(`/admin/tenants/${id}/features/`, { method: "PATCH", body: JSON.stringify({ features }) })
+      : mockRequest({} as Tenant, 200);
   },
 };

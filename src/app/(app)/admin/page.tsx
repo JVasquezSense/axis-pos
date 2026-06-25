@@ -1,19 +1,35 @@
 "use client";
 
-import { ShieldCheck, Building2, Globe } from "lucide-react";
-import type { Tenant } from "@/types";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
+  ShieldCheck, Building2, Globe, Plus, MoreHorizontal,
+  Pencil, Trash2, ToggleLeft, TrendingUp, TrendingDown,
+  CheckCircle, ShoppingBag, ChefHat, Boxes, BookOpen,
+  LayoutDashboard, CalendarDays, Users, Truck, UserCheck,
+  BarChart3, Smartphone, Loader2,
+} from "lucide-react";
+import type { Tenant, TenantFeatures, TenantPlan, TenantStatus } from "@/types";
 import { saasService } from "@/services/saas.service";
 import { useAsync } from "@/hooks/use-async";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { SalesByHourChart } from "@/components/dashboard/charts-lazy";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DonutChart } from "@/components/reports/charts-lazy";
+import { SalesByHourChart } from "@/components/dashboard/charts-lazy";
 import { TENANT_STATUS, PLAN_LABEL } from "@/lib/status";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+
+// ─── Constantes ──────────────────────────────────────────────────────────────
 
 const PLAN_STYLE: Record<string, string> = {
   starter: "bg-muted text-muted-foreground",
@@ -21,9 +37,72 @@ const PLAN_STYLE: Record<string, string> = {
   enterprise: "bg-violet-500/12 text-violet-600 dark:text-violet-400",
 };
 
+const FEATURE_LIST: { id: keyof TenantFeatures; label: string; icon: React.ElementType; desc: string }[] = [
+  { id: "pos", label: "POS / Caja", icon: ShoppingBag, desc: "Punto de venta y checkout" },
+  { id: "kitchen", label: "Pantalla Cocina", icon: ChefHat, desc: "KDS y gestión de tickets" },
+  { id: "inventory", label: "Inventario", icon: Boxes, desc: "Control de insumos y kardex" },
+  { id: "recipes", label: "Recetas", icon: BookOpen, desc: "Fichas técnicas y costos" },
+  { id: "salon", label: "Salón / Mesas", icon: LayoutDashboard, desc: "Mapa de mesas y estados" },
+  { id: "reservations", label: "Reservaciones", icon: CalendarDays, desc: "Agenda y confirmaciones" },
+  { id: "crm", label: "CRM Clientes", icon: Users, desc: "Base de clientes y fidelización" },
+  { id: "suppliers", label: "Proveedores", icon: Truck, desc: "Órdenes de compra y pagos" },
+  { id: "employees", label: "Empleados", icon: UserCheck, desc: "Equipo y roles" },
+  { id: "reports", label: "Reportes", icon: BarChart3, desc: "Análisis ejecutivo" },
+  { id: "website", label: "Carta Online", icon: Globe, desc: "Menú público del restaurante" },
+  { id: "web_orders", label: "Pedidos Web", icon: Smartphone, desc: "Órdenes desde la carta" },
+];
+
+const DEFAULT_FEATURES: TenantFeatures = {
+  pos: true, kitchen: true, inventory: true, recipes: true,
+  salon: true, reservations: true, crm: true, suppliers: true,
+  employees: true, reports: true, website: true, web_orders: true,
+};
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function AdminPage() {
   const { data: metrics, loading: mLoading } = useAsync(() => saasService.getMetrics());
-  const { data: tenants, loading: tLoading } = useAsync(() => saasService.getTenants());
+  const { data: rawTenants, loading: tLoading } = useAsync(() => saasService.getTenants());
+
+  const [tenants, setTenants] = useState<Tenant[] | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTenant, setEditTenant] = useState<Tenant | null>(null);
+  const [featuresTenant, setFeaturesTenant] = useState<Tenant | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const list = tenants ?? rawTenants ?? [];
+
+  const handleCreate = (t: Tenant) => {
+    setTenants([t, ...list]);
+    setCreateOpen(false);
+    toast.success("Restaurante creado", { description: t.name });
+  };
+
+  const handleUpdate = (t: Tenant) => {
+    setTenants(list.map((x) => (x.id === t.id ? t : x)));
+    setEditTenant(null);
+    toast.success("Restaurante actualizado", { description: t.name });
+  };
+
+  const handleFeaturesUpdate = (t: Tenant) => {
+    setTenants(list.map((x) => (x.id === t.id ? t : x)));
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await saasService.deleteTenant(deleteTarget.id);
+      setTenants(list.filter((x) => x.id !== deleteTarget.id));
+      toast.success("Restaurante eliminado");
+    } catch {
+      toast.error("Error al eliminar");
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -31,23 +110,25 @@ export default function AdminPage() {
         title="Super Admin · SaaS"
         description="Gestión global de la plataforma multi-tenant"
         icon={<ShieldCheck className="h-5 w-5" />}
-        actions={<Badge variant="success">Plataforma operativa</Badge>}
+        actions={
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" /> Nuevo restaurante
+          </Button>
+        }
       />
 
+      {/* KPIs */}
       {mLoading || !metrics ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
-          ))}
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {metrics.kpis.map((kpi, i) => (
-            <KpiCard key={kpi.id} kpi={kpi} index={i} />
-          ))}
+          {metrics.kpis.map((kpi, i) => <KpiCard key={kpi.id} kpi={kpi} index={i} />)}
         </div>
       )}
 
+      {/* Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
@@ -62,27 +143,24 @@ export default function AdminPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Distribución por plan</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Distribución por plan</CardTitle></CardHeader>
           <CardContent>
             {metrics ? <DonutChart data={metrics.planMix} /> : <Skeleton className="h-[240px] w-full" />}
           </CardContent>
         </Card>
       </div>
 
+      {/* Tenant table */}
       <Card className="overflow-hidden">
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-4 w-4" /> Restaurantes
           </CardTitle>
-          {tenants && <Badge variant="secondary">{tenants.length} cuentas</Badge>}
+          {list.length > 0 && <Badge variant="secondary">{list.length} cuentas</Badge>}
         </CardHeader>
-        {tLoading || !tenants ? (
+        {tLoading && !rawTenants ? (
           <div className="space-y-2 p-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
           </div>
         ) : (
           <Table>
@@ -93,24 +171,87 @@ export default function AdminPage() {
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">MRR</TableHead>
                 <TableHead className="text-right">Sedes</TableHead>
-                <TableHead className="text-right">Usuarios</TableHead>
                 <TableHead className="text-right">Pedidos/mes</TableHead>
+                <TableHead className="text-center">Funciones</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tenants.map((t) => (
-                <TenantRow key={t.id} tenant={t} />
+              {list.map((t) => (
+                <TenantRow
+                  key={t.id}
+                  tenant={t}
+                  onEdit={() => setEditTenant(t)}
+                  onFeatures={() => setFeaturesTenant(t)}
+                  onDelete={() => setDeleteTarget(t)}
+                />
               ))}
             </TableBody>
           </Table>
         )}
+        {!tLoading && list.length === 0 && (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            Sin restaurantes. Crea el primero.
+          </p>
+        )}
       </Card>
+
+      {/* Dialogs */}
+      <TenantFormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSave={handleCreate}
+      />
+      <TenantFormDialog
+        open={!!editTenant}
+        onOpenChange={(v) => { if (!v) setEditTenant(null); }}
+        initialData={editTenant ?? undefined}
+        onSave={handleUpdate}
+      />
+      <FeaturesDialog
+        tenant={featuresTenant}
+        onClose={() => setFeaturesTenant(null)}
+        onUpdate={handleFeaturesUpdate}
+      />
+
+      {/* Delete confirm */}
+      <Dialog open={!!deleteTarget} onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar restaurante</DialogTitle>
+            <DialogDescription>
+              Esto eliminará <strong>{deleteTarget?.name}</strong> y todos sus datos permanentemente.
+              Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function TenantRow({ tenant }: { tenant: Tenant }) {
+// ─── TenantRow ────────────────────────────────────────────────────────────────
+
+function TenantRow({
+  tenant, onEdit, onFeatures, onDelete,
+}: {
+  tenant: Tenant;
+  onEdit: () => void;
+  onFeatures: () => void;
+  onDelete: () => void;
+}) {
   const status = TENANT_STATUS[tenant.status];
+  const enabledCount = tenant.features
+    ? Object.values(tenant.features).filter(Boolean).length
+    : 12;
+
   return (
     <TableRow>
       <TableCell>
@@ -119,7 +260,7 @@ function TenantRow({ tenant }: { tenant: Tenant }) {
           <div>
             <p className="font-medium">{tenant.name}</p>
             <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Globe className="h-3 w-3" /> {tenant.city} · desde {tenant.joinedAt}
+              <Globe className="h-3 w-3" /> {tenant.city || "—"} · desde {tenant.joinedAt?.slice(0, 10) ?? "—"}
             </p>
           </div>
         </div>
@@ -129,13 +270,247 @@ function TenantRow({ tenant }: { tenant: Tenant }) {
           {PLAN_LABEL[tenant.plan]}
         </span>
       </TableCell>
-      <TableCell>
-        <Badge variant={status.variant}>{status.label}</Badge>
-      </TableCell>
+      <TableCell><Badge variant={status.variant}>{status.label}</Badge></TableCell>
       <TableCell className="text-right font-semibold">{formatCurrency(tenant.mrr)}</TableCell>
       <TableCell className="text-right">{tenant.locations}</TableCell>
-      <TableCell className="text-right">{tenant.users}</TableCell>
       <TableCell className="text-right">{formatNumber(tenant.ordersMonth)}</TableCell>
+      <TableCell className="text-center">
+        <button
+          onClick={onFeatures}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {enabledCount}/12 activas
+        </button>
+      </TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil className="mr-2 h-4 w-4" /> Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onFeatures}>
+              <ToggleLeft className="mr-2 h-4 w-4" /> Funcionalidades
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
     </TableRow>
+  );
+}
+
+// ─── TenantFormDialog ─────────────────────────────────────────────────────────
+
+function TenantFormDialog({
+  open, onOpenChange, initialData, onSave,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initialData?: Tenant;
+  onSave: (t: Tenant) => void;
+}) {
+  const isEdit = !!initialData;
+  const [name, setName] = useState(initialData?.name ?? "");
+  const [logo, setLogo] = useState(initialData?.logo ?? "🍔");
+  const [city, setCity] = useState(initialData?.city ?? "");
+  const [plan, setPlan] = useState<TenantPlan>(initialData?.plan ?? "starter");
+  const [status, setStatus] = useState<TenantStatus>(initialData?.status ?? "trial");
+  const [locations, setLocations] = useState(initialData?.locations ?? 1);
+  const [saving, setSaving] = useState(false);
+
+  // Reset on open
+  useState(() => {
+    if (open && initialData) {
+      setName(initialData.name);
+      setLogo(initialData.logo);
+      setCity(initialData.city);
+      setPlan(initialData.plan);
+      setStatus(initialData.status);
+      setLocations(initialData.locations);
+    } else if (open) {
+      setName(""); setLogo("🍔"); setCity(""); setPlan("starter"); setStatus("trial"); setLocations(1);
+    }
+  });
+
+  const valid = name.trim().length > 0;
+
+  const submit = async () => {
+    if (!valid) return;
+    setSaving(true);
+    try {
+      const payload = { name: name.trim(), logo, city, plan, status, locations, features: initialData?.features ?? DEFAULT_FEATURES };
+      let saved: Tenant;
+      if (isEdit && initialData) {
+        saved = await saasService.updateTenant(initialData.id, payload);
+      } else {
+        saved = await saasService.createTenant(payload);
+      }
+      onSave(saved);
+    } catch {
+      toast.error("Error al guardar restaurante");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Editar restaurante" : "Nuevo restaurante"}</DialogTitle>
+          <DialogDescription>
+            {isEdit ? "Modifica los datos del restaurante." : "Registra un nuevo restaurante en la plataforma."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <div className="w-20">
+              <label className="mb-1.5 block text-sm font-medium">Emoji</label>
+              <Input value={logo} onChange={(e) => setLogo(e.target.value)} className="text-center text-xl" maxLength={4} />
+            </div>
+            <div className="flex-1">
+              <label className="mb-1.5 block text-sm font-medium">Nombre del restaurante</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Burger House" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Ciudad</label>
+              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej: Bogotá" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Sedes</label>
+              <Input type="number" min={1} value={locations} onChange={(e) => setLocations(Number(e.target.value))} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Plan</label>
+              <Select value={plan} onValueChange={(v) => setPlan(v as TenantPlan)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="starter">Starter</SelectItem>
+                  <SelectItem value="growth">Growth</SelectItem>
+                  <SelectItem value="enterprise">Enterprise</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Estado</label>
+              <Select value={status} onValueChange={(v) => setStatus(v as TenantStatus)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="trial">Prueba</SelectItem>
+                  <SelectItem value="active">Activo</SelectItem>
+                  <SelectItem value="past_due">Mora</SelectItem>
+                  <SelectItem value="churned">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={submit} disabled={!valid || saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {isEdit ? "Guardar cambios" : "Crear restaurante"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── FeaturesDialog ───────────────────────────────────────────────────────────
+
+function FeaturesDialog({
+  tenant, onClose, onUpdate,
+}: {
+  tenant: Tenant | null;
+  onClose: () => void;
+  onUpdate: (t: Tenant) => void;
+}) {
+  const [features, setFeatures] = useState<TenantFeatures>(DEFAULT_FEATURES);
+  const [saving, setSaving] = useState(false);
+  const prevId = useState<string | null>(null);
+
+  // Sync features when tenant changes
+  if (tenant && tenant.id !== prevId[0]) {
+    prevId[1](tenant.id);
+    setFeatures(tenant.features ?? DEFAULT_FEATURES);
+  }
+
+  const toggle = (id: keyof TenantFeatures) =>
+    setFeatures((f) => ({ ...f, [id]: !f[id] }));
+
+  const save = async () => {
+    if (!tenant) return;
+    setSaving(true);
+    try {
+      await saasService.updateFeatures(tenant.id, features);
+      onUpdate({ ...tenant, features });
+      toast.success("Funcionalidades actualizadas");
+      onClose();
+    } catch {
+      toast.error("Error al actualizar funcionalidades");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!tenant} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <span className="text-xl">{tenant?.logo}</span>
+            {tenant?.name} · Funcionalidades
+          </DialogTitle>
+          <DialogDescription>
+            Activa o desactiva módulos para este restaurante.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {FEATURE_LIST.map(({ id, label, icon: Icon, desc }) => (
+            <div
+              key={id}
+              className="flex items-center justify-between rounded-lg border border-border p-3"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{label}</p>
+                  <p className="text-[11px] text-muted-foreground">{desc}</p>
+                </div>
+              </div>
+              <Switch checked={features[id]} onCheckedChange={() => toggle(id)} />
+            </div>
+          ))}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

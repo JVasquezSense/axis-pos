@@ -285,6 +285,21 @@ export interface ReportData {
 export type TenantPlan = "starter" | "growth" | "enterprise";
 export type TenantStatus = "active" | "trial" | "past_due" | "churned";
 
+export interface TenantFeatures {
+  pos: boolean;
+  kitchen: boolean;
+  inventory: boolean;
+  recipes: boolean;
+  salon: boolean;
+  reservations: boolean;
+  crm: boolean;
+  suppliers: boolean;
+  employees: boolean;
+  reports: boolean;
+  website: boolean;
+  web_orders: boolean;
+}
+
 export interface Tenant {
   id: string;
   name: string;
@@ -297,6 +312,7 @@ export interface Tenant {
   ordersMonth: number;
   joinedAt: string;
   city: string;
+  features: TenantFeatures;
 }
 
 export interface SaasMetrics {
