@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export type AuditModule =
   | "ventas"
@@ -48,19 +47,14 @@ export const MODULE_COLORS: Record<AuditModule, string> = {
   sistema: "bg-muted text-muted-foreground",
 };
 
-export const useAuditStore = create<AuditState>()(
-  persist(
-    (set) => ({
-      entries: [],
-      log: (entry) =>
-        set((s) => ({
-          entries: [
-            { ...entry, id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, ts: Date.now() },
-            ...s.entries,
-          ].slice(0, 500),
-        })),
-      clear: () => set({ entries: [] }),
-    }),
-    { name: "axis-audit", version: 1 }
-  )
-);
+export const useAuditStore = create<AuditState>()((set) => ({
+  entries: [],
+  log: (entry) =>
+    set((s) => ({
+      entries: [
+        { ...entry, id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, ts: Date.now() },
+        ...s.entries,
+      ].slice(0, 500),
+    })),
+  clear: () => set({ entries: [] }),
+}));

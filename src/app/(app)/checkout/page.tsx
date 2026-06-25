@@ -40,7 +40,8 @@ export default function CheckoutPage() {
   const recordSale = useSalesStore((s) => s.record);
   const setAvailable = useMenuStore((s) => s.setAvailable);
   const recipes = useRecipesStore((s) => s.recipes);
-  const waiters = useEmployeesStore((s) => s.employees.filter((e) => e.role === "mesero" && e.active));
+  const allEmployees = useEmployeesStore((s) => s.employees);
+  const waiters = useMemo(() => allEmployees.filter((e) => e.role === "mesero" && e.active), [allEmployees]);
 
   const lines = storeLines;
   const [table, setTableLocal] = useState<number | null>(storeTable ?? null);
@@ -51,9 +52,12 @@ export default function CheckoutPage() {
   const [waiter, setWaiter] = useState("");
   const [payOpen, setPayOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
+  const [splitCollected, setSplitCollected] = useState(0);
 
   // Sincronizar table local cuando el store cambia (ej. navegando desde salón)
   useEffect(() => { setTableLocal(storeTable ?? null); }, [storeTable]);
+  // Resetear cobro parcial cuando cambia la orden
+  useEffect(() => { setSplitCollected(0); }, [storeLines]);
 
   const st = SALE_TYPE_MAP[saleType];
 
@@ -64,8 +68,9 @@ export default function CheckoutPage() {
   const tax = st.noTax ? 0 : Math.round(taxedBase * TAX_RATE);
   const tip = st.full ? 0 : Math.round(subtotal * tipRate);
   const total = taxedBase + tax + tip;
+  const remaining = Math.max(total - splitCollected, 0);
 
-  const breakdown: PaymentBreakdown = { subtotal, tax, taxRate: st.noTax ? 0 : TAX_RATE, discount: effectiveDiscount, tip, total };
+  const breakdown: PaymentBreakdown = { subtotal, tax, taxRate: st.noTax ? 0 : TAX_RATE, discount: effectiveDiscount, tip, total: remaining };
 
   const completeSale = () => {
     const ref = table ? `mesa ${table}` : "mostrador";
@@ -259,9 +264,25 @@ export default function CheckoutPage() {
               <Row label="Propina" value={formatCurrency(tip)} muted />
               <Separator className="my-2" />
               <div className="flex items-center justify-between">
-                <span className="text-base font-semibold">Total a pagar</span>
-                <span className="text-2xl font-bold text-primary">{formatCurrency(total)}</span>
+                <span className="text-base font-semibold">Total</span>
+                <span className="font-semibold">{formatCurrency(total)}</span>
               </div>
+              {splitCollected > 0 && (
+                <>
+                  <Row label="Cobrado (cuenta dividida)" value={`- ${formatCurrency(splitCollected)}`} accent />
+                  <Separator className="my-2" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-semibold">Restante a cobrar</span>
+                    <span className="text-2xl font-bold text-primary">{formatCurrency(remaining)}</span>
+                  </div>
+                </>
+              )}
+              {splitCollected === 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-semibold">Total a pagar</span>
+                  <span className="text-2xl font-bold text-primary">{formatCurrency(total)}</span>
+                </div>
+              )}
               <Button variant="outline" className="mt-3 w-full" onClick={() => setSplitOpen(true)} disabled={total <= 0}>
                 <SplitSquareHorizontal className="h-4 w-4" /> Dividir cuenta
               </Button>
@@ -293,8 +314,8 @@ export default function CheckoutPage() {
                   </button>
                 ))}
               </div>
-              <Button size="lg" className="mt-4 w-full text-base" onClick={() => setPayOpen(true)}>
-                Cobrar {formatCurrency(total)}
+              <Button size="lg" className="mt-4 w-full text-base" onClick={() => setPayOpen(true)} disabled={remaining <= 0}>
+                Cobrar {formatCurrency(remaining)}
               </Button>
             </CardContent>
           </Card>
@@ -308,6 +329,7 @@ export default function CheckoutPage() {
         subtotal={subtotal}
         total={total}
         onComplete={completeSale}
+        onPartialPay={(collected) => setSplitCollected((prev) => Math.min(prev + collected, total))}
       />
 
       <PaymentDialog

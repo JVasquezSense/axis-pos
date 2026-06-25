@@ -30,6 +30,7 @@ export function SplitBillDialog({
   subtotal,
   total,
   onComplete,
+  onPartialPay,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -37,6 +38,7 @@ export function SplitBillDialog({
   subtotal: number;
   total: number;
   onComplete?: () => void;
+  onPartialPay?: (collected: number) => void;
 }) {
   const [people, setPeople] = useState(2);
   const [mode, setMode] = useState<"people" | "items">("people");
@@ -193,7 +195,16 @@ export function SplitBillDialog({
               <Check className="h-4 w-4" /> Finalizar
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const collected = paid.reduce((s, i) => s + amounts[i], 0);
+                if (collected > 0) onPartialPay?.(collected);
+                onOpenChange(false);
+              }}
+            >
+              {paid.length > 0 ? `Cerrar · ${paid.length} cobrado${paid.length > 1 ? "s" : ""}` : "Cerrar"}
+            </Button>
           )}
         </div>
       </DialogContent>

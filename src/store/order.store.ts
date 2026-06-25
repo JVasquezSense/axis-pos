@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { OrderLine, Product, ModifierOption } from "@/types";
 
 export const TAX_RATE = 0.08;
@@ -7,7 +6,7 @@ export const TAX_RATE = 0.08;
 interface OrderState {
   tableNumber: number | null;
   lines: OrderLine[];
-  tableOrders: Record<string, OrderLine[]>; // snapshot por mesa
+  tableOrders: Record<string, OrderLine[]>;
   tip: number;
   discount: number;
   setTable: (n: number | null) => void;
@@ -18,11 +17,6 @@ interface OrderState {
   remove: (lineId: string) => void;
   setTip: (v: number) => void;
   setDiscount: (v: number) => void;
-  /**
-   * Envío a cocina: guarda las líneas actuales en tableOrders sin borrarlas del
-   * snapshot de la mesa, limpia el panel activo y mantiene tableNumber.
-   * Así checkout puede recuperar el total cuando el mesero vaya a cobrar.
-   */
   flushToTable: () => void;
   clear: () => void;
 }
@@ -30,26 +24,23 @@ interface OrderState {
 const lineTotal = (l: OrderLine) =>
   (l.unitPrice + l.modifiers.reduce((s, m) => s + m.price, 0)) * l.quantity;
 
-export const useOrderStore = create<OrderState>()(
-  persist(
-    (set, get) => ({
+export const useOrderStore = create<OrderState>()((set, get) => ({
   tableNumber: null,
   lines: [],
   tableOrders: {},
   tip: 0,
   discount: 0,
+
   setTable: (n) =>
     set((s) => {
       const saved: Record<string, OrderLine[]> = { ...s.tableOrders };
-      // Solo guarda las líneas actuales si se cambia a una mesa DIFERENTE.
-      // Si es la misma mesa (ej. salon → checkout sobre la mesa activa),
-      // no sobreescribir el snapshot acumulado con las líneas activas vacías.
       if (s.tableNumber !== null && s.tableNumber !== n) {
         saved[String(s.tableNumber)] = s.lines;
       }
       const nextLines = n !== null ? (saved[String(n)] ?? []) : [];
       return { tableNumber: n, tableOrders: saved, lines: nextLines };
     }),
+
   addProduct: (product, modifiers = [], notes) =>
     set((state) => {
       const sig = `${product.id}-${modifiers.map((m) => m.id).join(",")}-${notes ?? ""}`;
@@ -77,25 +68,29 @@ export const useOrderStore = create<OrderState>()(
         ],
       };
     }),
+
   increment: (lineId) =>
     set((s) => ({
       lines: s.lines.map((l) => (l.id === lineId ? { ...l, quantity: l.quantity + 1 } : l)),
     })),
+
   decrement: (lineId) =>
     set((s) => ({
       lines: s.lines
         .map((l) => (l.id === lineId ? { ...l, quantity: l.quantity - 1 } : l))
         .filter((l) => l.quantity > 0),
     })),
+
   setNotes: (lineId, notes) =>
     set((s) => ({ lines: s.lines.map((l) => (l.id === lineId ? { ...l, notes } : l)) })),
+
   remove: (lineId) => set((s) => ({ lines: s.lines.filter((l) => l.id !== lineId) })),
   setTip: (v) => set({ tip: v }),
   setDiscount: (v) => set({ discount: v }),
+
   flushToTable: () =>
     set((s) => {
       if (s.tableNumber === null) return { lines: [] };
-      // Acumula las líneas actuales en el snapshot de la mesa (merge por producto+modificadores)
       const existing = s.tableOrders[String(s.tableNumber)] ?? [];
       const merged = [...existing];
       s.lines.forEach((line) => {
@@ -111,30 +106,15 @@ export const useOrderStore = create<OrderState>()(
       });
       return { lines: [], tableOrders: { ...s.tableOrders, [String(s.tableNumber)]: merged } };
     }),
+
   clear: () =>
     set((s) => {
       const tableOrders = { ...s.tableOrders };
       if (s.tableNumber !== null) delete tableOrders[String(s.tableNumber)];
       return { lines: [], tip: 0, discount: 0, tableNumber: null, tableOrders };
     }),
-    }),
-    {
-      name: "axis-order",
-      version: 1,
-      partialize: (s) => ({
-        lines: Array.isArray(s.lines) ? s.lines : [],
-        tableNumber: s.tableNumber,
-        tableOrders: Object.fromEntries(
-          Object.entries(s.tableOrders).filter(([, v]) => Array.isArray(v))
-        ),
-        tip: s.tip,
-        discount: s.discount,
-      }),
-    }
-  )
-);
+}));
 
-// Selectores derivados
 export const orderSelectors = {
   subtotal: (lines: OrderLine[]) => lines.reduce((s, l) => s + lineTotal(l), 0),
   count: (lines: OrderLine[]) => lines.reduce((s, l) => s + l.quantity, 0),

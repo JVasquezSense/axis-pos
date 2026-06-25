@@ -120,7 +120,7 @@ export function IngredientEditor({
             <div>
               <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Costo</label>
               <div className="flex h-9 items-center justify-end rounded-lg border border-border bg-muted/40 px-3 text-sm font-semibold">
-                {formatCurrency(ingredientCost(ing))}
+                {formatCurrency((() => { const item = items.find((i) => i.id === ing.inventoryId); return item ? ingredientCost(ing, item) : 0; })())}
               </div>
             </div>
           </div>

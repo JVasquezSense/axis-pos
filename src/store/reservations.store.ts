@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import { USE_API } from "@/services/http";
 import { reservationsService } from "@/services/reservations.service";
 
@@ -10,8 +9,8 @@ export interface Reservation {
   name: string;
   phone: string;
   tableNumber: number;
-  date: string;   // YYYY-MM-DD
-  time: string;   // HH:mm
+  date: string;
+  time: string;
   guests: number;
   notes: string;
   status: ReservationStatus;
@@ -19,6 +18,7 @@ export interface Reservation {
 
 interface ReservationsState {
   reservations: Reservation[];
+  load: () => Promise<void>;
   add: (r: Omit<Reservation, "id">) => void;
   update: (r: Reservation) => void;
   remove: (id: string) => void;
@@ -29,37 +29,38 @@ function uid() {
   return `res-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-export const useReservationsStore = create<ReservationsState>()(
-  persist(
-    (set) => ({
-      reservations: [],
+export const useReservationsStore = create<ReservationsState>()((set) => ({
+  reservations: [],
 
-      add: (r) => {
-        const newRes = { ...r, id: uid() };
-        set((s) => ({ reservations: [newRes, ...s.reservations] }));
-        if (USE_API) reservationsService.create(r).then((saved) =>
-          set((s) => ({ reservations: s.reservations.map((x) => (x.id === newRes.id ? saved : x)) }))
-        ).catch(console.error);
-      },
+  load: async () => {
+    if (!USE_API) return;
+    const reservations = await reservationsService.getAll();
+    set({ reservations });
+  },
 
-      update: (r) => {
-        set((s) => ({ reservations: s.reservations.map((x) => (x.id === r.id ? r : x)) }));
-        if (USE_API) reservationsService.update(r).catch(console.error);
-      },
+  add: (r) => {
+    const newRes = { ...r, id: uid() };
+    set((s) => ({ reservations: [newRes, ...s.reservations] }));
+    if (USE_API) reservationsService.create(r).then((saved) =>
+      set((s) => ({ reservations: s.reservations.map((x) => (x.id === newRes.id ? saved : x)) }))
+    ).catch(console.error);
+  },
 
-      remove: (id) => {
-        set((s) => ({ reservations: s.reservations.filter((r) => r.id !== id) }));
-        if (USE_API) reservationsService.remove(id).catch(console.error);
-      },
+  update: (r) => {
+    set((s) => ({ reservations: s.reservations.map((x) => (x.id === r.id ? r : x)) }));
+    if (USE_API) reservationsService.update(r).catch(console.error);
+  },
 
-      setStatus: (id, status) => {
-        set((s) => ({ reservations: s.reservations.map((r) => (r.id === id ? { ...r, status } : r)) }));
-        if (USE_API) reservationsService.setStatus(id, status).catch(console.error);
-      },
-    }),
-    { name: "axis-reservations", version: 2 }
-  )
-);
+  remove: (id) => {
+    set((s) => ({ reservations: s.reservations.filter((r) => r.id !== id) }));
+    if (USE_API) reservationsService.remove(id).catch(console.error);
+  },
+
+  setStatus: (id, status) => {
+    set((s) => ({ reservations: s.reservations.map((r) => (r.id === id ? { ...r, status } : r)) }));
+    if (USE_API) reservationsService.setStatus(id, status).catch(console.error);
+  },
+}));
 
 export const STATUS_CONFIG: Record<ReservationStatus, { label: string; color: string }> = {
   pending:   { label: "Pendiente",  color: "bg-amber-500/15 text-amber-600 border-amber-500/30" },

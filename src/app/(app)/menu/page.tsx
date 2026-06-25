@@ -9,6 +9,8 @@ import {
 import type { Category, Product, Recipe } from "@/types";
 import { useMenuStore, emptyProduct, uid } from "@/store/menu.store";
 import { useRecipesStore, emptyRecipe } from "@/store/recipes.store";
+import { useInventoryStore } from "@/store/inventory.store";
+import { INVENTORY } from "@/mock/datasets";
 import { computeRecipeCost, foodCostTone, STATION } from "@/lib/recipes";
 import { RecipeEditor } from "@/components/recipes/recipe-editor";
 import { RecipeCard } from "@/components/recipes/recipe-card";
@@ -72,6 +74,8 @@ function TabBtn({ active, onClick, label, icon }: { active: boolean; onClick: ()
 function CartaTab() {
   const { categories, products, addCategory, removeCategory, addProduct, updateProduct, removeProduct } = useMenuStore();
   const recipes = useRecipesStore((s) => s.recipes);
+  const invRaw = useInventoryStore((s) => s.items);
+  const invItems = invRaw.length > 0 ? invRaw : INVENTORY;
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("all");
   const [editing, setEditing] = useState<Product | null>(null);
@@ -199,7 +203,7 @@ function CartaTab() {
               {(() => {
                 const rc = recipeFor(p.id);
                 if (rc) {
-                  const c = computeRecipeCost(rc);
+                  const c = computeRecipeCost(rc, invItems);
                   return (
                     <button onClick={() => openRecipe(p)} className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium hover:bg-accent">
                       <BookOpen className="h-3 w-3" /> Food cost <span className={foodCostTone(c.foodCostPct)}>{(c.foodCostPct * 100).toFixed(0)}%</span>
@@ -259,6 +263,8 @@ function CartaTab() {
 function RecetasTab() {
   const { recipes, duplicate, remove } = useRecipesStore();
   const categories = useMenuStore((s) => s.categories);
+  const invRaw = useInventoryStore((s) => s.items);
+  const invItems = invRaw.length > 0 ? invRaw : INVENTORY;
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [station, setStation] = useState("all");
@@ -278,7 +284,7 @@ function RecetasTab() {
 
   const summary = useMemo(() => {
     if (!recipes.length) return { count: 0, avgFood: 0, avgMargin: 0, lowStock: 0 };
-    const costs = recipes.map((r) => computeRecipeCost(r));
+    const costs = recipes.map((r) => computeRecipeCost(r, invItems));
     return {
       count: recipes.length,
       avgFood: (costs.reduce((s, c) => s + c.foodCostPct, 0) / costs.length) * 100,

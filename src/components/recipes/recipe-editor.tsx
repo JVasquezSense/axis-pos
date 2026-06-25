@@ -38,6 +38,8 @@ export function RecipeEditor({
   const products = useMenuStore((s) => s.products);
   const addProduct = useMenuStore((s) => s.addProduct);
   const updateProduct = useMenuStore((s) => s.updateProduct);
+  const liveInventory = useInventoryStore((s) => s.items);
+  const items = liveInventory.length > 0 ? liveInventory : INVENTORY;
   const [draft, setDraft] = useState<Recipe | null>(recipe);
   const [tagInput, setTagInput] = useState("");
   const [describingAI, setDescribingAI] = useState(false);
@@ -52,7 +54,7 @@ export function RecipeEditor({
   if (!draft) return null;
   // Functional updater evita stale closure en handlers async
   const set = (patch: Partial<Recipe>) => setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
-  const cost = computeRecipeCost(draft);
+  const cost = computeRecipeCost(draft, items);
 
   const isImageUrl = (src: string) =>
     src.startsWith("data:") || src.startsWith("http") || src.startsWith("/") || src.startsWith("blob:");
@@ -115,7 +117,7 @@ export function RecipeEditor({
       const addInventoryItem = useInventoryStore.getState().addItem;
       let newItemsCount = 0;
 
-      const ingredients: RecipeIngredient[] = ((data.ingredients as { name: string; unit: string; quantity: number; waste?: number; existingId?: string | null }[]) ?? []).map((ing) => {
+      const ingredients: RecipeIngredient[] = ((data.ingredients as { name: string; unit: string; quantity: number; waste?: number; existingId?: string | null; cost?: number }[]) ?? []).map((ing) => {
         let inventoryId: string = ing.existingId ?? "";
         // Verificar que el id existe realmente
         if (inventoryId && !allItems.find((i) => i.id === inventoryId)) inventoryId = "";
@@ -127,7 +129,7 @@ export function RecipeEditor({
             stock: 10,
             unit: ing.unit ?? "und",
             minStock: 2,
-            cost: 0,
+            cost: Number(ing.cost) || 0,
             supplier: "",
             status: "normal",
             updatedAt: "Justo ahora",
@@ -175,6 +177,7 @@ export function RecipeEditor({
             ? (data.variations as { name: string; priceDelta: number }[]).map((v) => ({ ...emptyVariation(), name: String(v.name ?? ""), priceDelta: Number(v.priceDelta) || 0 }))
             : prev.variations,
           ingredients,
+          status: "active",
         };
       });
 

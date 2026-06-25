@@ -19,22 +19,55 @@ export function getInventoryItem(id: string): InventoryItem | undefined {
   return INV_MAP.get(id);
 }
 
+/**
+ * Factor de conversión entre unidades compatibles.
+ * Retorna cuántas `toUnit` equivalen a 1 `fromUnit`.
+ * Ejemplo: unitFactor("g","kg") = 0.001  →  200g × 0.001 = 0.2kg
+ */
+function unitFactor(fromUnit: string, toUnit: string): number {
+  const fu = fromUnit.toLowerCase();
+  const tu = toUnit.toLowerCase();
+  if (fu === tu) return 1;
+
+  // Masa: base gramo
+  const MASS: Record<string, number> = { g: 1, gr: 1, kg: 1000, lb: 453.592, oz: 28.3495 };
+  // Volumen: base mililitro
+  const VOL: Record<string, number> = { ml: 1, cl: 10, l: 1000, lt: 1000 };
+
+  if (MASS[fu] != null && MASS[tu] != null) return MASS[fu] / MASS[tu];
+  if (VOL[fu] != null && VOL[tu] != null) return VOL[fu] / VOL[tu];
+  return 1; // unidades de conteo o incompatibles — sin conversión
+}
+
 /** Cantidad efectiva considerando la merma. */
 export function effectiveQty(ing: RecipeIngredient): number {
   return ing.quantity / Math.max(1 - ing.waste, 0.01);
 }
 
-/** Costo de un insumo dentro de la receta (todo el rendimiento). */
-export function ingredientCost(ing: RecipeIngredient): number {
-  const item = INV_MAP.get(ing.inventoryId);
-  if (!item) return 0;
-  return effectiveQty(ing) * item.cost;
+/** Costo de un insumo dentro de la receta con conversión de unidades correcta. */
+export function ingredientCost(ing: RecipeIngredient, item: InventoryItem): number {
+  // Convierte la cantidad de la receta (ing.unit) a la unidad del insumo (item.unit)
+  // para multiplicar por el costo unitario del inventario.
+  const factor = unitFactor(ing.unit, item.unit);
+  return effectiveQty(ing) * factor * item.cost;
 }
 
-/** Motor de costeo: costo, food cost %, margen, precio sugerido y disponibilidad. */
-export function computeRecipeCost(recipe: Recipe): RecipeCost {
+/**
+ * Motor de costeo: costo, food cost %, margen, precio sugerido y disponibilidad.
+ * @param liveItems  Insumos del store en tiempo real (incluye items creados dinámicamente).
+ *                   Se fusionan con los mock; el store tiene prioridad.
+ */
+export function computeRecipeCost(recipe: Recipe, liveItems?: InventoryItem[]): RecipeCost {
+  // Mapa fusionado: mock base + items vivos (store tiene prioridad)
+  const lookup: (id: string) => InventoryItem | undefined = liveItems?.length
+    ? (id) => liveItems.find((i) => i.id === id) ?? INV_MAP.get(id)
+    : (id) => INV_MAP.get(id);
+
   const portions = Math.max(recipe.portions, 1);
-  const totalCost = recipe.ingredients.reduce((s, ing) => s + ingredientCost(ing), 0);
+  const totalCost = recipe.ingredients.reduce((s, ing) => {
+    const item = lookup(ing.inventoryId);
+    return s + (item ? ingredientCost(ing, item) : 0);
+  }, 0);
   const costPerPortion = totalCost / portions;
   const price = recipe.price || 1;
   const foodCostPct = costPerPortion / price;
@@ -42,14 +75,16 @@ export function computeRecipeCost(recipe: Recipe): RecipeCost {
   const marginPct = margin / price;
   const suggestedPrice = Math.round(costPerPortion / TARGET_FOOD_COST);
 
-  // Disponibilidad: porciones preparables con el stock actual
+  // Disponibilidad: porciones preparables con stock actual (respeta unidades)
   let maxPortions = Infinity;
   for (const ing of recipe.ingredients) {
-    const item = INV_MAP.get(ing.inventoryId);
+    const item = lookup(ing.inventoryId);
     if (!item) continue;
-    const perPortion = effectiveQty(ing) / portions;
+    const perPortion = effectiveQty(ing) / portions; // en ing.unit
     if (perPortion <= 0) continue;
-    maxPortions = Math.min(maxPortions, Math.floor(item.stock / perPortion));
+    // Convierte a item.unit para comparar con item.stock
+    const perPortionInItemUnit = perPortion * unitFactor(ing.unit, item.unit);
+    maxPortions = Math.min(maxPortions, Math.floor(item.stock / perPortionInItemUnit));
   }
   if (!isFinite(maxPortions)) maxPortions = 0;
 
@@ -57,11 +92,17 @@ export function computeRecipeCost(recipe: Recipe): RecipeCost {
 }
 
 /** Costo total de una variación = base + insumos extra. */
-export function variationCost(recipe: Recipe, variationId: string): number {
-  const base = computeRecipeCost(recipe).costPerPortion;
+export function variationCost(recipe: Recipe, variationId: string, liveItems?: InventoryItem[]): number {
+  const lookup: (id: string) => InventoryItem | undefined = liveItems?.length
+    ? (id) => liveItems.find((i) => i.id === id) ?? INV_MAP.get(id)
+    : (id) => INV_MAP.get(id);
+  const base = computeRecipeCost(recipe, liveItems).costPerPortion;
   const variation = recipe.variations.find((v) => v.id === variationId);
   if (!variation) return base;
-  const extra = variation.extraIngredients.reduce((s, ing) => s + ingredientCost(ing), 0);
+  const extra = variation.extraIngredients.reduce((s, ing) => {
+    const item = lookup(ing.inventoryId);
+    return s + (item ? ingredientCost(ing, item) : 0);
+  }, 0);
   return base + extra / Math.max(recipe.portions, 1);
 }
 

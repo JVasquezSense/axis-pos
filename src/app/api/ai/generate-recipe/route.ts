@@ -68,7 +68,7 @@ Genera la ficha técnica completa. Devuelve SOLO este JSON (sin texto extra):
   "tags": ["<etiqueta>"],
   "steps": ["<paso 1>", "<paso 2>", "<paso 3>"],
   "variations": [{"name": "<nombre>", "priceDelta": <numero COP>}],
-  "ingredients": [{"name": "<nombre>", "unit": "<kg|g|L|ml|und>", "quantity": <numero>, "waste": <0.0 a 0.3>, "existingId": "<id o null>"}]
+  "ingredients": [{"name": "<nombre>", "unit": "<kg|g|L|ml|und>", "quantity": <numero>, "waste": <0.0 a 0.3>, "existingId": "<id o null>", "cost": <costo unitario COP por unidad del campo unit, ej: 5000 por kg de carne>}]
 }
 
 Categorias (usa el id exacto): ${categoryList}

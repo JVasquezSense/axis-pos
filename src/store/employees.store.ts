@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export type EmployeeRole = "mesero" | "cocinero" | "cajero" | "admin" | "almacen";
 
@@ -40,15 +39,10 @@ export const EMPLOYEE_ROLE_COLORS: Record<EmployeeRole, string> = {
   almacen: "bg-cyan-500/15 text-cyan-600 border-cyan-500/30",
 };
 
-export const useEmployeesStore = create<EmployeesState>()(
-  persist(
-    (set) => ({
-      employees: [],
-      add: (e) => set((s) => ({ employees: [{ ...e, id: uid() }, ...s.employees] })),
-      update: (e) => set((s) => ({ employees: s.employees.map((x) => (x.id === e.id ? e : x)) })),
-      remove: (id) => set((s) => ({ employees: s.employees.filter((e) => e.id !== id) })),
-      toggle: (id) => set((s) => ({ employees: s.employees.map((e) => (e.id === id ? { ...e, active: !e.active } : e)) })),
-    }),
-    { name: "axis-employees", version: 1 }
-  )
-);
+export const useEmployeesStore = create<EmployeesState>()((set) => ({
+  employees: [],
+  add: (e) => set((s) => ({ employees: [{ ...e, id: uid() }, ...s.employees] })),
+  update: (e) => set((s) => ({ employees: s.employees.map((x) => (x.id === e.id ? e : x)) })),
+  remove: (id) => set((s) => ({ employees: s.employees.filter((e) => e.id !== id) })),
+  toggle: (id) => set((s) => ({ employees: s.employees.map((e) => (e.id === id ? { ...e, active: !e.active } : e)) })),
+}));
