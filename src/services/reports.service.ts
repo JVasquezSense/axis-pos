@@ -5,7 +5,8 @@ import { USE_API, request, mockRequest } from "./http";
 export const reportsService = {
   /** GET /api/v1/reports/executive/ */
   async getExecutive(): Promise<ReportData> {
-    // Sin endpoint en el backend aún → siempre mock
-    return mockRequest(REPORTS, 750);
+    return USE_API
+      ? request<ReportData>("/reports/executive/")
+      : mockRequest(REPORTS, 750);
   },
 };
