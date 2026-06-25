@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/auth.store";
 import { toast } from "sonner";
 import {
   ShieldCheck, Building2, Globe, Plus, MoreHorizontal,
@@ -61,6 +63,8 @@ const DEFAULT_FEATURES: TenantFeatures = {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
+  const router = useRouter();
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
   const { data: metrics, loading: mLoading } = useAsync(() => saasService.getMetrics());
   const { data: rawTenants, loading: tLoading } = useAsync(() => saasService.getTenants());
 
@@ -71,6 +75,12 @@ export default function AdminPage() {
   const [usersTenant, setUsersTenant] = useState<Tenant | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!isSuperAdmin) router.replace("/dashboard");
+  }, [isSuperAdmin, router]);
+
+  if (!isSuperAdmin) return null;
 
   const list = tenants ?? rawTenants ?? [];
 

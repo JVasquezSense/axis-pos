@@ -7,6 +7,7 @@ import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { NAV_ITEMS, NAV_GROUPS } from "@/lib/nav";
 import { ROLE_NAV } from "@/lib/roles";
 import { useAppStore } from "@/store/app.store";
+import { useAuthStore } from "@/store/auth.store";
 import { Icon } from "@/components/shared/icon";
 import { LogoMark } from "@/components/shared/logo";
 import { cn } from "@/lib/utils";
@@ -14,8 +15,9 @@ import { cn } from "@/lib/utils";
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar, role } = useAppStore();
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
   const allowed = ROLE_NAV[role] ?? ROLE_NAV["admin"];
-  const items = NAV_ITEMS.filter((i) => allowed.includes(i.key));
+  const items = NAV_ITEMS.filter((i) => allowed.includes(i.key) && (i.key !== "admin" || isSuperAdmin));
 
   return (
     <aside

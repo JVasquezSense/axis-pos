@@ -39,16 +39,21 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
+      let isSuperAdmin = false;
       if (USE_API) {
         const data = await request<{ access: string }>("/auth/token/", {
           method: "POST",
           body: JSON.stringify({ username: email, password }),
         });
         window.localStorage.setItem("axis-token", data.access);
+        try {
+          const payload = JSON.parse(atob(data.access.split(".")[1]));
+          isSuperAdmin = !!payload.is_superuser;
+        } catch { /* token malformado, isSuperAdmin queda false */ }
       } else {
-        await new Promise((r) => setTimeout(r, 700)); // latencia simulada
+        await new Promise((r) => setTimeout(r, 700));
       }
-      login(prettyName(email));
+      login(prettyName(email), isSuperAdmin);
       router.push("/dashboard");
     } catch {
       setError("Credenciales inválidas. Verifica tus datos.");
