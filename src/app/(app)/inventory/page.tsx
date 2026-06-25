@@ -13,6 +13,9 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronsUpDown,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import type { InventoryItem, StockStatus } from "@/types";
 import { inventoryService } from "@/services/inventory.service";
@@ -28,6 +31,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AddSupplyDialog } from "@/components/inventory/add-supply-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { KardexView } from "@/components/inventory/kardex-view";
 import { PhysicalCountView } from "@/components/inventory/physical-count-view";
 import { ConsumptionView } from "@/components/inventory/consumption-view";
@@ -43,8 +52,11 @@ export default function InventoryPage() {
   const items = useInventoryStore((s) => s.items);
   const movements = useInventoryStore((s) => s.movements);
   const addItemStore = useInventoryStore((s) => s.addItem);
+  const updateItemStore = useInventoryStore((s) => s.updateItem);
+  const deleteItemStore = useInventoryStore((s) => s.deleteItem);
   const { data: counts } = useAsync(() => inventoryService.getPhysicalCounts());
 
+  const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -101,6 +113,16 @@ export default function InventoryPage() {
   const addItem = (item: InventoryItem) => {
     addItemStore(item);
     toast.success("Insumo agregado", { description: item.name });
+  };
+
+  const updateItem = (item: InventoryItem) => {
+    updateItemStore(item);
+    toast.success("Insumo actualizado", { description: item.name });
+  };
+
+  const deleteItem = (item: InventoryItem) => {
+    deleteItemStore(item.id);
+    toast.success("Insumo eliminado", { description: item.name });
   };
 
   return (
@@ -179,10 +201,18 @@ export default function InventoryPage() {
                     <SortHead label="Costo unit." k="cost" sort={sort} onSort={toggleSort} align="right" />
                     <SortHead label="Valor" k="value" sort={sort} onSort={toggleSort} align="right" />
                     <SortHead label="Estado" k="status" sort={sort} onSort={toggleSort} />
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((item) => <InventoryRow key={item.id} item={item} />)}
+                  {filtered.map((item) => (
+                    <InventoryRow
+                      key={item.id}
+                      item={item}
+                      onEdit={() => setEditItem(item)}
+                      onDelete={() => deleteItem(item)}
+                    />
+                  ))}
                 </TableBody>
               </Table>
             )}
@@ -217,6 +247,12 @@ export default function InventoryPage() {
       </Tabs>
 
       <AddSupplyDialog open={addOpen} onOpenChange={setAddOpen} onCreate={addItem} />
+      <AddSupplyDialog
+        open={!!editItem}
+        onOpenChange={(v) => { if (!v) setEditItem(null); }}
+        initialItem={editItem ?? undefined}
+        onUpdate={updateItem}
+      />
     </div>
   );
 }
@@ -256,7 +292,15 @@ function SortHead({
   );
 }
 
-function InventoryRow({ item }: { item: InventoryItem }) {
+function InventoryRow({
+  item,
+  onEdit,
+  onDelete,
+}: {
+  item: InventoryItem;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const pct = Math.min((item.stock / (item.minStock * 1.6)) * 100, 100);
   const barColor: Record<StockStatus, string> = {
     normal: "bg-emerald-500",
@@ -281,6 +325,23 @@ function InventoryRow({ item }: { item: InventoryItem }) {
       <TableCell className="text-right">{formatCurrency(item.stock * item.cost)}</TableCell>
       <TableCell>
         <Badge variant={STOCK_STATUS[item.status].variant}>{STOCK_STATUS[item.status].label}</Badge>
+      </TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil className="mr-2 h-4 w-4" /> Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </TableRow>
   );

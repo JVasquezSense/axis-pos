@@ -27,11 +27,16 @@ export function AddSupplyDialog({
   open,
   onOpenChange,
   onCreate,
+  initialItem,
+  onUpdate,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreate: (item: InventoryItem) => void;
+  onCreate?: (item: InventoryItem) => void;
+  initialItem?: InventoryItem;
+  onUpdate?: (item: InventoryItem) => void;
 }) {
+  const isEdit = !!initialItem;
   const [name, setName] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [stock, setStock] = useState(0);
@@ -42,26 +47,51 @@ export function AddSupplyDialog({
 
   useEffect(() => {
     if (open) {
-      setName(""); setCategory(CATEGORIES[0]); setStock(0); setUnit("kg"); setMinStock(0); setCost(0); setSupplier("");
+      if (initialItem) {
+        setName(initialItem.name);
+        setCategory(initialItem.category);
+        setStock(initialItem.stock);
+        setUnit(initialItem.unit);
+        setMinStock(initialItem.minStock);
+        setCost(initialItem.cost);
+        setSupplier(initialItem.supplier ?? "");
+      } else {
+        setName(""); setCategory(CATEGORIES[0]); setStock(0); setUnit("Kg"); setMinStock(0); setCost(0); setSupplier("");
+      }
     }
-  }, [open]);
+  }, [open, initialItem]);
 
   const valid = name.trim() && cost > 0 && minStock >= 0;
 
   const submit = () => {
     if (!valid) return;
-    onCreate({
-      id: `i-${Date.now()}`,
-      name: name.trim(),
-      category,
-      stock,
-      unit,
-      minStock,
-      cost,
-      supplier: supplier.trim() || "Sin proveedor",
-      status: statusFor(stock, minStock),
-      updatedAt: "Justo ahora",
-    });
+    if (isEdit && initialItem && onUpdate) {
+      onUpdate({
+        ...initialItem,
+        name: name.trim(),
+        category,
+        stock,
+        unit,
+        minStock,
+        cost,
+        supplier: supplier.trim() || "Sin proveedor",
+        status: statusFor(stock, minStock),
+        updatedAt: "Justo ahora",
+      });
+    } else if (onCreate) {
+      onCreate({
+        id: `i-${Date.now()}`,
+        name: name.trim(),
+        category,
+        stock,
+        unit,
+        minStock,
+        cost,
+        supplier: supplier.trim() || "Sin proveedor",
+        status: statusFor(stock, minStock),
+        updatedAt: "Justo ahora",
+      });
+    }
     onOpenChange(false);
   };
 
@@ -69,8 +99,8 @@ export function AddSupplyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nuevo insumo</DialogTitle>
-          <DialogDescription>Registra una materia prima con su stock inicial y costo.</DialogDescription>
+          <DialogTitle>{isEdit ? "Editar insumo" : "Nuevo insumo"}</DialogTitle>
+          <DialogDescription>{isEdit ? "Modifica los datos del insumo." : "Registra una materia prima con su stock inicial y costo."}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -123,7 +153,7 @@ export function AddSupplyDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={submit} disabled={!valid}>Agregar insumo</Button>
+          <Button onClick={submit} disabled={!valid}>{isEdit ? "Guardar cambios" : "Agregar insumo"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
