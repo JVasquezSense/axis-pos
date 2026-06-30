@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, Sparkles, GripVertical, Wand2, Loader2, X } from "lucide-react";
-import type { Recipe, Allergen, RecipeStation, RecipeStatus, RecipeDifficulty, RecipeIngredient, InventoryItem } from "@/types";
+import type { Recipe, Product, Allergen, RecipeStation, RecipeStatus, RecipeDifficulty, RecipeIngredient, InventoryItem } from "@/types";
 import { useMenuStore } from "@/store/menu.store";
 import { useInventoryStore } from "@/store/inventory.store";
 import { INVENTORY } from "@/mock/datasets";
+import { USE_API } from "@/services/http";
+import { menuService } from "@/services/menu.service";
+import { inventoryService } from "@/services/inventory.service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,53 +109,66 @@ export function RecipeEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: draft.name,
-          categories: categories.map((c) => ({ id: c.id, name: c.name })),
-          inventoryItems: allItems.map((i) => ({ id: i.id, name: i.name, unit: i.unit })),
+          categories: categories.map((c) => ({ id: String(c.id), name: c.name })),
+          inventoryItems: allItems.map((i) => ({ id: String(i.id), name: i.name, unit: i.unit })),
         }),
       });
       const data = await res.json();
       if (data.error) { toast.error(data.error); return; }
 
-      // Crear insumos nuevos en inventario
+      // Crear insumos nuevos en inventario (await para obtener IDs reales del backend)
       const addInventoryItem = useInventoryStore.getState().addItem;
       let newItemsCount = 0;
 
-      const ingredients: RecipeIngredient[] = ((data.ingredients as { name: string; unit: string; quantity: number; waste?: number; existingId?: string | null; cost?: number }[]) ?? []).map((ing) => {
-        let inventoryId: string = ing.existingId ?? "";
-        // Verificar que el id existe realmente
-        if (inventoryId && !allItems.find((i) => i.id === inventoryId)) inventoryId = "";
-        if (!inventoryId) {
-          const newItem: InventoryItem = {
-            id: uid("inv"),
+      const ingredients: RecipeIngredient[] = await Promise.all(
+        ((data.ingredients as { name: string; unit: string; quantity: number; waste?: number; existingId?: string | null; cost?: number }[]) ?? []).map(async (ing) => {
+          let inventoryId: string = String(ing.existingId ?? "");
+          if (inventoryId && !allItems.find((i) => String(i.id) === inventoryId)) inventoryId = "";
+          if (!inventoryId) {
+            const newItem: InventoryItem = {
+              id: uid("inv"),
+              name: ing.name,
+              category: "general",
+              stock: 10,
+              unit: ing.unit ?? "und",
+              minStock: 2,
+              cost: Number(ing.cost) || 0,
+              supplier: "",
+              status: "normal",
+              updatedAt: "Justo ahora",
+            };
+            if (USE_API) {
+              try {
+                const saved = await inventoryService.createItem(newItem);
+                addInventoryItem(saved);
+                inventoryId = String(saved.id);
+              } catch {
+                addInventoryItem(newItem);
+                inventoryId = newItem.id;
+              }
+            } else {
+              addInventoryItem(newItem);
+              inventoryId = newItem.id;
+            }
+            newItemsCount++;
+          }
+          return {
+            id: uid("ing"),
+            inventoryId,
             name: ing.name,
-            category: "general",
-            stock: 10,
             unit: ing.unit ?? "und",
-            minStock: 2,
-            cost: Number(ing.cost) || 0,
-            supplier: "",
-            status: "normal",
-            updatedAt: "Justo ahora",
+            quantity: Number(ing.quantity) || 1,
+            waste: Number(ing.waste) || 0,
           };
-          addInventoryItem(newItem);
-          inventoryId = newItem.id;
-          newItemsCount++;
-        }
-        return {
-          id: uid("ing"),
-          inventoryId,
-          name: ing.name,
-          unit: ing.unit ?? "und",
-          quantity: Number(ing.quantity) || 1,
-          waste: Number(ing.waste) || 0,
-        };
-      });
+        })
+      );
 
       // Mapear categoría: el AI puede devolver id o nombre, buscar coincidencia
+      const storeCategories = useMenuStore.getState().categories;
       let category = String(data.category ?? "");
-      if (categories.length && !categories.find((c) => c.id === category)) {
-        const byName = categories.find((c) => c.name.toLowerCase() === category.toLowerCase());
-        category = byName?.id ?? categories[0].id;
+      if (storeCategories.length && !storeCategories.find((c) => String(c.id) === category)) {
+        const byName = storeCategories.find((c) => c.name.toLowerCase() === category.toLowerCase());
+        category = byName ? String(byName.id) : String(storeCategories[0].id);
       }
 
       const VALID_STATIONS = ["grill", "fry", "cold", "bar", "pastry"] as const;
@@ -164,7 +180,7 @@ export function RecipeEditor({
         return {
           ...prev,
           description: String(data.description ?? prev.description ?? ""),
-          emoji: String(data.emoji ?? prev.emoji),
+          emoji: data.emoji || prev.emoji,
           price: Number(data.price) || prev.price,
           category,
           prepMinutes: Number(data.prepMinutes) || prev.prepMinutes,
@@ -192,14 +208,18 @@ export function RecipeEditor({
     }
   };
 
-  const save = () => {
+  const save = async () => {
     if (!draft.name.trim()) {
       toast.error("La receta necesita un nombre");
       return;
     }
+    if (!draft.category) {
+      toast.error("Selecciona una categoría primero");
+      return;
+    }
     let finalDraft = { ...draft };
     if (isNew && !finalDraft.productId) {
-      const newProduct = {
+      const newProduct: Product = {
         id: uid("p"),
         name: finalDraft.name,
         description: finalDraft.description ?? "",
@@ -211,11 +231,22 @@ export function RecipeEditor({
         prepMinutes: finalDraft.prepMinutes,
         popular: false,
       };
-      addProduct(newProduct);
-      finalDraft = { ...finalDraft, productId: newProduct.id };
+      if (USE_API) {
+        try {
+          const savedProduct = await menuService.createProduct(newProduct);
+          addProduct(savedProduct);
+          finalDraft = { ...finalDraft, productId: String(savedProduct.id) };
+        } catch {
+          toast.error("Error al guardar el producto en el servidor");
+          return;
+        }
+      } else {
+        addProduct(newProduct);
+        finalDraft = { ...finalDraft, productId: newProduct.id };
+      }
     } else if (!isNew && finalDraft.productId) {
       // Sincroniza campos básicos del producto si ya existe
-      const existing = products.find((p) => p.id === finalDraft.productId);
+      const existing = products.find((p) => String(p.id) === String(finalDraft.productId));
       if (existing) {
         updateProduct({
           ...existing,
@@ -369,17 +400,19 @@ export function RecipeEditor({
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Producto del menú">
-                    <Select value={draft.productId ?? "none"} onValueChange={(v) => set({ productId: v === "none" ? undefined : v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin vincular</SelectItem>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
+                  {!isNew && (
+                    <Field label="Producto del menú">
+                      <Select value={draft.productId ?? "none"} onValueChange={(v) => set({ productId: v === "none" ? undefined : v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin vincular</SelectItem>
+                          {products.map((p) => (
+                            <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -585,8 +618,8 @@ export function RecipeEditor({
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Food cost</span>
-                  <span className={cn("font-bold", foodCostTone(cost.foodCostPct))}>
-                    {(cost.foodCostPct * 100).toFixed(0)}%
+                  <span className={cn("font-bold", draft.price > 0 ? foodCostTone(cost.foodCostPct) : "text-muted-foreground")}>
+                    {draft.price > 0 ? `${(cost.foodCostPct * 100).toFixed(0)}%` : "—"}
                   </span>
                 </div>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
@@ -620,7 +653,9 @@ export function RecipeEditor({
         <div className="flex items-center justify-between gap-2 border-t border-border p-4">
           <div className="text-sm md:hidden">
             <span className="text-muted-foreground">Food cost </span>
-            <span className={cn("font-bold", foodCostTone(cost.foodCostPct))}>{(cost.foodCostPct * 100).toFixed(0)}%</span>
+            <span className={cn("font-bold", draft.price > 0 ? foodCostTone(cost.foodCostPct) : "text-muted-foreground")}>
+              {draft.price > 0 ? `${(cost.foodCostPct * 100).toFixed(0)}%` : "—"}
+            </span>
             <span className="text-muted-foreground"> · {cost.maxPortions} porc.</span>
           </div>
           <div className="ml-auto flex gap-2">

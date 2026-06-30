@@ -86,7 +86,7 @@ function CartaTab() {
   const [recipeEditing, setRecipeEditing] = useState<Recipe | null>(null);
   const [recipeOpen, setRecipeOpen] = useState(false);
 
-  const recipeFor = (pid: string) => recipes.find((r) => r.productId === pid);
+  const recipeFor = (pid: string | number) => recipes.find((r) => String(r.productId) === String(pid));
 
   const openRecipe = (p: Product) => {
     const existing = recipeFor(p.id);
@@ -274,12 +274,16 @@ function RecetasTab() {
 
   const filtered = useMemo(
     () => recipes.filter(
-      (r) =>
-        (category === "all" || r.category === category) &&
-        (station === "all" || r.station === station) &&
-        (query === "" || r.name.toLowerCase().includes(query.toLowerCase()))
+      (r) => {
+        const catMatch = category === "all"
+          || String(r.category) === String(category)
+          || categories.find((c) => c.name.toLowerCase() === String(r.category).toLowerCase())?.id === category;
+        return catMatch
+          && (station === "all" || r.station === station)
+          && (query === "" || r.name.toLowerCase().includes(query.toLowerCase()));
+      }
     ),
-    [recipes, category, station, query]
+    [recipes, category, station, query, categories]
   );
 
   const summary = useMemo(() => {
