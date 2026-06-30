@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { Supplier, Purchase, PurchaseLine } from "@/types";
 import { SUPPLIERS } from "@/mock/suppliers";
 import { useInventoryStore } from "./inventory.store";
-import { USE_API } from "@/services/http";
+import { USE_API, apiErrorHandler } from "@/services/http";
 import { suppliersService } from "@/services/suppliers.service";
 
 interface SuppliersState {
@@ -34,17 +34,17 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
     set((st) => ({ suppliers: [s, ...st.suppliers] }));
     if (USE_API) suppliersService.createSupplier(s).then((saved) =>
       set((st) => ({ suppliers: st.suppliers.map((x) => (x.id === s.id ? saved : x)) }))
-    ).catch(console.error);
+    ).catch(apiErrorHandler("proveedor"));
   },
 
   updateSupplier: (s) => {
     set((st) => ({ suppliers: st.suppliers.map((x) => (x.id === s.id ? s : x)) }));
-    if (USE_API) suppliersService.updateSupplier(s).catch(console.error);
+    if (USE_API) suppliersService.updateSupplier(s).catch(apiErrorHandler("proveedor"));
   },
 
   removeSupplier: (id) => {
     set((st) => ({ suppliers: st.suppliers.filter((s) => s.id !== id) }));
-    if (USE_API) suppliersService.deleteSupplier(id).catch(console.error);
+    if (USE_API) suppliersService.deleteSupplier(id).catch(apiErrorHandler("eliminar proveedor"));
   },
 
   registerPurchase: (supplier, lines, invoicePhoto) => {
@@ -71,7 +71,7 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
         invoicePhoto,
       }).then((saved) =>
         set((st) => ({ purchases: st.purchases.map((p) => (p.id === purchase.id ? { ...saved } : p)) }))
-      ).catch(console.error);
+      ).catch(apiErrorHandler("registrar compra"));
     } else {
       useInventoryStore.getState().addPurchase(
         `${code} · ${supplier.name}`,

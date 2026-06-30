@@ -21,6 +21,7 @@ function TableNode({
   table,
   index,
   layoutMode,
+  isSelected,
   containerRef,
   onClick,
   onReposition,
@@ -28,6 +29,7 @@ function TableNode({
   table: RestaurantTable;
   index: number;
   layoutMode: boolean;
+  isSelected?: boolean;
   containerRef: React.RefObject<HTMLDivElement>;
   onClick: () => void;
   onReposition: (id: string, x: number, y: number) => void;
@@ -68,7 +70,7 @@ function TableNode({
       whileHover={layoutMode ? { scale: 1.08 } : { scale: 1.05 }}
       whileDrag={{ scale: 1.1, zIndex: 50, cursor: "grabbing" }}
       onDragEnd={handleDragEnd}
-      onClick={layoutMode ? undefined : onClick}
+      onClick={onClick}
     >
       {layoutMode && (
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground shadow">
@@ -81,7 +83,8 @@ function TableNode({
           SHAPE[table.shape],
           status.surface,
           status.ring,
-          layoutMode && "ring-primary/40 border-primary/60"
+          layoutMode && !isSelected && "ring-primary/40 border-primary/60",
+          isSelected && "ring-primary border-primary shadow-primary/30 shadow-lg"
         )}
       >
         <span className={cn("absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full", status.dot, table.status === "billing" && "animate-pulse")} />
@@ -114,12 +117,14 @@ export function TableMap({
   zones,
   onSelect,
   layoutMode = false,
+  selectedId,
   onReposition,
 }: {
   tables: RestaurantTable[];
   zones: SalonZone[];
   onSelect: (t: RestaurantTable) => void;
   layoutMode?: boolean;
+  selectedId?: string;
   onReposition: (id: string, x: number, y: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -150,6 +155,7 @@ export function TableMap({
           table={t}
           index={i}
           layoutMode={layoutMode}
+          isSelected={layoutMode && t.id === selectedId}
           containerRef={containerRef as React.RefObject<HTMLDivElement>}
           onClick={() => onSelect(t)}
           onReposition={onReposition}

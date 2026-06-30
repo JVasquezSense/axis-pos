@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Armchair, Plus, LayoutGrid, Layers } from "lucide-react";
+import { Armchair, Plus, LayoutGrid, Layers, Copy, Pencil, Trash2, X, Check } from "lucide-react";
 import type { RestaurantTable, TableStatus, SalonZone } from "@/types";
 import { useTablesStore } from "@/store/tables.store";
 import { useAppStore } from "@/store/app.store";
@@ -10,12 +10,21 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { TableMap } from "@/components/salon/table-map";
 import { TableDrawer } from "@/components/salon/table-drawer";
 import { AddTableDialog, type NewTableData } from "@/components/salon/add-table-dialog";
 import { ZonesDialog } from "@/components/salon/zones-dialog";
 import { TABLE_STATUS } from "@/lib/status";
 import { cn } from "@/lib/utils";
+
+const SHAPES: { id: RestaurantTable["shape"]; label: string }[] = [
+  { id: "round", label: "Redonda" },
+  { id: "square", label: "Cuadrada" },
+  { id: "rect", label: "Rectangular" },
+];
 
 function nextPosition(tables: RestaurantTable[], zones: SalonZone[], zone: string) {
   const zoneObj = [...zones].sort((a, b) => a.yStart - b.yStart).find((z) => z.name === zone);
@@ -45,6 +54,9 @@ export default function SalonPage() {
   const zones = useTablesStore((s) => s.zones);
   const addTableStore = useTablesStore((s) => s.addTable);
   const repositionTable = useTablesStore((s) => s.repositionTable);
+  const deleteTableStore = useTablesStore((s) => s.deleteTable);
+  const duplicateTableStore = useTablesStore((s) => s.duplicateTable);
+  const updateTablePropsStore = useTablesStore((s) => s.updateTableProps);
   const moveTable = useTablesStore((s) => s.moveOccupancy);
   const mergeTable = useTablesStore((s) => s.mergeTables);
   const addZone = useTablesStore((s) => s.addZone);
@@ -58,13 +70,68 @@ export default function SalonPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [zonesOpen, setZonesOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState(false);
+  const [layoutSelectedId, setLayoutSelectedId] = useState<string | null>(null);
+  const layoutSelected = tables.find((t) => t.id === layoutSelectedId) ?? null;
+
+  // Edit dialog state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editNumber, setEditNumber] = useState(0);
+  const [editCapacity, setEditCapacity] = useState(4);
+  const [editZone, setEditZone] = useState("");
+  const [editShape, setEditShape] = useState<RestaurantTable["shape"]>("square");
 
   useEffect(() => setMounted(true), []);
 
+  useEffect(() => {
+    if (!layoutMode) setLayoutSelectedId(null);
+  }, [layoutMode]);
+
   const select = (t: RestaurantTable) => {
-    if (layoutMode) return;
+    if (layoutMode) {
+      setLayoutSelectedId((prev) => (prev === t.id ? null : t.id));
+      return;
+    }
     setSelectedId(t.id);
     setOpen(true);
+  };
+
+  const openEdit = (t: RestaurantTable) => {
+    setEditNumber(t.number);
+    setEditCapacity(t.capacity);
+    setEditZone(t.zone);
+    setEditShape(t.shape);
+    setEditOpen(true);
+  };
+
+  const saveEdit = () => {
+    if (!layoutSelectedId) return;
+    const duplicate = tables.some((t) => t.id !== layoutSelectedId && t.number === editNumber);
+    if (duplicate || editNumber < 1 || editCapacity < 1) return;
+    updateTablePropsStore(layoutSelectedId, {
+      number: editNumber,
+      capacity: editCapacity,
+      zone: editZone,
+      shape: editShape,
+    });
+    setEditOpen(false);
+    toast.success(`Mesa ${editNumber} actualizada`);
+  };
+
+  const handleDuplicate = (id: string) => {
+    duplicateTableStore(id);
+    const src = tables.find((t) => t.id === id);
+    toast.success(`Mesa duplicada`, { description: src ? `Copia de Mesa ${src.number}` : undefined });
+  };
+
+  const handleDelete = (id: string) => {
+    const t = tables.find((x) => x.id === id);
+    if (t?.status !== "available") {
+      toast.error("No se puede eliminar una mesa ocupada");
+      return;
+    }
+    deleteTableStore(id);
+    setLayoutSelectedId(null);
+    toast.success(`Mesa ${t?.number ?? ""} eliminada`);
   };
 
   const createTable = (form: NewTableData) => {
@@ -151,8 +218,51 @@ export default function SalonPage() {
           zones={sortedZones}
           onSelect={select}
           layoutMode={layoutMode && isAdmin}
+          selectedId={layoutSelectedId ?? undefined}
           onReposition={repositionTable}
         />
+      )}
+
+      {/* Layout mode action bar */}
+      {layoutMode && isAdmin && (
+        <Card className={cn(
+          "flex items-center gap-3 p-4 transition-all",
+          layoutSelected ? "opacity-100" : "opacity-50 pointer-events-none"
+        )}>
+          <div className="flex-1 min-w-0">
+            {layoutSelected ? (
+              <>
+                <p className="font-semibold">Mesa {layoutSelected.number}</p>
+                <p className="text-xs text-muted-foreground">
+                  {layoutSelected.zone} · {layoutSelected.capacity} personas · {layoutSelected.shape === "round" ? "Redonda" : layoutSelected.shape === "rect" ? "Rectangular" : "Cuadrada"}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Toca una mesa para seleccionarla</p>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => layoutSelected && openEdit(layoutSelected)}
+          >
+            <Pencil className="h-3.5 w-3.5" /> Editar
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => layoutSelected && handleDuplicate(layoutSelected.id)}
+          >
+            <Copy className="h-3.5 w-3.5" /> Duplicar
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => layoutSelected && handleDelete(layoutSelected.id)}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Eliminar
+          </Button>
+        </Card>
       )}
 
       <TableDrawer
@@ -184,6 +294,94 @@ export default function SalonPage() {
           onDelete={removeZone}
         />
       )}
+
+      {/* Edit table dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar mesa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Número</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={editNumber}
+                  onChange={(e) => setEditNumber(Number(e.target.value))}
+                  className={cn(
+                    tables.some((t) => t.id !== layoutSelectedId && t.number === editNumber) &&
+                      "border-destructive focus-visible:ring-destructive"
+                  )}
+                />
+                {tables.some((t) => t.id !== layoutSelectedId && t.number === editNumber) && (
+                  <p className="mt-1 text-xs text-destructive">Ya existe la mesa {editNumber}.</p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Capacidad</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={editCapacity}
+                  onChange={(e) => setEditCapacity(Number(e.target.value))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Zona</label>
+              <Select value={editZone} onValueChange={setEditZone}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {sortedZones.map((z) => (
+                    <SelectItem key={z.id} value={z.name}>{z.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Forma</label>
+              <div className="grid grid-cols-3 gap-2">
+                {SHAPES.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setEditShape(s.id)}
+                    className={cn(
+                      "flex flex-col items-center gap-2 rounded-lg border p-3 text-xs font-medium transition-colors",
+                      editShape === s.id ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted"
+                    )}
+                  >
+                    <span className={cn(
+                      "h-7 border-2 border-current",
+                      s.id === "round" && "w-7 rounded-full",
+                      s.id === "square" && "w-7 rounded-md",
+                      s.id === "rect" && "w-11 rounded-md"
+                    )} />
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              <X className="h-3.5 w-3.5" /> Cancelar
+            </Button>
+            <Button
+              onClick={saveEdit}
+              disabled={
+                editNumber < 1 ||
+                editCapacity < 1 ||
+                tables.some((t) => t.id !== layoutSelectedId && t.number === editNumber)
+              }
+            >
+              <Check className="h-3.5 w-3.5" /> Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

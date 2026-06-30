@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Check, X, GripVertical, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, X, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react";
 import type { SalonZone } from "@/types";
 import {
   Dialog,
@@ -24,9 +24,11 @@ interface ZoneRowProps {
   onUpdate: (z: SalonZone) => void;
   onDelete: (id: string) => void;
   isOnly: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
-function ZoneRow({ zone, tablesInZone, onUpdate, onDelete, isOnly }: ZoneRowProps) {
+function ZoneRow({ zone, tablesInZone, onUpdate, onDelete, isOnly, onMoveUp, onMoveDown }: ZoneRowProps) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(zone.name);
   const [yStart, setYStart] = useState(zone.yStart);
@@ -113,8 +115,15 @@ function ZoneRow({ zone, tablesInZone, onUpdate, onDelete, isOnly }: ZoneRowProp
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/30">
-      <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+    <div className="flex items-center gap-2 rounded-xl border border-border p-3 transition-colors hover:bg-muted/30">
+      <div className="flex flex-col">
+        <Button size="icon" variant="ghost" className="h-5 w-5" onClick={onMoveUp} disabled={!onMoveUp}>
+          <ChevronUp className="h-3 w-3" />
+        </Button>
+        <Button size="icon" variant="ghost" className="h-5 w-5" onClick={onMoveDown} disabled={!onMoveDown}>
+          <ChevronDown className="h-3 w-3" />
+        </Button>
+      </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">{zone.name}</p>
         <p className="text-xs text-muted-foreground">
@@ -163,6 +172,13 @@ export function ZonesDialog({
 
   const sorted = [...zones].sort((a, b) => a.yStart - b.yStart);
 
+  const swapZones = (i: number, j: number) => {
+    const zA = sorted[i];
+    const zB = sorted[j];
+    onUpdate({ ...zA, yStart: zB.yStart });
+    onUpdate({ ...zB, yStart: zA.yStart });
+  };
+
   const submitAdd = () => {
     if (!newName.trim()) return;
     onAdd({ id: uid(), name: newName.trim(), yStart: newY });
@@ -180,7 +196,7 @@ export function ZonesDialog({
         </DialogHeader>
 
         <div className="space-y-2">
-          {sorted.map((zone) => (
+          {sorted.map((zone, i) => (
             <ZoneRow
               key={zone.id}
               zone={zone}
@@ -188,6 +204,8 @@ export function ZonesDialog({
               onUpdate={onUpdate}
               onDelete={onDelete}
               isOnly={zones.length <= 1}
+              onMoveUp={i > 0 ? () => swapZones(i, i - 1) : undefined}
+              onMoveDown={i < sorted.length - 1 ? () => swapZones(i, i + 1) : undefined}
             />
           ))}
         </div>

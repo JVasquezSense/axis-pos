@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { RestaurantTable, SalonZone } from "@/types";
 import { TABLES, DEFAULT_ZONES } from "@/mock/tables";
-import { USE_API } from "@/services/http";
+import { USE_API, apiErrorHandler } from "@/services/http";
 import { salonService } from "@/services/salon.service";
 
 interface TablesState {
@@ -10,6 +10,9 @@ interface TablesState {
   load: () => Promise<void>;
   addTable: (t: RestaurantTable) => void;
   repositionTable: (id: string, x: number, y: number) => void;
+  deleteTable: (id: string) => void;
+  duplicateTable: (id: string) => void;
+  updateTableProps: (id: string, props: Partial<Pick<RestaurantTable, "number" | "capacity" | "zone" | "shape">>) => void;
   moveOccupancy: (sourceId: string, targetId: string) => void;
   mergeTables: (sourceId: string, targetId: string) => void;
   occupy: (number: number, total?: number, waiter?: string) => void;
@@ -33,7 +36,7 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
     set((s) => ({ tables: [...s.tables, t] }));
     if (USE_API) salonService.createTable(t).then((saved) =>
       set((s) => ({ tables: s.tables.map((x) => (x.id === t.id ? saved : x)) }))
-    ).catch(console.error);
+    ).catch(apiErrorHandler("mesa"));
   },
 
   repositionTable: (id, x, y) => {
@@ -42,7 +45,40 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
     set((s) => ({
       tables: s.tables.map((t) => (t.id === id ? { ...t, x: rx, y: ry } : t)),
     }));
-    if (USE_API) salonService.updateTable({ id, x: rx, y: ry }).catch(console.error);
+    if (USE_API) salonService.updateTable({ id, x: rx, y: ry }).catch(apiErrorHandler("posición mesa"));
+  },
+
+  deleteTable: (id) => {
+    set((s) => ({ tables: s.tables.filter((t) => t.id !== id) }));
+    if (USE_API) salonService.deleteTable(id).catch(console.error);
+  },
+
+  duplicateTable: (id) => {
+    const src = get().tables.find((t) => t.id === id);
+    if (!src) return;
+    const maxNum = get().tables.reduce((m, t) => Math.max(m, t.number), 0);
+    const newTable: RestaurantTable = {
+      ...src,
+      id: `t-${Date.now()}`,
+      number: maxNum + 1,
+      status: "available",
+      x: Math.min(src.x + 10, 92),
+      y: Math.min(src.y + 8, 92),
+      guests: undefined,
+      waiter: undefined,
+      seatedAt: undefined,
+      orderTotal: undefined,
+      mergedInto: undefined,
+    };
+    set((s) => ({ tables: [...s.tables, newTable] }));
+    if (USE_API) salonService.createTable(newTable).then((saved) =>
+      set((s) => ({ tables: s.tables.map((t) => (t.id === newTable.id ? saved : t)) }))
+    ).catch(apiErrorHandler("duplicar mesa"));
+  },
+
+  updateTableProps: (id, props) => {
+    set((s) => ({ tables: s.tables.map((t) => (t.id === id ? { ...t, ...props } : t)) }));
+    if (USE_API) salonService.updateTable({ id, ...props }).catch(console.error);
   },
 
   addZone: (zone) =>

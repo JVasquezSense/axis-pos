@@ -52,3 +52,20 @@ export async function mockRequest<T>(data: T, latency = 500): Promise<T> {
   // Clonado para emular una respuesta JSON fresca del servidor.
   return structuredClone(data);
 }
+
+/**
+ * Handler de errores para mutaciones en stores.
+ * Muestra un toast visible al usuario + loguea en consola.
+ * Importar dinámicamente para evitar dependencia de React en la capa de servicios.
+ */
+export function apiErrorHandler(label: string) {
+  return async (e: unknown) => {
+    console.error(`[API:${label}]`, e);
+    if (!USE_API) return;
+    try {
+      const { toast } = await import("sonner");
+      const msg = e instanceof ApiError ? `${e.status}: ${e.message.slice(0, 80)}` : "Error de conexión";
+      toast.error(`No se pudo guardar (${label})`, { description: msg });
+    } catch { /* noop */ }
+  };
+}

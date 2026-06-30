@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Category, Product } from "@/types";
 import { CATEGORIES, PRODUCTS } from "@/mock/menu";
-import { USE_API } from "@/services/http";
+import { USE_API, apiErrorHandler } from "@/services/http";
 import { menuService } from "@/services/menu.service";
 
 interface MenuState {
@@ -33,7 +33,7 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
     set((s) => ({ categories: [...s.categories, c] }));
     if (USE_API) menuService.createCategory(c).then((saved) =>
       set((s) => ({ categories: s.categories.map((x) => (x.id === c.id ? saved : x)) }))
-    ).catch(console.error);
+    ).catch(apiErrorHandler("categoría"));
   },
 
   removeCategory: (id) => {
@@ -41,31 +41,31 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
       categories: s.categories.filter((c) => c.id !== id),
       products: s.products.filter((p) => p.category !== id),
     }));
-    if (USE_API) menuService.deleteCategory(id).catch(console.error);
+    if (USE_API) menuService.deleteCategory(id).catch(apiErrorHandler("eliminar categoría"));
   },
 
   addProduct: (p) => {
     set((s) => ({ products: [p, ...s.products] }));
     if (USE_API) menuService.createProduct(p).then((saved) =>
       set((s) => ({ products: s.products.map((x) => (x.id === p.id ? saved : x)) }))
-    ).catch(console.error);
+    ).catch(apiErrorHandler("producto"));
   },
 
   updateProduct: (p) => {
     set((s) => ({ products: s.products.map((x) => (x.id === p.id ? p : x)) }));
-    if (USE_API) menuService.updateProduct(p).catch(console.error);
+    if (USE_API) menuService.updateProduct(p).catch(apiErrorHandler("producto"));
   },
 
   removeProduct: (id) => {
     set((s) => ({ products: s.products.filter((p) => p.id !== id) }));
-    if (USE_API) menuService.deleteProduct(id).catch(console.error);
+    if (USE_API) menuService.deleteProduct(id).catch(apiErrorHandler("eliminar producto"));
   },
 
   setAvailable: (id, available) => {
     set((s) => ({ products: s.products.map((p) => (p.id === id ? { ...p, available } : p)) }));
     if (USE_API) {
       const p = get().products.find((x) => x.id === id);
-      if (p) menuService.updateProduct({ ...p, available }).catch(console.error);
+      if (p) menuService.updateProduct({ ...p, available }).catch(apiErrorHandler("disponibilidad"));
     }
   },
 }));

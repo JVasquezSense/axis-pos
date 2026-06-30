@@ -4,7 +4,7 @@ import { INVENTORY } from "@/mock/datasets";
 import { MOVEMENTS } from "@/mock/kardex";
 import { effectiveQty } from "@/lib/recipes";
 import { useRecipesStore } from "./recipes.store";
-import { USE_API } from "@/services/http";
+import { USE_API, apiErrorHandler } from "@/services/http";
 import { inventoryService } from "@/services/inventory.service";
 
 const r = (n: number) => Math.round(n * 100) / 100;
@@ -49,17 +49,17 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     set((s) => ({ items: [item, ...s.items] }));
     if (USE_API) inventoryService.createItem(item).then((saved) =>
       set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }))
-    ).catch(console.error);
+    ).catch(apiErrorHandler("inventario"));
   },
 
   updateItem: (item) => {
     set((s) => ({ items: s.items.map((x) => (x.id === item.id ? item : x)) }));
-    if (USE_API) inventoryService.updateItem(item).catch(console.error);
+    if (USE_API) inventoryService.updateItem(item).catch(apiErrorHandler("inventario"));
   },
 
   deleteItem: (id) => {
     set((s) => ({ items: s.items.filter((x) => x.id !== id) }));
-    if (USE_API) inventoryService.deleteItem(id).catch(console.error);
+    if (USE_API) inventoryService.deleteItem(id).catch(apiErrorHandler("eliminar insumo"));
   },
 
   applySale: (reference, lines) => {

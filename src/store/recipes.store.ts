@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Recipe, RecipeIngredient, RecipeVariation } from "@/types";
 import { RECIPES } from "@/mock/recipes";
-import { USE_API } from "@/services/http";
+import { USE_API, apiErrorHandler } from "@/services/http";
 import { recipesService } from "@/services/recipes.service";
 
 interface RecipesState {
@@ -26,19 +26,19 @@ export const useRecipesStore = create<RecipesState>()((set) => ({
     set((s) => ({ recipes: [recipe, ...s.recipes] }));
     if (USE_API) recipesService.create(recipe).then((saved) =>
       set((s) => ({ recipes: s.recipes.map((r) => (r.id === recipe.id ? saved : r)) }))
-    ).catch(console.error);
+    ).catch(apiErrorHandler("receta"));
   },
 
   update: (recipe) => {
     set((s) => ({
       recipes: s.recipes.map((r) => (r.id === recipe.id ? { ...recipe, updatedAt: "Justo ahora" } : r)),
     }));
-    if (USE_API) recipesService.update(recipe).catch(console.error);
+    if (USE_API) recipesService.update(recipe).catch(apiErrorHandler("receta"));
   },
 
   remove: (id) => {
     set((s) => ({ recipes: s.recipes.filter((r) => r.id !== id) }));
-    if (USE_API) recipesService.remove(id).catch(console.error);
+    if (USE_API) recipesService.remove(id).catch(apiErrorHandler("eliminar receta"));
   },
 
   duplicate: (id) =>
@@ -52,7 +52,7 @@ export const useRecipesStore = create<RecipesState>()((set) => ({
         status: "draft",
         updatedAt: "Justo ahora",
       };
-      if (USE_API) recipesService.create(copy).catch(console.error);
+      if (USE_API) recipesService.create(copy).catch(apiErrorHandler("duplicar receta"));
       const idx = s.recipes.findIndex((r) => r.id === id);
       const next = [...s.recipes];
       next.splice(idx + 1, 0, copy);
