@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StoreQR } from "@/components/shared/store-qr";
 import { WebOrdersFeed } from "@/components/website/web-orders-feed";
+import { useAppStore } from "@/store/app.store";
 
 export default function WebsitePage() {
+  const restaurant = useAppStore((s) => s.restaurant);
   const [origin, setOrigin] = useState("https://axispos.co");
   useEffect(() => setOrigin(window.location.origin), []);
-  const siteUrl = `${origin}/restaurant/demo-burger`;
+  const siteUrl = `${origin}/restaurant/${restaurant.slug}`;
 
   return (
     <div className="space-y-6">
@@ -23,7 +25,7 @@ export default function WebsitePage() {
         icon={<Globe className="h-5 w-5" />}
         actions={
           <Button asChild>
-            <Link href="/restaurant/demo-burger" target="_blank">
+            <Link href={`/restaurant/${restaurant.slug}`} target="_blank">
               <ExternalLink className="h-4 w-4" /> Abrir sitio
             </Link>
           </Button>
@@ -49,15 +51,15 @@ export default function WebsitePage() {
               </div>
               <div className="relative bg-gradient-to-br from-primary/15 via-orange-500/10 to-transparent p-8">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-2xl">🍔</div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-2xl">{restaurant.logo}</div>
                   <div>
-                    <p className="text-lg font-black">Demo Burger</p>
+                    <p className="text-lg font-black">{restaurant.name}</p>
                     <p className="text-xs text-muted-foreground">Pedidos en línea · 4.8 ★</p>
                   </div>
                 </div>
-                <p className="mt-4 max-w-sm text-xl font-bold">Las mejores hamburguesas artesanales de la ciudad 🔥</p>
+                <p className="mt-4 max-w-sm text-xl font-bold">Pide en línea y recibe tu pedido en minutos 🔥</p>
                 <Button asChild className="mt-5">
-                  <Link href="/restaurant/demo-burger" target="_blank">
+                  <Link href={`/restaurant/${restaurant.slug}`} target="_blank">
                     Ver experiencia completa <ExternalLink className="h-4 w-4" />
                   </Link>
                 </Button>
@@ -80,7 +82,7 @@ export default function WebsitePage() {
             <p className="text-sm text-muted-foreground">Imprímelo en mesas, vitrina o flyers para que pidan al instante.</p>
           </CardHeader>
           <CardContent className="flex justify-center pb-6">
-            <StoreQR url={siteUrl} name="Demo Burger" />
+            <StoreQR url={siteUrl} name={restaurant.name} />
           </CardContent>
         </Card>
       </div>

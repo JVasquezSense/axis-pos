@@ -29,7 +29,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { DonutChart } from "@/components/reports/charts-lazy";
 import { SalesByHourChart } from "@/components/dashboard/charts-lazy";
 import { TENANT_STATUS, PLAN_LABEL } from "@/lib/status";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatNumber, slugify } from "@/lib/utils";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -371,7 +371,7 @@ function TenantFormDialog({
       if (isEdit && initialData) {
         saved = await saasService.updateTenant(initialData.id, payload);
       } else {
-        saved = await saasService.createTenant(payload);
+        saved = await saasService.createTenant({ ...payload, slug: slugify(name.trim()) });
       }
       onSave(saved);
     } catch {

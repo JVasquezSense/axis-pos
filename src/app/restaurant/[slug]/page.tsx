@@ -18,17 +18,18 @@ import {
   Loader2,
 } from "lucide-react";
 import type { PaymentMethod, Product } from "@/types";
-import { CATEGORIES, PRODUCTS } from "@/mock/menu";
 import { Icon } from "@/components/shared/icon";
 import { ProductImage } from "@/components/shared/product-image";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useWebStore } from "@/store/web.store";
 import { useMenuStore } from "@/store/menu.store";
+import { useAppStore } from "@/store/app.store";
 import { MyOrdersSheet } from "@/components/website/my-orders-sheet";
+import { useAsync } from "@/hooks/use-async";
+import { saasService } from "@/services/saas.service";
 import { cn, formatCurrency } from "@/lib/utils";
 
 export default function RestaurantSitePage({
@@ -38,6 +39,15 @@ export default function RestaurantSitePage({
 }) {
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
+
+  // El tenant actualmente logueado ya conoce su propio restaurante (evita ir a red).
+  const currentRestaurant = useAppStore((s) => s.restaurant);
+  const { data: tenants, loading } = useAsync(() => saasService.getTenants(), []);
+  const tenant =
+    currentRestaurant.slug === slug
+      ? currentRestaurant
+      : tenants?.find((t) => t.slug === slug);
+
   const { cart, add, increment, decrement, submitOrder } = useWebStore();
   const categories = useMenuStore((s) => s.categories);
   const products = useMenuStore((s) => s.products);
@@ -77,17 +87,36 @@ export default function RestaurantSitePage({
     setCartOpen(false);
   };
 
+  if (!tenant) {
+    if (loading) {
+      return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-2 bg-background px-4 text-center">
+        <p className="text-lg font-bold">Restaurante no encontrado</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          No encontramos ningún restaurante con la dirección “{slug}”. Verifica el enlace o el código QR.
+        </p>
+        <Link href="/" className="mt-2 text-sm font-medium text-primary hover:underline">
+          Volver al inicio
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       {/* Top bar */}
       <header className="z-20 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background px-4 lg:px-6">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-orange-500 text-lg shadow">
-            🍔
+            {tenant.logo}
           </div>
-          <p className="text-base font-black tracking-tight">
-            DEMO <span className="text-primary">BURGER</span>
-          </p>
+          <p className="text-base font-black uppercase tracking-tight">{tenant.name}</p>
         </div>
 
         <div className="relative mx-auto hidden w-full max-w-md md:block">
@@ -120,6 +149,7 @@ export default function RestaurantSitePage({
               cart={cart}
               total={total}
               checkout={checkout}
+              restaurantName={tenant.name}
               name={name}
               setName={setName}
               phone={phone}
@@ -356,6 +386,7 @@ function CartSheet({
   cart,
   total,
   checkout,
+  restaurantName,
   name,
   setName,
   phone,
@@ -436,7 +467,7 @@ function CartSheet({
                 <div className="mt-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-2.5 text-xs">
                   <p className="font-medium text-foreground">Transfiere a:</p>
                   <p className="text-muted-foreground">
-                    {method === "nequi" ? "Nequi" : "Daviplata"} · <span className="font-semibold text-foreground">300 245 1188</span> · Demo Burger
+                    {method === "nequi" ? "Nequi" : "Daviplata"} · <span className="font-semibold text-foreground">300 245 1188</span> · {restaurantName}
                   </p>
                   <p className="mt-0.5 text-muted-foreground">Sube el comprobante al confirmar el pedido. 📸</p>
                 </div>

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { PAYMENT_LABEL } from "@/lib/payments";
 import { formatCurrency } from "@/lib/utils";
+import { useAppStore } from "@/store/app.store";
 
 type Phase = "processing" | "done";
 
@@ -32,6 +33,7 @@ export function PaymentDialog({
   waiter?: string;
   onComplete: () => void;
 }) {
+  const restaurant = useAppStore((s) => s.restaurant);
   const [phase, setPhase] = useState<Phase>("processing");
   const codeRef = useRef(`FV-${Math.floor(1000 + Math.random() * 9000)}`);
   const code = codeRef.current;
@@ -81,7 +83,7 @@ export function PaymentDialog({
             {/* Recibo */}
             <div className="print-area rounded-xl border border-dashed border-border bg-muted/30 p-4 text-sm">
               <div className="flex items-center justify-between">
-                <span className="font-semibold">Axis POS · Demo Burger</span>
+                <span className="font-semibold">Axis POS · {restaurant.name}</span>
                 <span className="text-xs text-muted-foreground">{code}</span>
               </div>
               <p className="text-xs text-muted-foreground">

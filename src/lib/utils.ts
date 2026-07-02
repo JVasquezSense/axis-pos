@@ -54,3 +54,14 @@ export function initials(name: string): string {
     .join("")
     .toUpperCase();
 }
+
+/** Convierte un nombre en un slug de URL (sin tildes, minúsculas, guiones). */
+export function slugify(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}

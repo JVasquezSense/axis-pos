@@ -303,6 +303,7 @@ export interface TenantFeatures {
 export interface Tenant {
   id: string;
   name: string;
+  slug: string;
   logo: string;
   plan: TenantPlan;
   status: TenantStatus;

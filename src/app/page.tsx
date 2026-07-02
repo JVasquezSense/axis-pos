@@ -9,6 +9,7 @@ import { LogoMark, LogoLockup } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/store/auth.store";
+import { useAppStore } from "@/store/app.store";
 import { USE_API, request } from "@/services/http";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ function prettyName(email: string): string {
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
+  const restaurant = useAppStore((s) => s.restaurant);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
@@ -190,7 +192,7 @@ export default function LoginPage() {
 
           <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
             <span>{USE_API ? "Conectado al servidor" : "v1.0 · Axis POS"}</span>
-            <Link href="/restaurant/demo-burger" className="font-medium text-primary hover:underline">
+            <Link href={`/restaurant/${restaurant.slug}`} className="font-medium text-primary hover:underline">
               Ver carta del restaurante →
             </Link>
           </div>

@@ -23,6 +23,7 @@ import { useKitchenStore } from "@/store/kitchen.store";
 import { useWebStore } from "@/store/web.store";
 import { useAuthStore } from "@/store/auth.store";
 import { useOnboardingStore } from "@/store/onboarding.store";
+import { useAppStore } from "@/store/app.store";
 import { initials, minutesAgo } from "@/lib/utils";
 
 interface Notif {
@@ -45,6 +46,7 @@ export function Header() {
   const liveOrders = useWebStore((s) => s.liveOrders);
   const userName = useAuthStore((s) => s.name);
   const logout = useAuthStore((s) => s.logout);
+  const restaurant = useAppStore((s) => s.restaurant);
 
   const critical = items.filter((i) => i.status === "critical");
   const webReview = liveOrders.filter((o) => o.status === "review");
@@ -134,7 +136,7 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2.5 py-2">
               <p className="text-sm font-semibold">{userName}</p>
-              <p className="text-xs text-muted-foreground">Propietario · Demo Burger</p>
+              <p className="text-xs text-muted-foreground">Propietario · {restaurant.name}</p>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => toast.info("Perfil de usuario")}>Mi perfil</DropdownMenuItem>

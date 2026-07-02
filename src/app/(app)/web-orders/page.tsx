@@ -5,8 +5,10 @@ import { ShoppingBag, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { WebOrdersFeed } from "@/components/website/web-orders-feed";
+import { useAppStore } from "@/store/app.store";
 
 export default function WebOrdersPage() {
+  const restaurant = useAppStore((s) => s.restaurant);
   return (
     <div className="space-y-6">
       <PageHeader
@@ -15,7 +17,7 @@ export default function WebOrdersPage() {
         icon={<ShoppingBag className="h-5 w-5" />}
         actions={
           <Button asChild variant="outline" size="sm">
-            <Link href="/restaurant/demo-burger" target="_blank">
+            <Link href={`/restaurant/${restaurant.slug}`} target="_blank">
               <ExternalLink className="h-4 w-4" /> Abrir sitio
             </Link>
           </Button>
