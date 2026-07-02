@@ -34,9 +34,15 @@ function useTargetRect(navKey: string | undefined) {
       const box = el?.getBoundingClientRect();
       setRect(box && box.width > 0 && box.height > 0 ? box : null);
     };
+    // El nav del sidebar tiene su propio scroll: si el item quedó fuera de vista, lo trae a pantalla.
+    document.querySelector<HTMLElement>(`[data-tour="${navKey}"]`)?.scrollIntoView({ block: "nearest" });
     measure();
+    const raf = requestAnimationFrame(measure);
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+    };
   }, [navKey]);
 
   return rect;
