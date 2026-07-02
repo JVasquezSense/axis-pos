@@ -47,6 +47,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   logout: () => {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("axis-token");
+      window.localStorage.removeItem("axis-refresh");
       window.localStorage.removeItem("axis-name");
       window.localStorage.removeItem("axis-superadmin");
     }

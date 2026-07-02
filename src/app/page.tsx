@@ -41,11 +41,12 @@ export default function LoginPage() {
     try {
       let isSuperAdmin = false;
       if (USE_API) {
-        const data = await request<{ access: string }>("/auth/token/", {
+        const data = await request<{ access: string; refresh: string }>("/auth/token/", {
           method: "POST",
           body: JSON.stringify({ username: email, password }),
         });
         window.localStorage.setItem("axis-token", data.access);
+        window.localStorage.setItem("axis-refresh", data.refresh);
         try {
           const payload = JSON.parse(atob(data.access.split(".")[1]));
           isSuperAdmin = !!payload.is_superuser;

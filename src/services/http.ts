@@ -27,11 +27,44 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** Limpia la sesión y manda al login cuando el refresh también falla. */
+function clearSessionAndRedirect() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem("axis-token");
+  window.localStorage.removeItem("axis-refresh");
+  window.localStorage.removeItem("axis-auth");
+  window.localStorage.removeItem("axis-name");
+  window.localStorage.removeItem("axis-superadmin");
+  if (window.location.pathname !== "/") window.location.href = "/";
+}
+
+// Deduplica refresh concurrentes: si varias requests reciben 401 a la vez,
+// solo se dispara una llamada a /auth/token/refresh/.
+let refreshingPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  const refresh = window.localStorage.getItem("axis-refresh");
+  if (!refresh) throw new ApiError(401, "No hay refresh token");
+  const res = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh }),
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, await res.text().catch(() => res.statusText));
+  }
+  const data = (await res.json()) as { access: string };
+  window.localStorage.setItem("axis-token", data.access);
+  return data.access;
+}
+
 /**
  * Petición real contra Django REST Framework.
  * Ej: request<DashboardData>("/dashboard/summary/")
+ * Si el access token expiró (401), intenta refrescarlo una vez con el
+ * refresh token antes de reintentar; si el refresh también falla, cierra sesión.
  */
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit, _retried = false): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
@@ -40,6 +73,22 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {}),
     },
   });
+
+  if (res.status === 401 && !_retried && typeof window !== "undefined") {
+    try {
+      if (!refreshingPromise) {
+        refreshingPromise = refreshAccessToken().finally(() => {
+          refreshingPromise = null;
+        });
+      }
+      await refreshingPromise;
+      return request<T>(path, init, true);
+    } catch {
+      clearSessionAndRedirect();
+      throw new ApiError(401, "Sesión expirada, vuelve a iniciar sesión");
+    }
+  }
+
   if (!res.ok) {
     throw new ApiError(res.status, await res.text().catch(() => res.statusText));
   }
