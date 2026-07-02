@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { InventoryItem, StockStatus } from "@/types";
 import {
   Dialog,
@@ -13,6 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useSuppliersStore } from "@/store/suppliers.store";
+
+const NO_SUPPLIER = "none";
 
 const CATEGORIES = ["Carnes", "Lácteos", "Verduras", "Frutas", "Panadería", "Abarrotes", "Bebidas", "Pescados", "Congelados"];
 const UNITS = ["Kg", "Gr", "Lt", "Ml", "Und"];
@@ -44,6 +47,14 @@ export function AddSupplyDialog({
   const [minStock, setMinStock] = useState(0);
   const [cost, setCost] = useState(0);
   const [supplier, setSupplier] = useState("");
+
+  const suppliers = useSuppliersStore((s) => s.suppliers);
+  const supplierNames = useMemo(() => {
+    const names = suppliers.filter((s) => s.active).map((s) => s.name);
+    // Conserva el valor actual aunque el proveedor ya no exista o esté inactivo.
+    if (supplier && !names.includes(supplier)) names.push(supplier);
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+  }, [suppliers, supplier]);
 
   useEffect(() => {
     if (open) {
@@ -147,7 +158,21 @@ export function AddSupplyDialog({
 
           <div>
             <label className="mb-1.5 block text-sm font-medium">Proveedor</label>
-            <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Ej: Frigorífico La 70" />
+            <Select
+              value={supplier || NO_SUPPLIER}
+              onValueChange={(v) => setSupplier(v === NO_SUPPLIER ? "" : v)}
+            >
+              <SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_SUPPLIER}>Sin proveedor</SelectItem>
+                {supplierNames.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {supplierNames.length === 0 && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Aún no tienes proveedores registrados. Agrégalos en el módulo de Proveedores.
+              </p>
+            )}
           </div>
         </div>
 
