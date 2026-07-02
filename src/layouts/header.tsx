@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Bell, AlertTriangle, ChefHat, Globe, CheckCheck } from "lucide-react";
+import { Bell, AlertTriangle, ChefHat, Globe, CheckCheck, Compass } from "lucide-react";
 import { MobileNav } from "./mobile-nav";
 import { GlobalSearch } from "@/components/shared/global-search";
 import { RoleSwitcher } from "@/components/shared/role-switcher";
@@ -22,6 +22,7 @@ import { useInventoryStore } from "@/store/inventory.store";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useWebStore } from "@/store/web.store";
 import { useAuthStore } from "@/store/auth.store";
+import { useOnboardingStore } from "@/store/onboarding.store";
 import { initials, minutesAgo } from "@/lib/utils";
 
 interface Notif {
@@ -139,6 +140,10 @@ export function Header() {
             <DropdownMenuItem onClick={() => toast.info("Perfil de usuario")}>Mi perfil</DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push("/admin")}>Configuración</DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push("/admin")}>Facturación</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { router.push("/dashboard"); useOnboardingStore.getState().start(); }}>
+              <Compass className="h-4 w-4" />
+              Ver recorrido guiado
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive"
