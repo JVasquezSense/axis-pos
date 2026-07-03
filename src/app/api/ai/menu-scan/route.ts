@@ -100,7 +100,7 @@ export async function POST(req: Request): Promise<Response> {
     upstream = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, stream: false, temperature: 0.1, max_tokens: 4000, messages }),
+      body: JSON.stringify({ model, stream: false, temperature: 0.1, max_tokens: 4000, thinking: { type: "disabled" }, messages }),
     });
   } catch {
     return Response.json({ products: [], error: "No se pudo conectar con la IA" } as ScanResponse, { status: 503 });

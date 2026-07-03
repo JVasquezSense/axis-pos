@@ -85,6 +85,7 @@ Inventario (usa existingId solo si el nombre coincide exacto): ${inventoryList}`
         stream: false,
         temperature: 0.5,
         max_tokens: 2000,
+        thinking: { type: "disabled" },
         messages: [
           {
             role: "system",

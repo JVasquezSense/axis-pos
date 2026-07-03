@@ -66,6 +66,7 @@ Reglas:
         stream: false,
         temperature: 0.8,
         max_tokens: 120,
+        thinking: { type: "disabled" },
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -80,6 +81,10 @@ Reglas:
 
   const data = await upstream.json();
   const description: string = (data.choices?.[0]?.message?.content ?? "").trim().replace(/^["']|["']$/g, "");
+
+  if (!description) {
+    return Response.json({ description: "", error: "La IA no devolvió una descripción. Intenta de nuevo." }, { status: 502 });
+  }
 
   return Response.json({ description });
 }
