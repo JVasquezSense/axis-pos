@@ -400,7 +400,8 @@ export interface PurchaseLine {
   name: string;
   unit: string;
   quantity: number;
-  unitCost: number;
+  unitCost: number; // costo unitario antes de IVA
+  taxRate?: number; // % de IVA/impuesto aplicado a este insumo (ej: 19)
 }
 
 export interface Purchase {
@@ -410,7 +411,9 @@ export interface Purchase {
   supplierName: string;
   date: string;
   lines: PurchaseLine[];
-  total: number;
+  subtotal?: number; // suma antes de IVA
+  taxTotal?: number; // suma del IVA de todas las líneas
+  total: number; // subtotal + taxTotal (lo pagado al proveedor)
   invoicePhoto?: string; // base64 o URL de la foto de la factura
 }
 

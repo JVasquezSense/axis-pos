@@ -29,6 +29,7 @@ interface InventoryState {
   deleteItem: (id: string) => void;
   applySale: (reference: string, lines: SaleLine[]) => { affected: number; depletedItemIds: string[] };
   addPurchase: (reference: string, lines: { inventoryId: string; quantity: number; unitCost: number }[]) => void;
+  applyPhysicalCount: (adjustments: { inventoryId: string; physical: number }[]) => number;
   reset: () => void;
 }
 
@@ -92,7 +93,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         });
         affected++;
         if (USE_API) {
-          inventoryService.adjustStock(it.id, newStock, `Venta ${reference}`).catch(console.error);
+          inventoryService.adjustStock(it.id, newStock, `Venta ${reference}`).catch(apiErrorHandler("ajuste stock"));
         }
       });
     });
@@ -124,6 +125,35 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       });
     });
     if (moves.length) set({ items, movements: [...get().movements, ...moves] });
+  },
+
+  applyPhysicalCount: (adjustments) => {
+    const items = [...get().items];
+    const moves: InventoryMovement[] = [];
+    let applied = 0;
+    adjustments.forEach(({ inventoryId, physical }) => {
+      const idx = items.findIndex((i) => i.id === inventoryId);
+      if (idx < 0) return;
+      const it = items[idx];
+      const diff = r(physical - it.stock);
+      if (diff === 0) return;
+      const newStock = r(Math.max(physical, 0));
+      items[idx] = { ...it, stock: newStock, status: statusFor(newStock, it.minStock), updatedAt: "Justo ahora" };
+      moves.push({
+        id: `mv-count-${Date.now()}-${idx}`,
+        inventoryId: it.id,
+        date: "Hoy",
+        type: "ajuste",
+        quantity: diff,
+        balance: newStock,
+        unitCost: it.cost,
+        reason: "Conteo físico",
+      });
+      applied++;
+      if (USE_API) inventoryService.adjustStock(it.id, newStock, "Conteo físico").catch(apiErrorHandler("ajuste stock"));
+    });
+    if (moves.length) set({ items, movements: [...get().movements, ...moves] });
+    return applied;
   },
 
   reset: () => set({ items: structuredClone(INVENTORY), movements: structuredClone(MOVEMENTS) }),

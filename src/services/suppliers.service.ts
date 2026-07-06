@@ -4,6 +4,8 @@ import { USE_API, request, mockRequest } from "./http";
 export interface CreatePurchasePayload {
   code: string;
   supplierId: string;
+  subtotal?: number;
+  taxTotal?: number;
   total: number;
   lines: PurchaseLine[];
   invoicePhoto?: string;

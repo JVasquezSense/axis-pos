@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { PaymentMethod, Kpi } from "@/types";
-import { USE_API } from "@/services/http";
+import { USE_API, apiErrorHandler } from "@/services/http";
 import { salesService } from "@/services/sales.service";
 
 export const SALES_BASE = { sales: 0, orders: 0 };
@@ -38,7 +38,7 @@ export const useSalesStore = create<SalesState>()((set) => ({
     set((st) => ({ records: [entry, ...st.records] }));
     if (USE_API) salesService.record(s).then((saved) =>
       set((st) => ({ records: st.records.map((r) => (r.id === entry.id ? saved : r)) }))
-    ).catch(console.error);
+    ).catch(apiErrorHandler("venta"));
   },
 
   reset: () => set({ records: [] }),

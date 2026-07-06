@@ -202,13 +202,15 @@ function PurchaseDialog({
     reader.readAsDataURL(file);
   };
 
-  const addLine = () => setLines((l) => [...l, { inventoryId: "", name: "", unit: "", quantity: 1, unitCost: 0 }]);
+  const addLine = () => setLines((l) => [...l, { inventoryId: "", name: "", unit: "", quantity: 1, unitCost: 0, taxRate: 0 }]);
   const update = (i: number, patch: Partial<PurchaseLine>) => setLines((l) => l.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   const pickItem = (i: number, id: string) => {
     const it = inventory.find((x) => x.id === id);
     if (it) update(i, { inventoryId: id, name: it.name, unit: it.unit, unitCost: it.cost });
   };
-  const total = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
+  const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
+  const taxTotal = lines.reduce((s, l) => s + l.quantity * l.unitCost * ((l.taxRate ?? 0) / 100), 0);
+  const total = subtotal + taxTotal;
   const supplier = suppliers.find((s) => s.id === supplierId);
   const valid = supplier && lines.length > 0 && lines.every((l) => l.inventoryId && l.quantity > 0);
 
@@ -274,19 +276,23 @@ function PurchaseDialog({
                     <Minus className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div>
                     <label className="mb-1 block text-[11px] text-muted-foreground">Cantidad ({l.unit || "—"})</label>
                     <Input type="number" min={0} step="0.001" value={l.quantity} onChange={(e) => update(i, { quantity: Number(e.target.value) })} className="h-9" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[11px] text-muted-foreground">Costo unit.</label>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">Costo unit. (antes de IVA)</label>
                     <Input type="number" min={0} value={l.unitCost} onChange={(e) => update(i, { unitCost: Number(e.target.value) })} className="h-9" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[11px] text-muted-foreground">Subtotal</label>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">IVA / impuesto (%)</label>
+                    <Input type="number" min={0} max={100} value={l.taxRate ?? 0} onChange={(e) => update(i, { taxRate: Number(e.target.value) })} className="h-9" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">Subtotal + IVA</label>
                     <div className="flex h-9 items-center justify-end rounded-lg border border-border bg-muted/40 px-3 text-sm font-semibold">
-                      {formatCurrency(l.quantity * l.unitCost)}
+                      {formatCurrency(l.quantity * l.unitCost * (1 + (l.taxRate ?? 0) / 100))}
                     </div>
                   </div>
                 </div>
@@ -322,9 +328,21 @@ function PurchaseDialog({
             )}
           </div>
 
-          <div className="flex items-center justify-between border-t border-border pt-3">
-            <span className="text-sm font-medium">Total de la compra</span>
-            <span className="text-lg font-bold">{formatCurrency(total)}</span>
+          <div className="space-y-1 border-t border-border pt-3">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Subtotal (antes de IVA)</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            {taxTotal > 0 && (
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>IVA / impuestos</span>
+                <span>{formatCurrency(taxTotal)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Total de la compra</span>
+              <span className="text-lg font-bold">{formatCurrency(total)}</span>
+            </div>
           </div>
         </div>
         <DialogFooter>

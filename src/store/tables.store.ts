@@ -50,7 +50,7 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
 
   deleteTable: (id) => {
     set((s) => ({ tables: s.tables.filter((t) => t.id !== id) }));
-    if (USE_API) salonService.deleteTable(id).catch(console.error);
+    if (USE_API) salonService.deleteTable(id).catch(apiErrorHandler("eliminar mesa"));
   },
 
   duplicateTable: (id) => {
@@ -78,7 +78,7 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
 
   updateTableProps: (id, props) => {
     set((s) => ({ tables: s.tables.map((t) => (t.id === id ? { ...t, ...props } : t)) }));
-    if (USE_API) salonService.updateTable({ id, ...props }).catch(console.error);
+    if (USE_API) salonService.updateTable({ id, ...props }).catch(apiErrorHandler("actualizar mesa"));
   },
 
   addZone: (zone) =>
@@ -108,8 +108,8 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
       if (USE_API) {
         const tgt = next.find((t) => t.id === targetId);
         const srcNew = next.find((t) => t.id === sourceId);
-        if (tgt) salonService.updateTable({ id: tgt.id, status: tgt.status, waiter: tgt.waiter ?? "" }).catch(console.error);
-        if (srcNew) salonService.updateTable({ id: srcNew.id, status: "available" }).catch(console.error);
+        if (tgt) salonService.updateTable({ id: tgt.id, status: tgt.status, waiter: tgt.waiter ?? "" }).catch(apiErrorHandler("mover mesa"));
+        if (srcNew) salonService.updateTable({ id: srcNew.id, status: "available" }).catch(apiErrorHandler("liberar mesa"));
       }
       return { tables: next };
     }),
@@ -137,8 +137,8 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
       if (USE_API) {
         const merged = next.find((t) => t.id === sourceId);
         const sub = next.find((t) => t.id === targetId);
-        if (merged) salonService.updateTable({ id: merged.id, status: "occupied", waiter: merged.waiter ?? "" }).catch(console.error);
-        if (sub) salonService.updateTable({ id: sub.id, status: "occupied" }).catch(console.error);
+        if (merged) salonService.updateTable({ id: merged.id, status: "occupied", waiter: merged.waiter ?? "" }).catch(apiErrorHandler("merge mesa"));
+        if (sub) salonService.updateTable({ id: sub.id, status: "occupied" }).catch(apiErrorHandler("merge mesa"));
       }
       return { tables: next };
     }),
@@ -159,7 +159,7 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
     }));
     if (USE_API) {
       const table = get().tables.find((t) => t.number === number);
-      if (table) salonService.updateTable({ id: table.id, status: "occupied", waiter: waiter ?? "" }).catch(console.error);
+      if (table) salonService.updateTable({ id: table.id, status: "occupied", waiter: waiter ?? "" }).catch(apiErrorHandler("ocupar mesa"));
     }
   },
 
@@ -174,7 +174,7 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
     if (USE_API) {
       get().tables
         .filter((t) => t.number === number || t.mergedInto === number)
-        .forEach((t) => salonService.updateTable({ id: t.id, status: "available" }).catch(console.error));
+        .forEach((t) => salonService.updateTable({ id: t.id, status: "available" }).catch(apiErrorHandler("liberar mesa")));
     }
   },
 }));

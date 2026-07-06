@@ -202,7 +202,7 @@ function CartaTab() {
               <p className="line-clamp-1 text-xs text-muted-foreground">{p.description}</p>
               {(() => {
                 const rc = recipeFor(p.id);
-                if (rc) {
+                if (rc && rc.price > 0) {
                   const c = computeRecipeCost(rc, invItems);
                   return (
                     <button onClick={() => openRecipe(p)} className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium hover:bg-accent">
@@ -212,7 +212,7 @@ function CartaTab() {
                 }
                 return (
                   <button onClick={() => openRecipe(p)} className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-primary hover:text-primary">
-                    <Plus className="h-3 w-3" /> Crear receta
+                    <Plus className="h-3 w-3" /> {rc ? "Ver receta" : "Crear receta"}
                   </button>
                 );
               })()}
@@ -353,6 +353,7 @@ function RecetasTab() {
               key={r.id}
               recipe={r}
               index={i}
+              invItems={invItems}
               onEdit={() => { setEditing(r); setEditorOpen(true); }}
               onDuplicate={() => { duplicate(r.id); toast.success("Receta duplicada"); }}
               onDelete={() => setToDelete(r)}

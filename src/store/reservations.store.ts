@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { USE_API } from "@/services/http";
+import { USE_API, apiErrorHandler } from "@/services/http";
 import { reservationsService } from "@/services/reservations.service";
 
 export type ReservationStatus = "pending" | "confirmed" | "arrived" | "cancelled";
@@ -43,22 +43,22 @@ export const useReservationsStore = create<ReservationsState>()((set) => ({
     set((s) => ({ reservations: [newRes, ...s.reservations] }));
     if (USE_API) reservationsService.create(r).then((saved) =>
       set((s) => ({ reservations: s.reservations.map((x) => (x.id === newRes.id ? saved : x)) }))
-    ).catch(console.error);
+    ).catch(apiErrorHandler("reservación"));
   },
 
   update: (r) => {
     set((s) => ({ reservations: s.reservations.map((x) => (x.id === r.id ? r : x)) }));
-    if (USE_API) reservationsService.update(r).catch(console.error);
+    if (USE_API) reservationsService.update(r).catch(apiErrorHandler("reservación"));
   },
 
   remove: (id) => {
     set((s) => ({ reservations: s.reservations.filter((r) => r.id !== id) }));
-    if (USE_API) reservationsService.remove(id).catch(console.error);
+    if (USE_API) reservationsService.remove(id).catch(apiErrorHandler("reservación"));
   },
 
   setStatus: (id, status) => {
     set((s) => ({ reservations: s.reservations.map((r) => (r.id === id ? { ...r, status } : r)) }));
-    if (USE_API) reservationsService.setStatus(id, status).catch(console.error);
+    if (USE_API) reservationsService.setStatus(id, status).catch(apiErrorHandler("reservación"));
   },
 }));
 

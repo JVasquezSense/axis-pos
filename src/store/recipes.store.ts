@@ -3,6 +3,8 @@ import type { Recipe, RecipeIngredient, RecipeVariation } from "@/types";
 import { RECIPES } from "@/mock/recipes";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { recipesService } from "@/services/recipes.service";
+import { useMenuStore } from "./menu.store";
+import { menuService } from "@/services/menu.service";
 
 interface RecipesState {
   recipes: Recipe[];
@@ -13,7 +15,7 @@ interface RecipesState {
   duplicate: (id: string) => void;
 }
 
-export const useRecipesStore = create<RecipesState>()((set) => ({
+export const useRecipesStore = create<RecipesState>()((set, get) => ({
   recipes: USE_API ? [] : structuredClone(RECIPES),
 
   load: async () => {
@@ -34,11 +36,28 @@ export const useRecipesStore = create<RecipesState>()((set) => ({
       recipes: s.recipes.map((r) => (r.id === recipe.id ? { ...recipe, updatedAt: "Justo ahora" } : r)),
     }));
     if (USE_API) recipesService.update(recipe).catch(apiErrorHandler("receta"));
+    // El precio de venta debe estar atado entre la ficha técnica y el producto.
+    if (recipe.productId) {
+      const product = useMenuStore.getState().products.find((p) => String(p.id) === String(recipe.productId));
+      if (product && product.price !== recipe.price) {
+        useMenuStore.setState((s) => ({
+          products: s.products.map((p) => (p.id === product.id ? { ...p, price: recipe.price } : p)),
+        }));
+        if (USE_API) menuService.updateProduct({ ...product, price: recipe.price }).catch(apiErrorHandler("producto"));
+      }
+    }
   },
 
   remove: (id) => {
+    const recipe = get().recipes.find((r) => r.id === id);
     set((s) => ({ recipes: s.recipes.filter((r) => r.id !== id) }));
     if (USE_API) recipesService.remove(id).catch(apiErrorHandler("eliminar receta"));
+    // Cascada: la ficha técnica y el producto son la misma entidad conceptual.
+    if (recipe?.productId) {
+      const pid = recipe.productId;
+      useMenuStore.setState((s) => ({ products: s.products.filter((p) => String(p.id) !== String(pid)) }));
+      if (USE_API) menuService.deleteProduct(String(pid)).catch(apiErrorHandler("eliminar producto"));
+    }
   },
 
   duplicate: (id) =>
@@ -50,6 +69,7 @@ export const useRecipesStore = create<RecipesState>()((set) => ({
         id: uid("r"),
         name: `${original.name} (copia)`,
         status: "draft",
+        productId: undefined, // la copia no queda ligada al producto del original
         updatedAt: "Justo ahora",
       };
       if (USE_API) recipesService.create(copy).catch(apiErrorHandler("duplicar receta"));

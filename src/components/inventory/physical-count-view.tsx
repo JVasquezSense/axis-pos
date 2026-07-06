@@ -11,8 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportCsv } from "@/lib/export";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useInventoryStore } from "@/store/inventory.store";
 
 export function PhysicalCountView({ items, counts }: { items: InventoryItem[]; counts: PhysicalCount[] }) {
+  const applyPhysicalCount = useInventoryStore((s) => s.applyPhysicalCount);
   // Conteo físico editable
   const [physical, setPhysical] = useState<Record<string, number>>(() =>
     Object.fromEntries(counts.map((c) => [c.inventoryId, c.physical]))
@@ -65,7 +67,17 @@ export function PhysicalCountView({ items, counts }: { items: InventoryItem[]; c
             <Button variant="outline" size="sm" onClick={exportCount}>
               <Download className="h-4 w-4" /> Exportar
             </Button>
-            <Button size="sm" onClick={() => toast.success("Conteo guardado", { description: `${summary.withDiff} ajustes aplicados al kardex` })}>
+            <Button
+              size="sm"
+              disabled={summary.withDiff === 0}
+              onClick={() => {
+                const adjustments = rows
+                  .filter((r) => Math.abs(r.diff) > 0.001)
+                  .map((r) => ({ inventoryId: r.item.id, physical: r.phys }));
+                const applied = applyPhysicalCount(adjustments);
+                toast.success("Conteo guardado", { description: `${applied} ajustes aplicados al inventario y kardex` });
+              }}
+            >
               Guardar conteo
             </Button>
           </div>

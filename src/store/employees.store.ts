@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { USE_API } from "@/services/http";
+import { USE_API, apiErrorHandler } from "@/services/http";
 import { employeesService } from "@/services/employees.service";
 
 export type EmployeeRole = "mesero" | "cocinero" | "cajero" | "admin" | "almacen";
@@ -56,17 +56,17 @@ export const useEmployeesStore = create<EmployeesState>()((set) => ({
     set((s) => ({ employees: [newEmp, ...s.employees] }));
     if (USE_API) employeesService.create(e).then((saved) =>
       set((s) => ({ employees: s.employees.map((x) => (x.id === newEmp.id ? saved : x)) }))
-    ).catch(console.error);
+    ).catch(apiErrorHandler("empleado"));
   },
 
   update: (e) => {
     set((s) => ({ employees: s.employees.map((x) => (x.id === e.id ? e : x)) }));
-    if (USE_API) employeesService.update(e).catch(console.error);
+    if (USE_API) employeesService.update(e).catch(apiErrorHandler("empleado"));
   },
 
   remove: (id) => {
     set((s) => ({ employees: s.employees.filter((e) => e.id !== id) }));
-    if (USE_API) employeesService.remove(id).catch(console.error);
+    if (USE_API) employeesService.remove(id).catch(apiErrorHandler("empleado"));
   },
 
   toggle: (id) => {
@@ -75,7 +75,7 @@ export const useEmployeesStore = create<EmployeesState>()((set) => ({
     }));
     if (USE_API) {
       const emp = useEmployeesStore.getState().employees.find((e) => e.id === id);
-      if (emp) employeesService.update(emp).catch(console.error);
+      if (emp) employeesService.update(emp).catch(apiErrorHandler("empleado"));
     }
   },
 }));

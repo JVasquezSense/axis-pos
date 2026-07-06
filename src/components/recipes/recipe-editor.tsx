@@ -125,12 +125,17 @@ export function RecipeEditor({
           let inventoryId: string = String(ing.existingId ?? "");
           if (inventoryId && !allItems.find((i) => String(i.id) === inventoryId)) inventoryId = "";
           if (!inventoryId) {
+            // La IA cotiza el costo en escala "grande" (por kg/L) aunque la receta
+            // use gramos/mililitros. Si guardáramos el insumo nuevo con unidad "g"
+            // y ese mismo costo, el precio quedaría inflado ~1000x (bug food cost >7000%).
+            const SMALL_TO_BIG: Record<string, string> = { g: "kg", gr: "kg", ml: "L", cl: "L" };
+            const stockUnit = SMALL_TO_BIG[(ing.unit ?? "").toLowerCase()] ?? ing.unit ?? "und";
             const newItem: InventoryItem = {
               id: uid("inv"),
               name: ing.name,
               category: "general",
               stock: 10,
-              unit: ing.unit ?? "und",
+              unit: stockUnit,
               minStock: 2,
               cost: Number(ing.cost) || 0,
               supplier: "",
@@ -167,7 +172,10 @@ export function RecipeEditor({
       const storeCategories = useMenuStore.getState().categories;
       let category = String(data.category ?? "");
       if (storeCategories.length && !storeCategories.find((c) => String(c.id) === category)) {
-        const byName = storeCategories.find((c) => c.name.toLowerCase() === category.toLowerCase());
+        const catLower = category.toLowerCase();
+        const byName = storeCategories.find((c) => c.name.toLowerCase() === catLower)
+          ?? storeCategories.find((c) => c.name.toLowerCase().includes(catLower))
+          ?? storeCategories.find((c) => catLower.includes(c.name.toLowerCase()));
         category = byName ? String(byName.id) : String(storeCategories[0].id);
       }
 
@@ -179,8 +187,8 @@ export function RecipeEditor({
         if (!prev) return prev;
         return {
           ...prev,
-          description: String(data.description ?? prev.description ?? ""),
-          emoji: data.emoji || prev.emoji,
+          description: String(data.description || prev.description || ""),
+          emoji: (data.emoji && !isImageUrl(prev.emoji ?? "")) ? data.emoji : (prev.emoji || data.emoji),
           price: Number(data.price) || prev.price,
           category,
           prepMinutes: Number(data.prepMinutes) || prev.prepMinutes,

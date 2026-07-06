@@ -17,7 +17,7 @@ const SYSTEM_BASE =
   "/checkout=Caja, /shift=Cierre de turno, /web-orders=Pedidos web, " +
   "/menu=Menú & Recetas (aquí se crean productos y fichas técnicas), " +
   "/inventory=Inventario, /suppliers=Proveedores (aquí se registran TODAS las compras, " +
-  "haz clic en 'Registrar compra' dentro de un proveedor), " +
+  "usa el botón 'Registrar compra' en la parte superior de /suppliers), " +
   "/employees=Empleados, /crm=Clientes, /reports=Reportes, /website=Página web. " +
   "NO existe ruta /compras, /purchases, /cocinas ni /stations — las compras van en /suppliers. " +
   "Las estaciones de cocina (Parrilla, Freidora, Fríos, Barra, Pastelería) son FIJAS en el sistema " +

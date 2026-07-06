@@ -17,17 +17,19 @@ import { cn, formatCurrency } from "@/lib/utils";
 export function RecipeCard({
   recipe,
   index,
+  invItems,
   onEdit,
   onDuplicate,
   onDelete,
 }: {
   recipe: Recipe;
   index: number;
+  invItems?: import("@/types").InventoryItem[];
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
-  const cost = computeRecipeCost(recipe);
+  const cost = computeRecipeCost(recipe, invItems);
   const station = STATION[recipe.station];
   const status = RECIPE_STATUS[recipe.status];
   const lowStock = cost.maxPortions <= 10;

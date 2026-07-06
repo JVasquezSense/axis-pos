@@ -49,7 +49,9 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
 
   registerPurchase: (supplier, lines, invoicePhoto) => {
     const code = `OC-${get().seq}`;
-    const total = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
+    const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
+    const taxTotal = lines.reduce((s, l) => s + l.quantity * l.unitCost * ((l.taxRate ?? 0) / 100), 0);
+    const total = subtotal + taxTotal;
     const purchase: Purchase = {
       id: `purchase-${Date.now()}`,
       code,
@@ -57,6 +59,8 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
       supplierName: supplier.name,
       date: "Hoy",
       lines,
+      subtotal,
+      taxTotal,
       total,
       ...(invoicePhoto ? { invoicePhoto } : {}),
     };
@@ -66,6 +70,8 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
       suppliersService.createPurchase({
         code,
         supplierId: supplier.id,
+        subtotal,
+        taxTotal,
         total,
         lines,
         invoicePhoto,
