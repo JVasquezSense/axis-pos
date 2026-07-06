@@ -72,7 +72,7 @@ function TabBtn({ active, onClick, label, icon }: { active: boolean; onClick: ()
 /* ─── TAB: CARTA ─────────────────────────────────────────────────────────── */
 
 function CartaTab() {
-  const { categories, products, addCategory, removeCategory, addProduct, updateProduct, removeProduct } = useMenuStore();
+  const { categories, products, addCategory, removeCategory, addProduct, updateProduct, removeProduct, syncRecipePrice } = useMenuStore();
   const recipes = useRecipesStore((s) => s.recipes);
   const invRaw = useInventoryStore((s) => s.items);
   const invItems = invRaw.length > 0 ? invRaw : INVENTORY;
@@ -84,6 +84,7 @@ function CartaTab() {
   const [scanOpen, setScanOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Product | null>(null);
   const [recipeEditing, setRecipeEditing] = useState<Recipe | null>(null);
+  const [recipeIsNew, setRecipeIsNew] = useState(false);
   const [recipeOpen, setRecipeOpen] = useState(false);
 
   const recipeFor = (pid: string | number) => recipes.find((r) => String(r.productId) === String(pid));
@@ -93,6 +94,7 @@ function CartaTab() {
     setRecipeEditing(
       existing ?? { ...emptyRecipe(), name: p.name, emoji: p.image, category: p.category, price: p.price, productId: p.id }
     );
+    setRecipeIsNew(!existing);
     setRecipeOpen(true);
   };
 
@@ -116,11 +118,13 @@ function CartaTab() {
       ...emptyRecipe(),
       category: activeCat === "all" ? (categories[0]?.id ?? "") : activeCat,
     });
+    setRecipeIsNew(true);
     setRecipeOpen(true);
   };
   const save = (p: Product) => {
     if (products.some((x) => x.id === p.id)) {
       updateProduct(p);
+      syncRecipePrice(String(p.id), p.price);
       toast.success("Producto actualizado", { description: p.name });
     } else {
       addProduct(p);
@@ -231,7 +235,7 @@ function CartaTab() {
       )}
 
       <ProductFormDialog product={editing} categories={categories} open={formOpen} onOpenChange={setFormOpen} onSave={save} />
-      <RecipeEditor recipe={recipeEditing} open={recipeOpen} onOpenChange={setRecipeOpen} />
+      <RecipeEditor recipe={recipeEditing} isNew={recipeIsNew} open={recipeOpen} onOpenChange={setRecipeOpen} />
       <AddCategoryDialog open={catOpen} onOpenChange={setCatOpen} onCreate={(c) => { addCategory(c); toast.success(`Categoría "${c.name}" creada`); }} />
       <MenuScanDialog
         open={scanOpen}
@@ -269,6 +273,7 @@ function RecetasTab() {
   const [category, setCategory] = useState("all");
   const [station, setStation] = useState("all");
   const [editing, setEditing] = useState<Recipe | null>(null);
+  const [editingIsNew, setEditingIsNew] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Recipe | null>(null);
 
@@ -297,7 +302,7 @@ function RecetasTab() {
     };
   }, [recipes]);
 
-  const openNew = () => { setEditing(emptyRecipe()); setEditorOpen(true); };
+  const openNew = () => { setEditing(emptyRecipe()); setEditingIsNew(true); setEditorOpen(true); };
 
   return (
     <div className="space-y-4">
@@ -354,7 +359,7 @@ function RecetasTab() {
               recipe={r}
               index={i}
               invItems={invItems}
-              onEdit={() => { setEditing(r); setEditorOpen(true); }}
+              onEdit={() => { setEditing(r); setEditingIsNew(false); setEditorOpen(true); }}
               onDuplicate={() => { duplicate(r.id); toast.success("Receta duplicada"); }}
               onDelete={() => setToDelete(r)}
             />
@@ -362,7 +367,7 @@ function RecetasTab() {
         </div>
       )}
 
-      <RecipeEditor recipe={editing} open={editorOpen} onOpenChange={setEditorOpen} />
+      <RecipeEditor recipe={editing} isNew={editingIsNew} open={editorOpen} onOpenChange={setEditorOpen} />
 
       <Dialog open={!!toDelete} onOpenChange={(v) => !v && setToDelete(null)}>
         <DialogContent className="max-w-sm">

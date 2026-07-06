@@ -14,6 +14,7 @@ interface MenuState {
   removeCategory: (id: string) => void;
   addProduct: (p: Product) => void;
   updateProduct: (p: Product) => void;
+  syncRecipePrice: (productId: string, price: number) => void;
   removeProduct: (id: string) => void;
   setAvailable: (id: string, available: boolean) => void;
 }
@@ -64,13 +65,19 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
   updateProduct: (p) => {
     set((s) => ({ products: s.products.map((x) => (x.id === p.id ? p : x)) }));
     if (USE_API) menuService.updateProduct(p).catch(apiErrorHandler("producto"));
-    // El precio de venta debe estar atado entre el producto y su ficha técnica.
-    const recipe = useRecipesStore.getState().recipes.find((r) => String(r.productId) === String(p.id));
-    if (recipe && recipe.price !== p.price) {
+  },
+
+  /** Sincroniza el precio hacia la ficha técnica vinculada (si existe).
+   * Vive fuera de updateProduct para no disparase también cuando quien
+   * llama a updateProduct es el propio recipe-editor (que ya maneja su
+   * lado de la sincronización) — evita dos PATCH /recipes/ en carrera. */
+  syncRecipePrice: (productId, price) => {
+    const recipe = useRecipesStore.getState().recipes.find((r) => String(r.productId) === String(productId));
+    if (recipe && recipe.price !== price) {
       useRecipesStore.setState((s) => ({
-        recipes: s.recipes.map((r) => (r.id === recipe.id ? { ...r, price: p.price, updatedAt: "Justo ahora" } : r)),
+        recipes: s.recipes.map((r) => (r.id === recipe.id ? { ...r, price, updatedAt: "Justo ahora" } : r)),
       }));
-      if (USE_API) recipesService.update({ ...recipe, price: p.price }).catch(apiErrorHandler("receta"));
+      if (USE_API) recipesService.update({ ...recipe, price }).catch(apiErrorHandler("receta"));
     }
   },
 

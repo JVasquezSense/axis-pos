@@ -36,16 +36,6 @@ export const useRecipesStore = create<RecipesState>()((set, get) => ({
       recipes: s.recipes.map((r) => (r.id === recipe.id ? { ...recipe, updatedAt: "Justo ahora" } : r)),
     }));
     if (USE_API) recipesService.update(recipe).catch(apiErrorHandler("receta"));
-    // El precio de venta debe estar atado entre la ficha técnica y el producto.
-    if (recipe.productId) {
-      const product = useMenuStore.getState().products.find((p) => String(p.id) === String(recipe.productId));
-      if (product && product.price !== recipe.price) {
-        useMenuStore.setState((s) => ({
-          products: s.products.map((p) => (p.id === product.id ? { ...p, price: recipe.price } : p)),
-        }));
-        if (USE_API) menuService.updateProduct({ ...product, price: recipe.price }).catch(apiErrorHandler("producto"));
-      }
-    }
   },
 
   remove: (id) => {

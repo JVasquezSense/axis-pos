@@ -29,10 +29,17 @@ const ALLERGEN_KEYS = Object.keys(ALLERGENS) as Allergen[];
 
 export function RecipeEditor({
   recipe,
+  isNew,
   open,
   onOpenChange,
 }: {
   recipe: Recipe | null;
+  /** El caller ya sabe con certeza si esto es una receta nueva o una edición
+   * (evita inferirlo comparando IDs: el id de una receta recién creada se
+   * reemplaza de forma asíncrona por el id real del servidor, y comparar
+   * contra el store en ese instante podía dar un falso "isNew" y duplicar
+   * el producto). */
+  isNew: boolean;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
@@ -48,7 +55,6 @@ export function RecipeEditor({
   const [describingAI, setDescribingAI] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const isNew = recipe ? !useRecipesStore.getState().recipes.some((r) => r.id === recipe.id) : false;
 
   useEffect(() => {
     if (open) setDraft(recipe ? structuredClone(recipe) : null);
@@ -189,7 +195,10 @@ export function RecipeEditor({
           ...prev,
           description: String(data.description || prev.description || ""),
           emoji: (data.emoji && !isImageUrl(prev.emoji ?? "")) ? data.emoji : (prev.emoji || data.emoji),
-          price: Number(data.price) || prev.price,
+          // Solo usa el precio sugerido por la IA si es una receta nueva o
+          // todavía no tiene precio; si ya está vinculada a un producto con
+          // precio real, no lo pisamos al regenerar.
+          price: (isNew || !prev.price) ? (Number(data.price) || prev.price) : prev.price,
           category,
           prepMinutes: Number(data.prepMinutes) || prev.prepMinutes,
           difficulty: VALID_DIFFS.includes(data.difficulty as RecipeDifficulty) ? (data.difficulty as RecipeDifficulty) : prev.difficulty,
