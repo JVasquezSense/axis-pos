@@ -55,7 +55,9 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   updateItem: (item) => {
     set((s) => ({ items: s.items.map((x) => (x.id === item.id ? item : x)) }));
-    if (USE_API) inventoryService.updateItem(item).catch(apiErrorHandler("inventario"));
+    if (USE_API) inventoryService.updateItem(item).then((saved) =>
+      set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }))
+    ).catch(apiErrorHandler("inventario"));
   },
 
   deleteItem: (id) => {

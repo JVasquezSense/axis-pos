@@ -92,6 +92,9 @@ export async function request<T>(path: string, init?: RequestInit, _retried = fa
   if (!res.ok) {
     throw new ApiError(res.status, await res.text().catch(() => res.statusText));
   }
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
   return (await res.json()) as T;
 }
 
