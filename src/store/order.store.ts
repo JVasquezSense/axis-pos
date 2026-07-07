@@ -147,19 +147,19 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
     const { lines, tableNumber } = get();
     if (USE_API) {
       const code = `OC-${Date.now().toString(36).toUpperCase()}`;
-      const saved = await ordersService.createOrder({
+      const payload = {
         code,
         channel,
         table: tableNumber,
         lines: lines.map((l) => ({
-          productId: l.product.id,
+          productId: Number(l.product.id),
           quantity: l.quantity,
-          // La IA/modificadores no tienen columna propia en el backend: se
-          // pliegan en el precio unitario efectivo y se listan en las notas.
           unitPrice: l.unitPrice + l.modifiers.reduce((s, m) => s + m.price, 0),
           notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
         })),
-      });
+      };
+      console.log("[sendToKitchen] payload:", JSON.stringify(payload));
+      const saved = await ordersService.createOrder(payload);
       get().flushToTable();
       return { id: String(saved.id), code: saved.code };
     }

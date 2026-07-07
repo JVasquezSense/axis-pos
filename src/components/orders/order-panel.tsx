@@ -173,8 +173,10 @@ export function OrderPanel() {
                   if (tableNumber) occupyTable(tableNumber, total);
                   toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
                   router.push("/kitchen");
-                } catch {
-                  toast.error("No se pudo enviar el pedido a cocina");
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : "Error desconocido";
+                  console.error("[sendToKitchen] error:", err);
+                  toast.error("No se pudo enviar el pedido a cocina", { description: msg.slice(0, 120) });
                 } finally {
                   setSending(false);
                 }
