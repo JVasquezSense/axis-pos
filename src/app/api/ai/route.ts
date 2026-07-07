@@ -75,7 +75,7 @@ function fallback(mode: Mode): string {
 }
 
 export async function POST(req: Request) {
-  let body: { mode?: Mode; message?: string; context?: string } = {};
+  let body: { mode?: Mode; message?: string; context?: string; history?: { role: string; content: string }[] } = {};
   try {
     body = await req.json();
   } catch {
@@ -111,7 +111,8 @@ export async function POST(req: Request) {
         thinking: { type: "disabled" },
         messages: [
           { role: "system", content: SYSTEM_BASE },
-          { role: "user", content: userContent },
+          ...(body.history ?? []).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+          { role: "user" as const, content: userContent },
         ],
       }),
     });

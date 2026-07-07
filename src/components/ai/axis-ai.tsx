@@ -14,6 +14,7 @@ import { useKitchenStore } from "@/store/kitchen.store";
 import { useReservationsStore } from "@/store/reservations.store";
 import { useSuppliersStore } from "@/store/suppliers.store";
 import { useEmployeesStore } from "@/store/employees.store";
+import { useAuditStore } from "@/store/audit.store";
 import {
   buildBrief,
   buildPricing,
@@ -24,6 +25,47 @@ import {
   type AiMode,
 } from "@/lib/ai-context";
 import { cn } from "@/lib/utils";
+
+function MdText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <div className="space-y-1">
+      {lines.map((line, i) => {
+        if (!line.trim()) return <div key={i} className="h-1" />;
+        if (/^#{1,3}\s/.test(line)) {
+          const clean = line.replace(/^#{1,3}\s*/, "");
+          return <p key={i} className="font-bold text-foreground">{inlineMd(clean)}</p>;
+        }
+        if (/^[-•]\s/.test(line.trim())) {
+          const clean = line.trim().replace(/^[-•]\s*/, "");
+          return <p key={i} className="pl-2 before:content-['•_'] before:text-primary">{inlineMd(clean)}</p>;
+        }
+        if (/^\d+\.\s/.test(line.trim())) {
+          return <p key={i} className="pl-2">{inlineMd(line.trim())}</p>;
+        }
+        return <p key={i}>{inlineMd(line)}</p>;
+      })}
+    </div>
+  );
+}
+
+function inlineMd(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let key = 0;
+  while (remaining) {
+    const bold = remaining.match(/\*\*(.+?)\*\*/);
+    if (bold && bold.index !== undefined) {
+      if (bold.index > 0) parts.push(remaining.slice(0, bold.index));
+      parts.push(<strong key={key++} className="font-semibold text-foreground">{bold[1]}</strong>);
+      remaining = remaining.slice(bold.index + bold[0].length);
+    } else {
+      parts.push(remaining);
+      break;
+    }
+  }
+  return <>{parts}</>;
+}
 
 interface Msg {
   role: "user" | "assistant";
@@ -75,6 +117,13 @@ const QUICK: { mode: AiMode; label: string; icon: React.ElementType; user: strin
   },
 ];
 
+function recentAudit(): string {
+  const entries = useAuditStore.getState().entries.slice(0, 8);
+  if (entries.length === 0) return "";
+  const lines = entries.map((e) => `[${new Date(e.ts).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}] ${e.action}: ${e.details}`);
+  return `\nÚltimas acciones del sistema:\n${lines.join("\n")}`;
+}
+
 function contextFor(mode: AiMode): string {
   const sales = useSalesStore.getState().records;
   const recipes = useRecipesStore.getState().recipes;
@@ -84,21 +133,21 @@ function contextFor(mode: AiMode): string {
   const reservations = useReservationsStore.getState().reservations;
   const { purchases, suppliers } = useSuppliersStore.getState();
   const employees = useEmployeesStore.getState().employees;
+  const audit = recentAudit();
 
   switch (mode) {
     case "pricing":
-      return buildPricing(recipes);
+      return buildPricing(recipes) + audit;
     case "inventory":
-      return buildInventoryForecast(inv.items, inv.movements, purchases, suppliers);
+      return buildInventoryForecast(inv.items, inv.movements, purchases, suppliers) + audit;
     case "waiter":
-      return buildWaiterStats(sales, employees);
+      return buildWaiterStats(sales, employees) + audit;
     case "menu_eng":
-      return buildMenuEngineering(recipes, sales);
+      return buildMenuEngineering(recipes, sales) + audit;
     case "reservations":
-      return buildReservationsBrief(reservations);
+      return buildReservationsBrief(reservations) + audit;
     default:
-      // chat y shift: brief completo con todos los datos
-      return buildBrief({ sales, recipes, inventory: inv.items, movements: inv.movements, tables, tickets, reservations, purchases, suppliers, employees });
+      return buildBrief({ sales, recipes, inventory: inv.items, movements: inv.movements, tables, tickets, reservations, purchases, suppliers, employees }) + audit;
   }
 }
 
@@ -119,6 +168,7 @@ export function AxisAI() {
   const send = async (mode: AiMode, userText: string) => {
     if (busy) return;
     setBusy(true);
+    const prev = messages.filter((m) => m.content).slice(-6);
     setMessages((m) => [...m, { role: "user", content: userText }, { role: "assistant", content: "" }]);
     try {
       const res = await fetch("/api/ai", {
@@ -128,6 +178,7 @@ export function AxisAI() {
           mode,
           message: mode === "chat" ? userText : "",
           context: contextFor(mode),
+          history: prev.length > 0 ? prev : undefined,
         }),
       });
       if (!res.body) throw new Error("sin respuesta");
@@ -238,7 +289,7 @@ export function AxisAI() {
                         : "rounded-bl-sm bg-muted"
                     )}
                   >
-                    {m.content || <Loader2 className="h-4 w-4 animate-spin" />}
+                    {!m.content ? <Loader2 className="h-4 w-4 animate-spin" /> : m.role === "assistant" ? <MdText text={m.content} /> : m.content}
                   </div>
                 </div>
               ))}
@@ -286,7 +337,7 @@ export function AxisAI() {
                   ].map((ex) => (
                     <button
                       key={ex}
-                      onClick={() => { setInput(ex); }}
+                      onClick={() => send("chat", ex)}
                       className="rounded-lg border border-border/60 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     >
                       {ex}

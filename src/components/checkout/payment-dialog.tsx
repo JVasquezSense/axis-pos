@@ -93,7 +93,7 @@ export function PaymentDialog({
                 <span className="text-xs text-muted-foreground">{code}</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                {table ? `Mesa ${table} · ` : ""}{saleType ? `${saleType} · ` : ""}15 jun 2026, 8:42 p.m.
+                {table ? `Mesa ${table} · ` : ""}{saleType ? `${saleType} · ` : ""}{new Date().toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}, {new Date().toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" })}
               </p>
               <Separator className="my-3" />
               <Row label="Subtotal" value={formatCurrency(breakdown.subtotal)} />
