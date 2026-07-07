@@ -11,7 +11,8 @@ export const inventoryService = {
     return USE_API ? request<InventoryMovement[]>("/inventory/movements/") : mockRequest(MOVEMENTS, 500);
   },
   async getPhysicalCounts(): Promise<PhysicalCount[]> {
-    return USE_API ? request<PhysicalCount[]>("/inventory/physical-count/") : mockRequest(PHYSICAL_COUNTS, 500);
+    if (!USE_API) return mockRequest(PHYSICAL_COUNTS, 500);
+    return request<PhysicalCount[]>("/inventory/physical-count/").catch(() => []);
   },
   async createItem(item: InventoryItem): Promise<InventoryItem> {
     return USE_API
