@@ -394,3 +394,126 @@ export function buildReservationsBrief(reservations: Reservation[]): string {
     upStr,
   ].join("\n");
 }
+
+// ─── Insights / Anomalías ──────────────────────────────────────────────────
+
+export interface Insight {
+  type: "inventory" | "employee" | "supplier";
+  severity: "critical" | "warning" | "info";
+  title: string;
+  detail: string;
+}
+
+export function detectInsights(s: Stores): Insight[] {
+  const insights: Insight[] = [];
+
+  // ── 1. Inventario: insumos sin movimiento que deberían tener consumo ──
+  const recipesUsingItem = new Map<string, string[]>();
+  s.recipes.forEach((r) => {
+    (r.ingredients ?? []).forEach((ing) => {
+      const list = recipesUsingItem.get(ing.inventoryId) ?? [];
+      list.push(r.name);
+      recipesUsingItem.set(ing.inventoryId, list);
+    });
+  });
+
+  const movementsByItem = new Map<string, number>();
+  s.movements.forEach((m) => {
+    if (m.type === "salida") {
+      movementsByItem.set(m.inventoryId, (movementsByItem.get(m.inventoryId) ?? 0) + Math.abs(m.quantity));
+    }
+  });
+
+  s.inventory.forEach((item) => {
+    const usedInRecipes = recipesUsingItem.get(item.id);
+    const totalOut = movementsByItem.get(item.id) ?? 0;
+    if (usedInRecipes && usedInRecipes.length > 0 && totalOut === 0 && item.stock > 0) {
+      insights.push({
+        type: "inventory",
+        severity: "warning",
+        title: `${item.name} sin consumo registrado`,
+        detail: `Tiene ${item.stock}${item.unit} en stock y se usa en ${usedInRecipes.slice(0, 3).join(", ")} pero no hay salidas registradas. Posible descuadre o falta de registro de consumo.`,
+      });
+    }
+  });
+
+  // Insumos con stock que no se usa en ninguna receta (stock muerto)
+  s.inventory.forEach((item) => {
+    const usedInRecipes = recipesUsingItem.get(item.id);
+    if ((!usedInRecipes || usedInRecipes.length === 0) && item.stock > 0) {
+      insights.push({
+        type: "inventory",
+        severity: "info",
+        title: `${item.name} no se usa en ninguna receta`,
+        detail: `Tiene ${item.stock}${item.unit} en stock pero no está vinculado a ningún plato. Capital inmovilizado: ${k(item.cost * item.stock)}.`,
+      });
+    }
+  });
+
+  // ── 2. Empleados activos sin actividad ──
+  const waiterSales = new Set<string>();
+  s.sales.forEach((r) => {
+    if (r.waiter && r.waiter !== "Sin asignar") waiterSales.add(r.waiter);
+  });
+
+  const activeEmployees = (s.employees ?? []).filter((e) => e.active);
+  const idleEmployees = activeEmployees.filter((e) => !waiterSales.has(e.name));
+  if (idleEmployees.length > 0 && s.sales.length > 0) {
+    insights.push({
+      type: "employee",
+      severity: idleEmployees.length > 2 ? "warning" : "info",
+      title: `${idleEmployees.length} empleado${idleEmployees.length > 1 ? "s" : ""} activo${idleEmployees.length > 1 ? "s" : ""} sin ventas`,
+      detail: `${idleEmployees.map((e) => `${e.name} (${e.role})`).join(", ")} — están marcados como activos pero sin ventas en este turno. Verificar asistencia o asignación.`,
+    });
+  }
+
+  // ── 3. Proveedores costosos: comparar precios de compra ──
+  const pricesByItem = new Map<string, { supplier: string; unitCost: number; name: string }[]>();
+  (s.purchases ?? []).forEach((p) => {
+    p.lines.forEach((line) => {
+      const list = pricesByItem.get(line.inventoryId) ?? [];
+      list.push({ supplier: p.supplierName, unitCost: line.unitCost, name: line.name });
+      pricesByItem.set(line.inventoryId, list);
+    });
+  });
+
+  pricesByItem.forEach((entries, itemId) => {
+    const suppliers = new Map<string, number>();
+    entries.forEach((e) => suppliers.set(e.supplier, e.unitCost));
+    if (suppliers.size < 2) return;
+    const costs = Array.from(suppliers.values());
+    const avg = costs.reduce((a, b) => a + b, 0) / costs.length;
+    const min = Math.min(...costs);
+
+    suppliers.forEach((cost, supplier) => {
+      const pctAboveMin = ((cost - min) / min) * 100;
+      if (pctAboveMin > 20 && cost > avg) {
+        const itemName = entries.find((e) => e.supplier === supplier)?.name ?? itemId;
+        insights.push({
+          type: "supplier",
+          severity: pctAboveMin > 40 ? "warning" : "info",
+          title: `${supplier} cobra ${Math.round(pctAboveMin)}% más por ${itemName}`,
+          detail: `Precio: ${k(cost)}/unidad vs ${k(min)}/unidad del proveedor más barato. Diferencia de ${k(cost - min)} por unidad. Evaluar renegociación o cambio.`,
+        });
+      }
+    });
+  });
+
+  // Comparar costo unitario de inventario vs precio promedio de compras
+  s.inventory.forEach((item) => {
+    const purchases = pricesByItem.get(item.id);
+    if (!purchases || purchases.length === 0) return;
+    const avgPurchaseCost = purchases.reduce((s, p) => s + p.unitCost, 0) / purchases.length;
+    const diff = ((item.cost - avgPurchaseCost) / avgPurchaseCost) * 100;
+    if (diff > 30) {
+      insights.push({
+        type: "inventory",
+        severity: "warning",
+        title: `Costo de ${item.name} desactualizado`,
+        detail: `Costo en inventario: ${k(item.cost)}/${item.unit} pero promedio de compras: ${k(avgPurchaseCost)}/${item.unit}. Diferencia del ${Math.round(diff)}%. Actualizar costo en inventario.`,
+      });
+    }
+  });
+
+  return insights;
+}

@@ -25,7 +25,9 @@ import {
   buildMenuEngineering,
   buildReservationsBrief,
   buildDashboardKpis,
+  detectInsights,
   type AiMode,
+  type Insight,
 } from "@/lib/ai-context";
 import { computeRecipeCost } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
@@ -196,25 +198,35 @@ function getStores() {
   return { sales, recipes, inv, tables, tickets, reservations, purchases, suppliers, employees };
 }
 
+function formatInsights(insights: Insight[]): string {
+  if (insights.length === 0) return "";
+  const lines = insights.map((i) => {
+    const icon = i.severity === "critical" ? "🔴" : i.severity === "warning" ? "⚠️" : "ℹ️";
+    return `${icon} [${i.type}] ${i.title}: ${i.detail}`;
+  });
+  return `\n\n=== ANOMALÍAS DETECTADAS ===\n${lines.join("\n")}`;
+}
+
 function contextFor(mode: AiMode): string {
   const { sales, recipes, inv, tables, tickets, reservations, purchases, suppliers, employees } = getStores();
   const stores = { sales, recipes, inventory: inv.items, movements: inv.movements, tables, tickets, reservations, purchases, suppliers, employees };
   const audit = recentAudit();
   const kpis = buildDashboardKpis(stores);
+  const anomalies = formatInsights(detectInsights(stores));
 
   switch (mode) {
     case "pricing":
-      return kpis + "\n\n" + buildPricing(recipes) + audit;
+      return kpis + "\n\n" + buildPricing(recipes) + anomalies + audit;
     case "inventory":
-      return kpis + "\n\n" + buildInventoryForecast(inv.items, inv.movements, purchases, suppliers) + audit;
+      return kpis + "\n\n" + buildInventoryForecast(inv.items, inv.movements, purchases, suppliers) + anomalies + audit;
     case "waiter":
-      return kpis + "\n\n" + buildWaiterStats(sales, employees) + audit;
+      return kpis + "\n\n" + buildWaiterStats(sales, employees) + anomalies + audit;
     case "menu_eng":
-      return kpis + "\n\n" + buildMenuEngineering(recipes, sales) + audit;
+      return kpis + "\n\n" + buildMenuEngineering(recipes, sales) + anomalies + audit;
     case "reservations":
-      return kpis + "\n\n" + buildReservationsBrief(reservations) + audit;
+      return kpis + "\n\n" + buildReservationsBrief(reservations) + anomalies + audit;
     default:
-      return kpis + "\n\n" + buildBrief(stores) + audit;
+      return kpis + "\n\n" + buildBrief(stores) + anomalies + audit;
   }
 }
 
@@ -225,8 +237,11 @@ interface ProactiveAlert {
 }
 
 function computeAlerts(): ProactiveAlert[] {
-  const { recipes, inv } = getStores();
+  const storeData = getStores();
+  const { recipes, inv } = storeData;
+  const stores = { sales: storeData.sales, recipes, inventory: inv.items, movements: inv.movements, tables: storeData.tables, tickets: storeData.tickets, reservations: storeData.reservations, purchases: storeData.purchases, suppliers: storeData.suppliers, employees: storeData.employees };
   const alerts: ProactiveAlert[] = [];
+
   const critical = inv.items.filter((i) => i.status === "critical");
   if (critical.length > 0)
     alerts.push({ icon: "🔴", text: `${critical.length} insumo${critical.length > 1 ? "s" : ""} en nivel crítico`, severity: "critical" });
@@ -236,6 +251,19 @@ function computeAlerts(): ProactiveAlert[] {
   const highFC = recipes.filter((r) => Math.round(computeRecipeCost(r).foodCostPct * 100) > 35);
   if (highFC.length > 0)
     alerts.push({ icon: "📊", text: `Food cost alto en ${highFC.length} plato${highFC.length > 1 ? "s" : ""}`, severity: "warning" });
+
+  const insights = detectInsights(stores);
+  const invInsights = insights.filter((i) => i.type === "inventory" && i.severity !== "info");
+  const empInsights = insights.filter((i) => i.type === "employee");
+  const supInsights = insights.filter((i) => i.type === "supplier");
+
+  if (invInsights.length > 0)
+    alerts.push({ icon: "📦", text: `${invInsights.length} inconsistencia${invInsights.length > 1 ? "s" : ""} de inventario`, severity: "warning" });
+  if (empInsights.length > 0)
+    alerts.push({ icon: "👤", text: empInsights[0].title, severity: empInsights[0].severity as "warning" | "critical" | "info" });
+  if (supInsights.length > 0)
+    alerts.push({ icon: "💰", text: `${supInsights.length} proveedor${supInsights.length > 1 ? "es" : ""} con sobreprecio`, severity: "warning" });
+
   return alerts;
 }
 

@@ -35,7 +35,13 @@ EJEMPLO DE RESPUESTA (usa este formato):
 - **Mejor mesero:** Carlos — $320k en ventas, $45k en propinas
 - ⚠️ **Alerta:** Queso cheddar en nivel crítico (1.8kg)
 
-👉 Registra la compra de queso en [Ver en /suppliers] antes del servicio de mañana.`;
+👉 Registra la compra de queso en [Ver en /suppliers] antes del servicio de mañana.
+
+ANOMALÍAS: Si recibes un bloque "=== ANOMALÍAS DETECTADAS ===" en los datos, SIEMPRE menciona las más relevantes:
+- [inventory] Insumos sin consumo o con costo desactualizado → posible descuadre, recomendar auditoría en [Ver en /inventory]
+- [employee] Empleados activos sin ventas → verificar asistencia en [Ver en /employees]
+- [supplier] Proveedores con sobreprecio → recomendar renegociación en [Ver en /suppliers]
+Prioriza anomalías críticas y de warning. Las de tipo "info" menciónalas solo si el usuario pregunta.`;
 
 const MODE_PROMPT: Record<Mode, string> = {
   chat:
