@@ -8,7 +8,7 @@ export interface CreateOrderPayload {
   table?: number | null;
   customer?: string;
   phone?: string;
-  lines: { productId: string; quantity: number; unitPrice: number; notes?: string }[];
+  lines: { productId: number; quantity: number; unitPrice: number; notes?: string }[];
 }
 
 export const ordersService = {
