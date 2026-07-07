@@ -143,7 +143,7 @@ export function OrderPanel() {
       </div>
 
       {lines.length > 0 && (
-        <div className="border-t border-border p-4">
+        <div className="relative z-[60] border-t border-border bg-background p-4">
           <div className="space-y-1.5 text-sm">
             <Row label="Subtotal" value={formatCurrency(subtotal)} />
             <Row label={`Impuesto (${Math.round(TAX_RATE * 100)}%)`} value={formatCurrency(tax)} muted />
