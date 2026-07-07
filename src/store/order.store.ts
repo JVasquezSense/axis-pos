@@ -154,7 +154,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
         lines: lines.map((l) => ({
           productId: Number(l.product.id),
           quantity: l.quantity,
-          unitPrice: l.unitPrice + l.modifiers.reduce((s, m) => s + m.price, 0),
+          unitPrice: Number((Number(l.unitPrice) + l.modifiers.reduce((s, m) => s + Number(m.price), 0)).toFixed(2)),
           notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
         })),
       };
