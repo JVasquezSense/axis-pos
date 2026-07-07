@@ -226,7 +226,7 @@ export default function SalonPage() {
       {/* Layout mode action bar */}
       {layoutMode && isAdmin && (
         <Card className={cn(
-          "flex items-center gap-3 p-4 transition-all",
+          "relative z-[60] flex items-center gap-3 p-4 transition-all",
           layoutSelected ? "opacity-100" : "opacity-50 pointer-events-none"
         )}>
           <div className="flex-1 min-w-0">
