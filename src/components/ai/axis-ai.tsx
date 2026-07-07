@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Sparkles, X, Send, Receipt, Tag, Boxes, Loader2,
   Users, ChefHat, CalendarClock, ChevronDown, ChevronUp,
+  AlertTriangle,
 } from "lucide-react";
 import { useSalesStore } from "@/store/sales.store";
 import { useRecipesStore } from "@/store/recipes.store";
@@ -22,47 +24,61 @@ import {
   buildWaiterStats,
   buildMenuEngineering,
   buildReservationsBrief,
+  buildDashboardKpis,
   type AiMode,
 } from "@/lib/ai-context";
+import { computeRecipeCost } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
 
-function MdText({ text }: { text: string }) {
+function MdText({ text, onNavigate }: { text: string; onNavigate: (path: string) => void }) {
   const lines = text.split("\n");
+  const md = (t: string) => <InlineMdWithLinks text={t} onNavigate={onNavigate} />;
   return (
     <div className="space-y-1">
       {lines.map((line, i) => {
         if (!line.trim()) return <div key={i} className="h-1" />;
         if (/^#{1,3}\s/.test(line)) {
           const clean = line.replace(/^#{1,3}\s*/, "");
-          return <p key={i} className="font-bold text-foreground">{inlineMd(clean)}</p>;
+          return <p key={i} className="font-bold text-foreground">{md(clean)}</p>;
         }
         if (/^[-•]\s/.test(line.trim())) {
           const clean = line.trim().replace(/^[-•]\s*/, "");
-          return <p key={i} className="pl-2 before:content-['•_'] before:text-primary">{inlineMd(clean)}</p>;
+          return <p key={i} className="pl-2 before:content-['•_'] before:text-primary">{md(clean)}</p>;
         }
         if (/^\d+\.\s/.test(line.trim())) {
-          return <p key={i} className="pl-2">{inlineMd(line.trim())}</p>;
+          return <p key={i} className="pl-2">{md(line.trim())}</p>;
         }
-        return <p key={i}>{inlineMd(line)}</p>;
+        return <p key={i}>{md(line)}</p>;
       })}
     </div>
   );
 }
 
-function inlineMd(text: string): React.ReactNode {
+function InlineMdWithLinks({ text, onNavigate }: { text: string; onNavigate: (path: string) => void }) {
   const parts: React.ReactNode[] = [];
   let remaining = text;
   let key = 0;
   while (remaining) {
+    const link = remaining.match(/\[([^\]]+)\s+(\/[a-z-]+)\]/);
     const bold = remaining.match(/\*\*(.+?)\*\*/);
-    if (bold && bold.index !== undefined) {
-      if (bold.index > 0) parts.push(remaining.slice(0, bold.index));
-      parts.push(<strong key={key++} className="font-semibold text-foreground">{bold[1]}</strong>);
-      remaining = remaining.slice(bold.index + bold[0].length);
+    const first = [link, bold]
+      .filter((m): m is RegExpMatchArray => m !== null && m.index !== undefined)
+      .sort((a, b) => a.index! - b.index!)[0];
+    if (!first) { parts.push(remaining); break; }
+    if (first.index! > 0) parts.push(remaining.slice(0, first.index!));
+    if (first === link) {
+      const label = first[1];
+      const path = first[2];
+      parts.push(
+        <button key={key++} onClick={() => onNavigate(path)}
+          className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors">
+          {label} →
+        </button>
+      );
     } else {
-      parts.push(remaining);
-      break;
+      parts.push(<strong key={key++} className="font-semibold text-foreground">{first[1]}</strong>);
     }
+    remaining = remaining.slice(first.index! + first[0].length);
   }
   return <>{parts}</>;
 }
@@ -124,7 +140,7 @@ function recentAudit(): string {
   return `\nÚltimas acciones del sistema:\n${lines.join("\n")}`;
 }
 
-function contextFor(mode: AiMode): string {
+function getStores() {
   const sales = useSalesStore.getState().records;
   const recipes = useRecipesStore.getState().recipes;
   const inv = useInventoryStore.getState();
@@ -133,25 +149,54 @@ function contextFor(mode: AiMode): string {
   const reservations = useReservationsStore.getState().reservations;
   const { purchases, suppliers } = useSuppliersStore.getState();
   const employees = useEmployeesStore.getState().employees;
+  return { sales, recipes, inv, tables, tickets, reservations, purchases, suppliers, employees };
+}
+
+function contextFor(mode: AiMode): string {
+  const { sales, recipes, inv, tables, tickets, reservations, purchases, suppliers, employees } = getStores();
+  const stores = { sales, recipes, inventory: inv.items, movements: inv.movements, tables, tickets, reservations, purchases, suppliers, employees };
   const audit = recentAudit();
+  const kpis = buildDashboardKpis(stores);
 
   switch (mode) {
     case "pricing":
-      return buildPricing(recipes) + audit;
+      return kpis + "\n\n" + buildPricing(recipes) + audit;
     case "inventory":
-      return buildInventoryForecast(inv.items, inv.movements, purchases, suppliers) + audit;
+      return kpis + "\n\n" + buildInventoryForecast(inv.items, inv.movements, purchases, suppliers) + audit;
     case "waiter":
-      return buildWaiterStats(sales, employees) + audit;
+      return kpis + "\n\n" + buildWaiterStats(sales, employees) + audit;
     case "menu_eng":
-      return buildMenuEngineering(recipes, sales) + audit;
+      return kpis + "\n\n" + buildMenuEngineering(recipes, sales) + audit;
     case "reservations":
-      return buildReservationsBrief(reservations) + audit;
+      return kpis + "\n\n" + buildReservationsBrief(reservations) + audit;
     default:
-      return buildBrief({ sales, recipes, inventory: inv.items, movements: inv.movements, tables, tickets, reservations, purchases, suppliers, employees }) + audit;
+      return kpis + "\n\n" + buildBrief(stores) + audit;
   }
 }
 
+interface ProactiveAlert {
+  icon: string;
+  text: string;
+  severity: "critical" | "warning" | "info";
+}
+
+function computeAlerts(): ProactiveAlert[] {
+  const { recipes, inv } = getStores();
+  const alerts: ProactiveAlert[] = [];
+  const critical = inv.items.filter((i) => i.status === "critical");
+  if (critical.length > 0)
+    alerts.push({ icon: "🔴", text: `${critical.length} insumo${critical.length > 1 ? "s" : ""} en nivel crítico`, severity: "critical" });
+  const low = inv.items.filter((i) => i.status === "low");
+  if (low.length > 0)
+    alerts.push({ icon: "🟡", text: `${low.length} insumo${low.length > 1 ? "s" : ""} en nivel bajo`, severity: "warning" });
+  const highFC = recipes.filter((r) => Math.round(computeRecipeCost(r).foodCostPct * 100) > 35);
+  if (highFC.length > 0)
+    alerts.push({ icon: "📊", text: `Food cost alto en ${highFC.length} plato${highFC.length > 1 ? "s" : ""}`, severity: "warning" });
+  return alerts;
+}
+
 export function AxisAI() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -159,6 +204,11 @@ export function AxisAI() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [showAllQuick, setShowAllQuick] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const invItems = useInventoryStore((s) => s.items);
+  const recipeList = useRecipesStore((s) => s.recipes);
+  const alerts = useMemo(() => computeAlerts(), [invItems, recipeList]);
+  const navigate = (path: string) => { setOpen(false); router.push(path); };
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -231,6 +281,11 @@ export function AxisAI() {
       >
         <Sparkles className="h-5 w-5" />
         <span className="pr-1 text-sm font-semibold">Axis IA</span>
+        {alerts.length > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+            {alerts.length}
+          </span>
+        )}
       </button>
 
       <AnimatePresence>
@@ -270,9 +325,26 @@ export function AxisAI() {
             {/* Mensajes */}
             <div ref={scrollRef} className="scrollbar-thin flex-1 space-y-3 overflow-y-auto p-4">
               {messages.length === 0 && (
-                <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                  👋 Soy <strong className="text-foreground">Axis IA</strong>. Pregúntame por tus ventas, meseros, precios, inventario o reservaciones — leo los datos reales de tu negocio.
-                </div>
+                <>
+                  <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                    👋 Soy <strong className="text-foreground">Axis IA</strong>. Pregúntame por tus ventas, meseros, precios, inventario o reservaciones — leo los datos reales de tu negocio.
+                  </div>
+                  {alerts.length > 0 && (
+                    <div className="space-y-1.5">
+                      {alerts.map((a, i) => (
+                        <div key={i} className={cn(
+                          "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium",
+                          a.severity === "critical" ? "bg-destructive/10 text-destructive border border-destructive/20" :
+                          a.severity === "warning" ? "bg-amber-500/10 text-amber-700 border border-amber-500/20" :
+                          "bg-primary/10 text-primary border border-primary/20"
+                        )}>
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          <span>{a.icon} {a.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
               {messages.map((m, i) => (
                 <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
@@ -289,7 +361,7 @@ export function AxisAI() {
                         : "rounded-bl-sm bg-muted"
                     )}
                   >
-                    {!m.content ? <Loader2 className="h-4 w-4 animate-spin" /> : m.role === "assistant" ? <MdText text={m.content} /> : m.content}
+                    {!m.content ? <Loader2 className="h-4 w-4 animate-spin" /> : m.role === "assistant" ? <MdText text={m.content} onNavigate={navigate} /> : m.content}
                   </div>
                 </div>
               ))}

@@ -10,7 +10,7 @@ import type { Purchase, Supplier } from "@/types";
 import { computeRecipeCost } from "@/lib/recipes";
 import { liveDayTotals, type SaleRecord } from "@/store/sales.store";
 
-const k = (n: number) => `$${Math.round(n / 1000)}k`; // miles, compacto
+const k = (n: number) => n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${Math.round(n)}`;
 
 export type AiMode =
   | "chat"
@@ -318,6 +318,52 @@ export function buildMenuEngineering(recipes: Recipe[], records: SaleRecord[]): 
     ``,
     `Total platos: ${items.length} | Margen mediano: ${k(medianMargin)} | Food cost prom: ${Math.round(items.reduce((s, i) => s + i.fc, 0) / (items.length || 1))}%`,
   ].join("\n");
+}
+
+/** KPIs de dashboard pre-calculados para contexto enriquecido. */
+export function buildDashboardKpis(s: Stores): string {
+  const d = liveDayTotals(s.sales);
+  const occ = s.tables.filter((t) => t.status === "occupied" || t.status === "billing").length;
+  const free = s.tables.filter((t) => t.status === "available").length;
+  const active = s.tickets.filter((t) => t.status !== "ready").length;
+
+  const invCrit = s.inventory.filter((i) => i.status === "critical");
+  const invLow = s.inventory.filter((i) => i.status === "low");
+
+  const highFC = s.recipes
+    .map((r) => ({ n: r.name, fc: Math.round(computeRecipeCost(r).foodCostPct * 100) }))
+    .filter((r) => r.fc > 35);
+
+  const avgFC = s.recipes.length > 0
+    ? Math.round(s.recipes.reduce((sum, r) => sum + computeRecipeCost(r).foodCostPct * 100, 0) / s.recipes.length)
+    : 0;
+
+  const totalTips = s.sales.reduce((sum, r) => sum + r.tip, 0);
+  const byMethod = s.sales.reduce<Record<string, number>>((acc, r) => {
+    acc[r.method] = (acc[r.method] ?? 0) + r.total;
+    return acc;
+  }, {});
+  const topMethod = Object.entries(byMethod).sort(([, a], [, b]) => b - a)[0];
+
+  const todayRes = (s.reservations ?? []).filter(
+    (r) => r.date === new Date().toISOString().slice(0, 10) && r.status !== "cancelled"
+  );
+
+  return [
+    `=== KPIs EN TIEMPO REAL ===`,
+    `Ventas hoy: ${k(d.sales)} | Pedidos: ${d.orders} | Ticket promedio: ${k(d.avg)}`,
+    topMethod ? `Método de pago #1: ${topMethod[0]} (${k(topMethod[1])})` : "",
+    `Propinas totales: ${k(totalTips)}`,
+    `Mesas: ${occ} ocupadas, ${free} libres de ${s.tables.length}`,
+    `Cocina: ${active} pedidos activos`,
+    `Inventario: ${invCrit.length} críticos, ${invLow.length} bajos de ${s.inventory.length}`,
+    invCrit.length > 0 ? `⚠️ Críticos: ${invCrit.map((i) => `${i.name}(${i.stock}${i.unit})`).join(", ")}` : "",
+    `Menú: ${s.recipes.length} platos, food cost promedio ${avgFC}%`,
+    highFC.length > 0 ? `⚠️ Food cost alto: ${highFC.map((r) => `${r.n}(${r.fc}%)`).join(", ")}` : "",
+    todayRes.length > 0 ? `Reservaciones hoy: ${todayRes.length} (${todayRes.reduce((s, r) => s + r.guests, 0)} comensales)` : "",
+    `Empleados activos: ${(s.employees ?? []).filter((e) => e.active).length}`,
+    `Proveedores activos: ${(s.suppliers ?? []).filter((sup) => sup.active).length}`,
+  ].filter(Boolean).join("\n");
 }
 
 /** Briefing de reservaciones (hoy + próximas). */
