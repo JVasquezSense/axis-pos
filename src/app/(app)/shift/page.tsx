@@ -15,6 +15,7 @@ import {
 import { cn, formatCurrency } from "@/lib/utils";
 import { PAYMENT_LABEL } from "@/lib/payments";
 import { useAuditStore } from "@/store/audit.store";
+import { useHistoryStore } from "@/store/history.store";
 
 export default function ShiftPage() {
   const records = useSalesStore((s) => s.records);
@@ -40,12 +41,25 @@ export default function ShiftPage() {
   }, [records]);
 
   const auditLog = useAuditStore((s) => s.log);
+  const archiveSales = useHistoryStore((s) => s.archiveSales);
+  const closeShiftHistory = useHistoryStore((s) => s.closeShift);
 
   const closeShift = () => {
+    archiveSales(records);
+    closeShiftHistory({
+      sales: stats.sales,
+      orders: records.length,
+      avg: stats.avg,
+      totalTips: stats.totalTips,
+      byMethod: stats.byMethod,
+      byWaiter: stats.byWaiter,
+      closedBy: "Administrador",
+      records,
+    });
     auditLog({ action: "Turno cerrado", details: `${records.length} ventas · ${formatCurrency(stats.sales)}`, user: "Sistema", module: "ventas" });
     reset();
     setConfirmOpen(false);
-    toast.success("Turno cerrado", { description: "Registros del turno eliminados. Nueva sesión lista." });
+    toast.success("Turno cerrado", { description: "Turno archivado en historial. Nueva sesión lista." });
   };
 
   return (

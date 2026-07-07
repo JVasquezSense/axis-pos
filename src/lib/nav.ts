@@ -15,6 +15,8 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "kitchen", label: "Cocina KDS", href: "/kitchen", icon: "ChefHat", badge: "live", group: "Operación" },
   { key: "checkout", label: "Caja", href: "/checkout", icon: "CreditCard", group: "Operación" },
   { key: "shift", label: "Cierre de turno", href: "/shift", icon: "TimerOff", group: "Operación" },
+  { key: "history", label: "Historial ventas", href: "/history", icon: "History", group: "Gestión" },
+  { key: "shift-history", label: "Historial turnos", href: "/shift-history", icon: "Clock", group: "Gestión" },
   { key: "weborders", label: "Pedidos web", href: "/web-orders", icon: "ShoppingBag", badge: "live", group: "Operación" },
   { key: "menu", label: "Menú & Recetas", href: "/menu", icon: "UtensilsCrossed", group: "Gestión" },
   { key: "inventory", label: "Inventario", href: "/inventory", icon: "Boxes", group: "Gestión" },

@@ -44,11 +44,11 @@ export const ROLE_LIST = Object.values(ROLES);
 export const ROLE_NAV: Record<Role, string[]> = {
   admin: [
     "dashboard", "salon", "reservations", "orders", "kitchen",
-    "checkout", "shift", "menu", "inventory", "suppliers",
+    "checkout", "shift", "history", "shift-history", "menu", "inventory", "suppliers",
     "employees", "audit", "crm", "reports", "weborders", "website", "admin",
   ],
   waiter: ["dashboard", "salon", "reservations", "orders", "kitchen"],
-  cashier: ["dashboard", "checkout", "shift", "salon", "weborders", "crm", "employees"],
+  cashier: ["dashboard", "checkout", "shift", "history", "shift-history", "salon", "weborders", "crm", "employees"],
   kitchen: ["dashboard", "kitchen", "menu", "inventory"],
   warehouse: ["dashboard", "inventory", "suppliers", "menu"],
 };
