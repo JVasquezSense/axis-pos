@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { employeesService } from "@/services/employees.service";
+import { useAuditStore } from "./audit.store";
 
 export type EmployeeRole = "mesero" | "cocinero" | "cajero" | "admin" | "almacen";
 
@@ -54,6 +55,7 @@ export const useEmployeesStore = create<EmployeesState>()((set) => ({
   add: (e) => {
     const newEmp = { ...e, id: uid() };
     set((s) => ({ employees: [newEmp, ...s.employees] }));
+    useAuditStore.getState().log({ action: "Empleado creado", details: `${e.name} · ${e.role}`, user: "Sistema", module: "empleados" });
     if (USE_API) employeesService.create(e).then((saved) =>
       set((s) => ({ employees: s.employees.map((x) => (x.id === newEmp.id ? saved : x)) }))
     ).catch(apiErrorHandler("empleado"));
@@ -61,11 +63,14 @@ export const useEmployeesStore = create<EmployeesState>()((set) => ({
 
   update: (e) => {
     set((s) => ({ employees: s.employees.map((x) => (x.id === e.id ? e : x)) }));
+    useAuditStore.getState().log({ action: "Empleado actualizado", details: `${e.name} · ${e.role}`, user: "Sistema", module: "empleados" });
     if (USE_API) employeesService.update(e).catch(apiErrorHandler("empleado"));
   },
 
   remove: (id) => {
+    const name = useEmployeesStore.getState().employees.find((e) => e.id === id)?.name ?? id;
     set((s) => ({ employees: s.employees.filter((e) => e.id !== id) }));
+    useAuditStore.getState().log({ action: "Empleado eliminado", details: name, user: "Sistema", module: "empleados" });
     if (USE_API) employeesService.remove(id).catch(apiErrorHandler("empleado"));
   },
 
@@ -73,9 +78,10 @@ export const useEmployeesStore = create<EmployeesState>()((set) => ({
     set((s) => ({
       employees: s.employees.map((e) => (e.id === id ? { ...e, active: !e.active } : e)),
     }));
-    if (USE_API) {
-      const emp = useEmployeesStore.getState().employees.find((e) => e.id === id);
-      if (emp) employeesService.update(emp).catch(apiErrorHandler("empleado"));
+    const emp = useEmployeesStore.getState().employees.find((e) => e.id === id);
+    if (emp) {
+      useAuditStore.getState().log({ action: emp.active ? "Empleado activado" : "Empleado desactivado", details: emp.name, user: "Sistema", module: "empleados" });
+      if (USE_API) employeesService.update(emp).catch(apiErrorHandler("empleado"));
     }
   },
 }));

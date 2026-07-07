@@ -3,6 +3,7 @@ import type { RestaurantTable, SalonZone } from "@/types";
 import { TABLES, DEFAULT_ZONES } from "@/mock/tables";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { salonService } from "@/services/salon.service";
+import { useAuditStore } from "./audit.store";
 
 interface TablesState {
   tables: RestaurantTable[];
@@ -34,6 +35,7 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
 
   addTable: (t) => {
     set((s) => ({ tables: [...s.tables, t] }));
+    useAuditStore.getState().log({ action: "Mesa creada", details: `Mesa ${t.number} · ${t.zone} · ${t.capacity} personas`, user: "Sistema", module: "mesas" });
     if (USE_API) salonService.createTable(t).then((saved) =>
       set((s) => ({ tables: s.tables.map((x) => (x.id === t.id ? saved : x)) }))
     ).catch(apiErrorHandler("mesa"));
@@ -49,7 +51,9 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
   },
 
   deleteTable: (id) => {
+    const t = get().tables.find((t) => t.id === id);
     set((s) => ({ tables: s.tables.filter((t) => t.id !== id) }));
+    useAuditStore.getState().log({ action: "Mesa eliminada", details: t ? `Mesa ${t.number}` : id, user: "Sistema", module: "mesas" });
     if (USE_API) salonService.deleteTable(id).catch(apiErrorHandler("eliminar mesa"));
   },
 

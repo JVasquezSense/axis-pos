@@ -3,6 +3,7 @@ import type { Category, Product } from "@/types";
 import { CATEGORIES, PRODUCTS } from "@/mock/menu";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { menuService } from "@/services/menu.service";
+import { useAuditStore } from "./audit.store";
 import { useRecipesStore } from "./recipes.store";
 import { recipesService } from "@/services/recipes.service";
 
@@ -34,17 +35,20 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
 
   addCategory: (c) => {
     set((s) => ({ categories: [...s.categories, c] }));
+    useAuditStore.getState().log({ action: "Categoría creada", details: c.name, user: "Sistema", module: "menu" });
     if (USE_API) menuService.createCategory(c).then((saved) =>
       set((s) => ({ categories: s.categories.map((x) => (x.id === c.id ? saved : x)) }))
     ).catch(apiErrorHandler("categoría"));
   },
 
   removeCategory: (id) => {
+    const cat = get().categories.find((c) => c.id === id);
     const removedProducts = get().products.filter((p) => p.category === id);
     set((s) => ({
       categories: s.categories.filter((c) => c.id !== id),
       products: s.products.filter((p) => p.category !== id),
     }));
+    useAuditStore.getState().log({ action: "Categoría eliminada", details: `${cat?.name ?? id} · ${removedProducts.length} productos`, user: "Sistema", module: "menu" });
     if (USE_API) menuService.deleteCategory(id).catch(apiErrorHandler("eliminar categoría"));
     // Cascada: elimina las fichas técnicas de los productos que se van con la categoría.
     removedProducts.forEach((p) => {
@@ -57,6 +61,7 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
 
   addProduct: (p) => {
     set((s) => ({ products: [p, ...s.products] }));
+    useAuditStore.getState().log({ action: "Producto creado", details: `${p.name} · $${p.price}`, user: "Sistema", module: "menu" });
     if (USE_API) menuService.createProduct(p).then((saved) =>
       set((s) => ({ products: s.products.map((x) => (x.id === p.id ? saved : x)) }))
     ).catch(apiErrorHandler("producto"));
@@ -64,6 +69,7 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
 
   updateProduct: (p) => {
     set((s) => ({ products: s.products.map((x) => (x.id === p.id ? p : x)) }));
+    useAuditStore.getState().log({ action: "Producto actualizado", details: `${p.name} · $${p.price}`, user: "Sistema", module: "menu" });
     if (USE_API) menuService.updateProduct(p).catch(apiErrorHandler("producto"));
   },
 
@@ -82,7 +88,9 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
   },
 
   removeProduct: (id) => {
+    const name = get().products.find((p) => p.id === id)?.name ?? id;
     set((s) => ({ products: s.products.filter((p) => p.id !== id) }));
+    useAuditStore.getState().log({ action: "Producto eliminado", details: name, user: "Sistema", module: "menu" });
     if (USE_API) menuService.deleteProduct(id).catch(apiErrorHandler("eliminar producto"));
     // Cascada: el producto y su ficha técnica son la misma entidad conceptual.
     const recipe = useRecipesStore.getState().recipes.find((r) => String(r.productId) === String(id));

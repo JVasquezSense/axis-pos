@@ -6,6 +6,7 @@ import { effectiveQty } from "@/lib/recipes";
 import { useRecipesStore } from "./recipes.store";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { inventoryService } from "@/services/inventory.service";
+import { useAuditStore } from "./audit.store";
 
 const r = (n: number) => Math.round(n * 100) / 100;
 
@@ -48,6 +49,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   addItem: (item) => {
     set((s) => ({ items: [item, ...s.items] }));
+    useAuditStore.getState().log({ action: "Insumo creado", details: `${item.name} · ${item.stock} ${item.unit}`, user: "Sistema", module: "inventario" });
     if (USE_API) inventoryService.createItem(item).then((saved) =>
       set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }))
     ).catch(apiErrorHandler("inventario"));
@@ -55,13 +57,16 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   updateItem: (item) => {
     set((s) => ({ items: s.items.map((x) => (x.id === item.id ? item : x)) }));
+    useAuditStore.getState().log({ action: "Insumo actualizado", details: item.name, user: "Sistema", module: "inventario" });
     if (USE_API) inventoryService.updateItem(item).then((saved) =>
       set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }))
     ).catch(apiErrorHandler("inventario"));
   },
 
   deleteItem: (id) => {
+    const name = get().items.find((x) => x.id === id)?.name ?? id;
     set((s) => ({ items: s.items.filter((x) => x.id !== id) }));
+    useAuditStore.getState().log({ action: "Insumo eliminado", details: name, user: "Sistema", module: "inventario" });
     if (USE_API) inventoryService.deleteItem(id).catch(apiErrorHandler("eliminar insumo"));
   },
 

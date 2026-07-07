@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { reservationsService } from "@/services/reservations.service";
+import { useAuditStore } from "./audit.store";
 
 export type ReservationStatus = "pending" | "confirmed" | "arrived" | "cancelled";
 
@@ -41,6 +42,7 @@ export const useReservationsStore = create<ReservationsState>()((set) => ({
   add: (r) => {
     const newRes = { ...r, id: uid() };
     set((s) => ({ reservations: [newRes, ...s.reservations] }));
+    useAuditStore.getState().log({ action: "Reservación creada", details: `${r.name} · Mesa ${r.tableNumber} · ${r.date} ${r.time} · ${r.guests} personas`, user: "Sistema", module: "reservaciones" });
     if (USE_API) reservationsService.create(r).then((saved) =>
       set((s) => ({ reservations: s.reservations.map((x) => (x.id === newRes.id ? saved : x)) }))
     ).catch(apiErrorHandler("reservación"));
@@ -48,16 +50,21 @@ export const useReservationsStore = create<ReservationsState>()((set) => ({
 
   update: (r) => {
     set((s) => ({ reservations: s.reservations.map((x) => (x.id === r.id ? r : x)) }));
+    useAuditStore.getState().log({ action: "Reservación actualizada", details: `${r.name} · Mesa ${r.tableNumber}`, user: "Sistema", module: "reservaciones" });
     if (USE_API) reservationsService.update(r).catch(apiErrorHandler("reservación"));
   },
 
   remove: (id) => {
+    const r = useReservationsStore.getState().reservations.find((r) => r.id === id);
     set((s) => ({ reservations: s.reservations.filter((r) => r.id !== id) }));
+    useAuditStore.getState().log({ action: "Reservación eliminada", details: r?.name ?? id, user: "Sistema", module: "reservaciones" });
     if (USE_API) reservationsService.remove(id).catch(apiErrorHandler("reservación"));
   },
 
   setStatus: (id, status) => {
+    const r = useReservationsStore.getState().reservations.find((r) => r.id === id);
     set((s) => ({ reservations: s.reservations.map((r) => (r.id === id ? { ...r, status } : r)) }));
+    useAuditStore.getState().log({ action: `Reservación ${status}`, details: r?.name ?? id, user: "Sistema", module: "reservaciones" });
     if (USE_API) reservationsService.setStatus(id, status).catch(apiErrorHandler("reservación"));
   },
 }));

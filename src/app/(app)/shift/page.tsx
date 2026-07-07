@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn, formatCurrency } from "@/lib/utils";
 import { PAYMENT_LABEL } from "@/lib/payments";
+import { useAuditStore } from "@/store/audit.store";
 
 export default function ShiftPage() {
   const records = useSalesStore((s) => s.records);
@@ -38,7 +39,10 @@ export default function ShiftPage() {
     return { sales, orders, avg, totalTips, byMethod, byWaiter };
   }, [records]);
 
+  const auditLog = useAuditStore((s) => s.log);
+
   const closeShift = () => {
+    auditLog({ action: "Turno cerrado", details: `${records.length} ventas · ${formatCurrency(stats.sales)}`, user: "Sistema", module: "ventas" });
     reset();
     setConfirmOpen(false);
     toast.success("Turno cerrado", { description: "Registros del turno eliminados. Nueva sesión lista." });

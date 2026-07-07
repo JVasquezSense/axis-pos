@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaymentDialog } from "@/components/checkout/payment-dialog";
 import { SplitBillDialog } from "@/components/checkout/split-bill-dialog";
-import { PAYMENT_METHODS } from "@/lib/payments";
+import { PAYMENT_METHODS, PAYMENT_LABEL } from "@/lib/payments";
 import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { useInventoryStore } from "@/store/inventory.store";
@@ -24,6 +24,8 @@ import { useMenuStore } from "@/store/menu.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useSalesStore } from "@/store/sales.store";
 import { useRecipesStore } from "@/store/recipes.store";
+import { useAuditStore } from "@/store/audit.store";
+import { useAppStore } from "@/store/app.store";
 import { USE_API } from "@/services/http";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -43,8 +45,10 @@ export default function CheckoutPage() {
   const recordSale = useSalesStore((s) => s.record);
   const setAvailable = useMenuStore((s) => s.setAvailable);
   const recipes = useRecipesStore((s) => s.recipes);
+  const auditLog = useAuditStore((s) => s.log);
   const allEmployees = useEmployeesStore((s) => s.employees);
-  const waiters = useMemo(() => allEmployees.filter((e) => e.role === "mesero" && e.active), [allEmployees]);
+  const role = useAppStore((s) => s.role);
+  const waiters = useMemo(() => allEmployees.filter((e) => e.active), [allEmployees]);
 
   const lines = storeLines;
   const [table, setTableLocal] = useState<number | null>(storeTable ?? null);
@@ -52,7 +56,10 @@ export default function CheckoutPage() {
   const [tipRate, setTipRate] = useState(0.1);
   const [discount, setDiscount] = useState(0);
   const [method, setMethod] = useState<PaymentMethod>("card");
-  const [waiter, setWaiter] = useState("");
+  const [waiter, setWaiter] = useState(() => {
+    if (role === "admin") return "Administrador";
+    return "";
+  });
   const [payOpen, setPayOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitCollected, setSplitCollected] = useState(0);
@@ -95,8 +102,9 @@ export default function CheckoutPage() {
       occupyTable(table, undefined, waiter.trim() || undefined);
       freeTable(table);
     }
-    await markPaid(); // cierra los Order reales del backend que componían esta cuenta
+    await markPaid();
     clear();
+    auditLog({ action: "Venta cobrada", details: `${st.label} · ${formatCurrency(total)} · ${PAYMENT_LABEL[method]}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}`, user: waiter.trim() || "Sistema", module: "ventas" });
     toast.success("Venta registrada", { description: affected > 0 ? `${st.label} · ${affected} salidas de inventario` : st.label });
   };
 
@@ -143,17 +151,14 @@ export default function CheckoutPage() {
           <div>
             <label className="mb-1.5 block text-sm font-medium">Mesero</label>
             {waiters.length > 0 ? (
-              <Select value={waiter || "__none__"} onValueChange={(v) => setWaiter(v === "__none__" ? "" : v)}>
+              <Select value={waiter} onValueChange={setWaiter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar mesero" />
+                  <SelectValue placeholder="Seleccionar mesero *" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">
-                    <span className="flex items-center gap-2"><User className="h-4 w-4" /> Sin asignar</span>
-                  </SelectItem>
                   {waiters.map((w) => (
                     <SelectItem key={w.id} value={w.name}>
-                      <span className="flex items-center gap-2"><User className="h-4 w-4" /> {w.name}</span>
+                      <span className="flex items-center gap-2"><User className="h-4 w-4" /> {w.name} <span className="text-xs text-muted-foreground">({w.role})</span></span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -326,9 +331,12 @@ export default function CheckoutPage() {
                   </button>
                 ))}
               </div>
-              <Button size="lg" className="mt-4 w-full text-base" onClick={() => setPayOpen(true)} disabled={remaining <= 0}>
+              <Button size="lg" className="mt-4 w-full text-base" onClick={() => setPayOpen(true)} disabled={remaining <= 0 || !waiter.trim()}>
                 Cobrar {formatCurrency(remaining)}
               </Button>
+              {!waiter.trim() && remaining > 0 && (
+                <p className="mt-1.5 text-center text-xs text-destructive">Selecciona un mesero para cobrar</p>
+              )}
             </CardContent>
           </Card>
         </div>

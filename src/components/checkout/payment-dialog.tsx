@@ -52,6 +52,12 @@ export function PaymentDialog({
     return () => clearTimeout(t);
   }, [open]);
 
+  useEffect(() => {
+    if (phase !== "done") return;
+    const t = setTimeout(() => window.print(), 400);
+    return () => clearTimeout(t);
+  }, [phase]);
+
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogContent hideClose className="max-w-sm">

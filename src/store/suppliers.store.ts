@@ -4,6 +4,7 @@ import { SUPPLIERS } from "@/mock/suppliers";
 import { useInventoryStore } from "./inventory.store";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { suppliersService } from "@/services/suppliers.service";
+import { useAuditStore } from "./audit.store";
 
 interface SuppliersState {
   suppliers: Supplier[];
@@ -32,6 +33,7 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
 
   addSupplier: (s) => {
     set((st) => ({ suppliers: [s, ...st.suppliers] }));
+    useAuditStore.getState().log({ action: "Proveedor creado", details: `${s.name} · ${s.category}`, user: "Sistema", module: "proveedores" });
     if (USE_API) suppliersService.createSupplier(s).then((saved) =>
       set((st) => ({ suppliers: st.suppliers.map((x) => (x.id === s.id ? saved : x)) }))
     ).catch(apiErrorHandler("proveedor"));
@@ -39,11 +41,14 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
 
   updateSupplier: (s) => {
     set((st) => ({ suppliers: st.suppliers.map((x) => (x.id === s.id ? s : x)) }));
+    useAuditStore.getState().log({ action: "Proveedor actualizado", details: s.name, user: "Sistema", module: "proveedores" });
     if (USE_API) suppliersService.updateSupplier(s).catch(apiErrorHandler("proveedor"));
   },
 
   removeSupplier: (id) => {
+    const name = get().suppliers.find((s) => s.id === id)?.name ?? id;
     set((st) => ({ suppliers: st.suppliers.filter((s) => s.id !== id) }));
+    useAuditStore.getState().log({ action: "Proveedor eliminado", details: name, user: "Sistema", module: "proveedores" });
     if (USE_API) suppliersService.deleteSupplier(id).catch(apiErrorHandler("eliminar proveedor"));
   },
 
@@ -65,6 +70,7 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
       ...(invoicePhoto ? { invoicePhoto } : {}),
     };
     set((st) => ({ purchases: [purchase, ...st.purchases].slice(0, 50), seq: st.seq + 1 }));
+    useAuditStore.getState().log({ action: "Compra registrada", details: `${code} · ${supplier.name} · $${total.toFixed(0)}`, user: "Sistema", module: "proveedores" });
 
     if (USE_API) {
       suppliersService.createPurchase({

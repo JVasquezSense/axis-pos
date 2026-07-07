@@ -19,6 +19,7 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { useTablesStore } from "@/store/tables.store";
+import { useAuditStore } from "@/store/audit.store";
 import { formatCurrency } from "@/lib/utils";
 
 export function OrderPanel() {
@@ -30,6 +31,7 @@ export function OrderPanel() {
   const tax = Math.round(subtotal * TAX_RATE);
   const total = subtotal + tax;
   const count = orderSelectors.count(lines);
+  const auditLog = useAuditStore((s) => s.log);
   const [sending, setSending] = useState(false);
 
   return (
@@ -171,6 +173,7 @@ export function OrderPanel() {
                 try {
                   const ticket = await sendToKitchen(tableNumber ? "dine_in" : "takeaway");
                   if (tableNumber) occupyTable(tableNumber, total);
+                  auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} · ${count} productos · ${formatCurrency(total)}${tableNumber ? ` · Mesa ${tableNumber}` : " · Para llevar"}`, user: "Sistema", module: "ventas" });
                   toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
                   router.push("/kitchen");
                 } catch (err) {
