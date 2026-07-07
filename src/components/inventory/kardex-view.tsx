@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Download, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Download, ArrowDownToLine, ArrowUpFromLine, ChevronDown, Search } from "lucide-react";
 import type { InventoryItem, InventoryMovement } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportCsv } from "@/lib/export";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -47,8 +47,8 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
       items.map((item) => {
         const mv = byItem.get(String(item.id)) ?? [];
         const inicial = mv.find((m) => m.type === "inicial")?.quantity ?? 0;
-        const entradas = mv.filter((m) => m.type !== "inicial" && m.quantity > 0).reduce((s, m) => s + m.quantity, 0);
-        const salidas = mv.filter((m) => m.quantity < 0).reduce((s, m) => s + Math.abs(m.quantity), 0);
+        const entradas = Math.round(mv.filter((m) => m.type !== "inicial" && m.quantity > 0).reduce((s, m) => s + m.quantity, 0) * 1000) / 1000;
+        const salidas = Math.round(mv.filter((m) => m.quantity < 0).reduce((s, m) => s + Math.abs(m.quantity), 0) * 1000) / 1000;
         return { item, inicial, entradas, salidas, final: item.stock, value: item.stock * item.cost };
       }),
     [items, byItem]
@@ -86,12 +86,7 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
           </button>
         </div>
         {mode === "detail" && (
-          <Select value={selectedId} onValueChange={setSelectedId}>
-            <SelectTrigger className="w-full sm:w-64"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {items.map((i) => <SelectItem key={i.id} value={String(i.id)}>{i.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <ItemCombobox items={items} value={selectedId} onChange={setSelectedId} />
         )}
         <Button variant="outline" size="sm" onClick={mode === "summary" ? exportSummary : exportDetail}>
           <Download className="h-4 w-4" /> Exportar
@@ -119,8 +114,8 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
                     <p className="text-xs text-muted-foreground">{s.item.category}</p>
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">{s.inicial} {s.item.unit}</TableCell>
-                  <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">+{s.entradas}</TableCell>
-                  <TableCell className="text-right font-medium text-destructive">−{s.salidas}</TableCell>
+                  <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">+{s.entradas} {s.item.unit}</TableCell>
+                  <TableCell className="text-right font-medium text-destructive">−{s.salidas} {s.item.unit}</TableCell>
                   <TableCell className="text-right font-semibold">{s.final} {s.item.unit}</TableCell>
                   <TableCell className="text-right">{formatCurrency(s.value)}</TableCell>
                 </TableRow>
@@ -166,6 +161,76 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
             </TableBody>
           </Table>
         </Card>
+      )}
+    </div>
+  );
+}
+
+function ItemCombobox({ items, value, onChange }: { items: InventoryItem[]; value: string; onChange: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const selected = items.find((i) => String(i.id) === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  const filtered = items.filter((i) => i.name.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div ref={ref} className="relative w-full sm:w-64">
+      <button
+        type="button"
+        onClick={() => { setOpen(!open); setQuery(""); }}
+        className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors hover:bg-muted"
+      >
+        <span className="truncate">{selected?.name ?? "Seleccionar insumo"}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md">
+          <div className="flex items-center border-b border-border px-2">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar insumo..."
+              className="h-9 border-0 shadow-none focus-visible:ring-0"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto p-1">
+            {filtered.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">Sin resultados</p>
+            ) : (
+              filtered.map((i) => (
+                <button
+                  key={i.id}
+                  type="button"
+                  onClick={() => { onChange(String(i.id)); setOpen(false); }}
+                  className={cn(
+                    "flex w-full items-center rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-accent",
+                    String(i.id) === value && "bg-accent font-medium"
+                  )}
+                >
+                  {i.name}
+                  <span className="ml-auto text-xs text-muted-foreground">{i.category}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
