@@ -33,25 +33,69 @@ import { cn } from "@/lib/utils";
 function MdText({ text, onNavigate }: { text: string; onNavigate: (path: string) => void }) {
   const lines = text.split("\n");
   const md = (t: string) => <InlineMdWithLinks text={t} onNavigate={onNavigate} />;
-  return (
-    <div className="space-y-1">
-      {lines.map((line, i) => {
-        if (!line.trim()) return <div key={i} className="h-1" />;
-        if (/^#{1,3}\s/.test(line)) {
-          const clean = line.replace(/^#{1,3}\s*/, "");
-          return <p key={i} className="font-bold text-foreground">{md(clean)}</p>;
-        }
-        if (/^[-•]\s/.test(line.trim())) {
-          const clean = line.trim().replace(/^[-•]\s*/, "");
-          return <p key={i} className="pl-2 before:content-['•_'] before:text-primary">{md(clean)}</p>;
-        }
-        if (/^\d+\.\s/.test(line.trim())) {
-          return <p key={i} className="pl-2">{md(line.trim())}</p>;
-        }
-        return <p key={i}>{md(line)}</p>;
-      })}
-    </div>
-  );
+
+  const elements: React.ReactNode[] = [];
+  let bulletGroup: React.ReactNode[] = [];
+
+  const flushBullets = () => {
+    if (bulletGroup.length === 0) return;
+    elements.push(
+      <ul key={`ul-${elements.length}`} className="space-y-1.5 pl-1">
+        {bulletGroup}
+      </ul>
+    );
+    bulletGroup = [];
+  };
+
+  lines.forEach((line, i) => {
+    const isBullet = /^[-•]\s/.test(line.trim());
+    const isNumbered = /^\d+\.\s/.test(line.trim());
+
+    if (isBullet) {
+      const clean = line.trim().replace(/^[-•]\s*/, "");
+      bulletGroup.push(
+        <li key={i} className="flex gap-2 text-[13px] leading-relaxed">
+          <span className="mt-0.5 text-primary shrink-0">•</span>
+          <span>{md(clean)}</span>
+        </li>
+      );
+      return;
+    }
+
+    flushBullets();
+
+    if (!line.trim()) {
+      elements.push(<div key={i} className="h-2" />);
+    } else if (/^###\s/.test(line)) {
+      const clean = line.replace(/^###\s*/, "");
+      elements.push(
+        <p key={i} className="text-[13px] font-bold text-foreground border-b border-border/50 pb-1 mb-0.5">{md(clean)}</p>
+      );
+    } else if (/^#{1,2}\s/.test(line)) {
+      const clean = line.replace(/^#{1,2}\s*/, "");
+      elements.push(
+        <p key={i} className="text-sm font-bold text-foreground border-b border-border/50 pb-1 mb-0.5">{md(clean)}</p>
+      );
+    } else if (isNumbered) {
+      elements.push(
+        <p key={i} className="pl-1 text-[13px] leading-relaxed">{md(line.trim())}</p>
+      );
+    } else if (/^👉|^⚠️|^🔴|^🟡|^💡/.test(line.trim())) {
+      elements.push(
+        <div key={i} className="mt-1 rounded-md bg-primary/5 px-2.5 py-1.5 text-[13px] font-medium leading-relaxed">
+          {md(line.trim())}
+        </div>
+      );
+    } else {
+      elements.push(
+        <p key={i} className="text-[13px] leading-relaxed">{md(line)}</p>
+      );
+    }
+  });
+
+  flushBullets();
+
+  return <div className="space-y-1">{elements}</div>;
 }
 
 function InlineMdWithLinks({ text, onNavigate }: { text: string; onNavigate: (path: string) => void }) {
@@ -355,9 +399,9 @@ export function AxisAI() {
                   )}
                   <div
                     className={cn(
-                      "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm",
+                      "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
                       m.role === "user"
-                        ? "rounded-br-sm bg-primary text-primary-foreground"
+                        ? "rounded-br-sm bg-primary text-primary-foreground whitespace-pre-wrap"
                         : "rounded-bl-sm bg-muted"
                     )}
                   >
