@@ -59,6 +59,10 @@ export default function CheckoutPage() {
 
   // Sincronizar table local cuando el store cambia (ej. navegando desde salón)
   useEffect(() => { setTableLocal(storeTable ?? null); }, [storeTable]);
+  // Al montar, si hay mesa seleccionada y sin líneas, cargar cuenta desde backend
+  useEffect(() => {
+    if (USE_API && storeTable && storeLines.length === 0) loadTableOrder(storeTable);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Resetear cobro parcial cuando cambia la orden
   useEffect(() => { setSplitCollected(0); }, [storeLines]);
 
