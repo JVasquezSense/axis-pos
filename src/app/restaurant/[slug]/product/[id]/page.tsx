@@ -23,13 +23,13 @@ export default function ProductDetailPage({
   const categories = useMenuStore((s) => s.categories);
   const { cart, add, increment, decrement } = useWebStore();
 
-  const product = useMemo(() => products.find((p) => p.id === id), [products, id]);
+  const product = useMemo(() => products.find((p) => String(p.id) === id), [products, id]);
   const category = useMemo(
-    () => categories.find((c) => c.id === product?.category),
+    () => categories.find((c) => String(c.id) === String(product?.category)),
     [categories, product]
   );
 
-  const cartItem = cart.find((l) => l.product.id === id);
+  const cartItem = cart.find((l) => String(l.product.id) === id);
   const qty = cartItem?.quantity ?? 0;
   const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
 

@@ -205,13 +205,13 @@ function PurchaseDialog({
   const addLine = () => setLines((l) => [...l, { inventoryId: "", name: "", unit: "", quantity: 1, unitCost: 0, taxRate: 0 }]);
   const update = (i: number, patch: Partial<PurchaseLine>) => setLines((l) => l.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   const pickItem = (i: number, id: string) => {
-    const it = inventory.find((x) => x.id === id);
+    const it = inventory.find((x) => String(x.id) === id);
     if (it) update(i, { inventoryId: id, name: it.name, unit: it.unit, unitCost: it.cost });
   };
   const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
   const taxTotal = lines.reduce((s, l) => s + l.quantity * l.unitCost * ((l.taxRate ?? 0) / 100), 0);
   const total = subtotal + taxTotal;
-  const supplier = suppliers.find((s) => s.id === supplierId);
+  const supplier = suppliers.find((s) => String(s.id) === supplierId);
   const valid = supplier && lines.length > 0 && lines.every((l) => l.inventoryId && l.quantity > 0);
 
   return (
@@ -238,13 +238,13 @@ function PurchaseDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.filter((s) => s.active).map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name} · {s.category}</SelectItem>
+                    <SelectItem key={s.id} value={String(s.id)}>{s.name} · {s.category}</SelectItem>
                   ))}
                   {suppliers.some((s) => !s.active) && (
                     <>
                       <div className="px-2 py-1 text-[11px] text-muted-foreground">Inactivos</div>
                       {suppliers.filter((s) => !s.active).map((s) => (
-                        <SelectItem key={s.id} value={s.id} className="opacity-60">{s.name}</SelectItem>
+                        <SelectItem key={s.id} value={String(s.id)} className="opacity-60">{s.name}</SelectItem>
                       ))}
                     </>
                   )}
@@ -266,7 +266,7 @@ function PurchaseDialog({
                   <Select value={l.inventoryId} onValueChange={(v) => pickItem(i, v)}>
                     <SelectTrigger className="h-9 flex-1"><SelectValue placeholder="Insumo" /></SelectTrigger>
                     <SelectContent>
-                      {inventory.map((it) => <SelectItem key={it.id} value={it.id}>{it.name} · {it.unit}</SelectItem>)}
+                      {inventory.map((it) => <SelectItem key={it.id} value={String(it.id)}>{it.name} · {it.unit}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <button

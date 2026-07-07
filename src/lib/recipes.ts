@@ -60,7 +60,7 @@ export function ingredientCost(ing: RecipeIngredient, item: InventoryItem): numb
 export function computeRecipeCost(recipe: Recipe, liveItems?: InventoryItem[]): RecipeCost {
   // Mapa fusionado: mock base + items vivos (store tiene prioridad)
   const lookup: (id: string) => InventoryItem | undefined = liveItems?.length
-    ? (id) => liveItems.find((i) => i.id === id) ?? INV_MAP.get(id)
+    ? (id) => liveItems.find((i) => String(i.id) === String(id)) ?? INV_MAP.get(id)
     : (id) => INV_MAP.get(id);
 
   const portions = Math.max(recipe.portions, 1);
@@ -94,7 +94,7 @@ export function computeRecipeCost(recipe: Recipe, liveItems?: InventoryItem[]): 
 /** Costo total de una variación = base + insumos extra. */
 export function variationCost(recipe: Recipe, variationId: string, liveItems?: InventoryItem[]): number {
   const lookup: (id: string) => InventoryItem | undefined = liveItems?.length
-    ? (id) => liveItems.find((i) => i.id === id) ?? INV_MAP.get(id)
+    ? (id) => liveItems.find((i) => String(i.id) === String(id)) ?? INV_MAP.get(id)
     : (id) => INV_MAP.get(id);
   const base = computeRecipeCost(recipe, liveItems).costPerPortion;
   const variation = recipe.variations.find((v) => v.id === variationId);

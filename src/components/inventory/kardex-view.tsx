@@ -29,14 +29,15 @@ interface KardexSummary {
 
 export function KardexView({ items, movements }: { items: InventoryItem[]; movements: InventoryMovement[] }) {
   const [mode, setMode] = useState<"summary" | "detail">("summary");
-  const [selectedId, setSelectedId] = useState(items[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(String(items[0]?.id ?? ""));
 
   const byItem = useMemo(() => {
     const map = new Map<string, InventoryMovement[]>();
     movements.forEach((m) => {
-      const arr = map.get(m.inventoryId) ?? [];
+      const key = String(m.inventoryId);
+      const arr = map.get(key) ?? [];
       arr.push(m);
-      map.set(m.inventoryId, arr);
+      map.set(key, arr);
     });
     return map;
   }, [movements]);
@@ -44,7 +45,7 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
   const summary: KardexSummary[] = useMemo(
     () =>
       items.map((item) => {
-        const mv = byItem.get(item.id) ?? [];
+        const mv = byItem.get(String(item.id)) ?? [];
         const inicial = mv.find((m) => m.type === "inicial")?.quantity ?? 0;
         const entradas = mv.filter((m) => m.type !== "inicial" && m.quantity > 0).reduce((s, m) => s + m.quantity, 0);
         const salidas = mv.filter((m) => m.quantity < 0).reduce((s, m) => s + Math.abs(m.quantity), 0);
@@ -54,7 +55,7 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
   );
 
   const detail = byItem.get(selectedId) ?? [];
-  const detailItem = items.find((i) => i.id === selectedId);
+  const detailItem = items.find((i) => String(i.id) === selectedId);
 
   const exportSummary = () => {
     exportCsv(
@@ -88,7 +89,7 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
           <Select value={selectedId} onValueChange={setSelectedId}>
             <SelectTrigger className="w-full sm:w-64"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {items.map((i) => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+              {items.map((i) => <SelectItem key={i.id} value={String(i.id)}>{i.name}</SelectItem>)}
             </SelectContent>
           </Select>
         )}

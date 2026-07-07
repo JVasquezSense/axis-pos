@@ -412,7 +412,7 @@ export function RecipeEditor({
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {categories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

@@ -50,7 +50,7 @@ export function MenuScanDialog({
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<DraftProduct[]>([]);
 
-  const defaultCatId = categories[0]?.id ?? "";
+  const defaultCatId = String(categories[0]?.id ?? "");
 
   const reset = () => {
     setPreview(null); setMenuText(""); setLoading(false); setError(null); setDrafts([]);
@@ -85,7 +85,7 @@ export function MenuScanDialog({
       const mapped: DraftProduct[] = (data.products as ScannedProduct[]).map((p) => {
         const hint = p.categoryHint?.toLowerCase() ?? "";
         const matched = categories.find((c) => c.name.toLowerCase().includes(hint) || hint.includes(c.name.toLowerCase()));
-        return { ...p, _id: uid("scan"), _selected: true, _categoryId: matched?.id ?? defaultCatId, _price: p.price > 0 ? p.price : 0 };
+        return { ...p, _id: uid("scan"), _selected: true, _categoryId: matched ? String(matched.id) : defaultCatId, _price: p.price > 0 ? p.price : 0 };
       });
       setDrafts(mapped);
     } catch { setError("Error al contactar la IA."); }
@@ -233,7 +233,7 @@ export function MenuScanDialog({
                           <Select value={d._categoryId} onValueChange={(v) => patch(d._id, { _categoryId: v })}>
                             <SelectTrigger className="h-7 w-40 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {categories.map((c) => <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>)}
+                              {categories.map((c) => <SelectItem key={c.id} value={String(c.id)} className="text-xs">{c.name}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           {d.tags?.map((t) => <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>)}

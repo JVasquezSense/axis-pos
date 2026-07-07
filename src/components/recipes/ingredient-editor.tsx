@@ -40,7 +40,7 @@ export function IngredientEditor({
     onChange(value.map((ing) => (ing.id === id ? { ...ing, ...patch } : ing)));
 
   const pickItem = (id: string, inventoryId: string) => {
-    const item = items.find((i) => i.id === inventoryId);
+    const item = items.find((i) => String(i.id) === inventoryId);
     if (!item) return;
     const qty = suggestQty(item.unit);
     update(id, { inventoryId, name: item.name, unit: item.unit, quantity: qty });
@@ -64,7 +64,7 @@ export function IngredientEditor({
               </SelectTrigger>
               <SelectContent>
                 {items.map((i) => (
-                  <SelectItem key={i.id} value={i.id}>
+                  <SelectItem key={i.id} value={String(i.id)}>
                     {i.name} <span className="text-muted-foreground">· {i.unit}</span>
                   </SelectItem>
                 ))}
@@ -120,7 +120,7 @@ export function IngredientEditor({
             <div>
               <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Costo</label>
               <div className="flex h-9 items-center justify-end rounded-lg border border-border bg-muted/40 px-3 text-sm font-semibold">
-                {formatCurrency((() => { const item = items.find((i) => i.id === ing.inventoryId); return item ? ingredientCost(ing, item) : 0; })())}
+                {formatCurrency((() => { const item = items.find((i) => String(i.id) === ing.inventoryId); return item ? ingredientCost(ing, item) : 0; })())}
               </div>
             </div>
           </div>
