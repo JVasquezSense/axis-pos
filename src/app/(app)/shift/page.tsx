@@ -45,13 +45,13 @@ export default function ShiftPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-area">
       <PageHeader
         title="Cierre de turno"
         description="Cuadre de caja, propinas por mesero y cierre de sesión"
         icon={<TimerOff className="h-5 w-5" />}
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 print-hidden">
             <Button variant="outline" size="sm" onClick={() => window.print()}>
               <Printer className="h-4 w-4" /> Imprimir
             </Button>
@@ -82,7 +82,7 @@ export default function ShiftPage() {
             {/* Cuadre por método */}
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><Banknote className="h-4 w-4" /> Cuadre por método de pago</CardTitle></CardHeader>
-              <CardContent className="space-y-2 print-area">
+              <CardContent className="space-y-2">
                 {Object.entries(stats.byMethod).map(([method, amount]) => (
                   <div key={method} className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
                     <span className="text-sm font-medium">{PAYMENT_LABEL[method as keyof typeof PAYMENT_LABEL] ?? method}</span>
@@ -100,7 +100,7 @@ export default function ShiftPage() {
             {/* Propinas por mesero */}
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-4 w-4" /> Propinas por mesero</CardTitle></CardHeader>
-              <CardContent className="print-area">
+              <CardContent>
                 {Object.keys(stats.byWaiter).length === 0 ? (
                   <p className="py-4 text-center text-sm text-muted-foreground">Sin propinas registradas en este turno.</p>
                 ) : (

@@ -143,6 +143,11 @@
     top: 0;
     width: 100%;
     padding: 16px;
+    color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .print-area .grid {
+    display: grid !important;
   }
   .print-hidden,
   .print-hidden * {
