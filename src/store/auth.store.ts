@@ -5,7 +5,8 @@ interface AuthState {
   loggedIn: boolean;
   name: string;
   isSuperAdmin: boolean;
-  login: (name?: string, isSuperAdmin?: boolean) => void;
+  tenantId: string | null;
+  login: (name?: string, isSuperAdmin?: boolean, tenantId?: string | null) => void;
   logout: () => void;
 }
 
@@ -30,18 +31,25 @@ function readIsSuperAdmin(): boolean {
   return window.localStorage.getItem("axis-superadmin") === "1";
 }
 
+function readTenantId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("axis-tenant-id");
+}
+
 export const useAuthStore = create<AuthState>()((set) => ({
   loggedIn: readToken(),
   name: readName(),
   isSuperAdmin: readIsSuperAdmin(),
+  tenantId: readTenantId(),
 
-  login: (name, isSuperAdmin = false) => {
+  login: (name, isSuperAdmin = false, tenantId = null) => {
     const display = name ?? "Usuario";
     if (typeof window !== "undefined") {
       window.localStorage.setItem("axis-name", display);
       window.localStorage.setItem("axis-superadmin", isSuperAdmin ? "1" : "0");
+      if (tenantId) window.localStorage.setItem("axis-tenant-id", tenantId);
     }
-    set({ loggedIn: true, name: display, isSuperAdmin });
+    set({ loggedIn: true, name: display, isSuperAdmin, tenantId });
   },
 
   logout: () => {
@@ -50,7 +58,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
       window.localStorage.removeItem("axis-refresh");
       window.localStorage.removeItem("axis-name");
       window.localStorage.removeItem("axis-superadmin");
+      window.localStorage.removeItem("axis-tenant-id");
     }
-    set({ loggedIn: false, name: "Usuario", isSuperAdmin: false });
+    set({ loggedIn: false, name: "Usuario", isSuperAdmin: false, tenantId: null });
   },
 }));

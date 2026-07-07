@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { Minus, Plus, Trash2, ShoppingCart, Send, Hash, ChevronDown, ShoppingBag } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart, Send, Hash, ChevronDown, ShoppingBag, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/shared/product-image";
 import { Separator } from "@/components/ui/separator";
@@ -17,20 +18,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
-import { useKitchenStore } from "@/store/kitchen.store";
 import { useTablesStore } from "@/store/tables.store";
 import { formatCurrency } from "@/lib/utils";
 
 export function OrderPanel() {
   const router = useRouter();
-  const { lines, tableNumber, increment, decrement, remove, clear, setTable, flushToTable } = useOrderStore();
-  const addFromOrder = useKitchenStore((s) => s.addFromOrder);
+  const { lines, tableNumber, increment, decrement, remove, clear, setTable, sendToKitchen } = useOrderStore();
   const allTables = useTablesStore((s) => s.tables);
   const occupyTable = useTablesStore((s) => s.occupy);
   const subtotal = orderSelectors.subtotal(lines);
   const tax = Math.round(subtotal * TAX_RATE);
   const total = subtotal + tax;
   const count = orderSelectors.count(lines);
+  const [sending, setSending] = useState(false);
 
   return (
     <div className="flex h-full flex-col">
@@ -165,17 +165,22 @@ export function OrderPanel() {
             </Button>
             <Button
               className="col-span-2"
-              onClick={() => {
-                const ticket = addFromOrder(lines, tableNumber, tableNumber ? "dine_in" : "takeaway");
-                if (tableNumber) occupyTable(tableNumber, total);
-                toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
-                // flushToTable acumula las líneas en tableOrders[mesa] sin borrarlas del snapshot,
-                // para que Caja pueda recuperar el pedido completo al cobrar.
-                flushToTable();
-                router.push("/kitchen");
+              disabled={sending}
+              onClick={async () => {
+                setSending(true);
+                try {
+                  const ticket = await sendToKitchen(tableNumber ? "dine_in" : "takeaway");
+                  if (tableNumber) occupyTable(tableNumber, total);
+                  toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
+                  router.push("/kitchen");
+                } catch {
+                  toast.error("No se pudo enviar el pedido a cocina");
+                } finally {
+                  setSending(false);
+                }
               }}
             >
-              <Send className="h-4 w-4" /> Enviar a cocina
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar a cocina
             </Button>
           </div>
         </div>

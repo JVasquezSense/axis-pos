@@ -24,6 +24,7 @@ import { useMenuStore } from "@/store/menu.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useSalesStore } from "@/store/sales.store";
 import { useRecipesStore } from "@/store/recipes.store";
+import { USE_API } from "@/services/http";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const TIP_OPTIONS = [0, 0.05, 0.1, 0.15];
@@ -33,6 +34,8 @@ export default function CheckoutPage() {
   const storeTable = useOrderStore((s) => s.tableNumber);
   const clear = useOrderStore((s) => s.clear);
   const setStoreTable = useOrderStore((s) => s.setTable);
+  const loadTableOrder = useOrderStore((s) => s.loadTableOrder);
+  const markPaid = useOrderStore((s) => s.markPaid);
   const applySale = useInventoryStore((s) => s.applySale);
   const allTables = useTablesStore((s) => s.tables);
   const freeTable = useTablesStore((s) => s.free);
@@ -72,7 +75,7 @@ export default function CheckoutPage() {
 
   const breakdown: PaymentBreakdown = { subtotal, tax, taxRate: st.noTax ? 0 : TAX_RATE, discount: effectiveDiscount, tip, total: remaining };
 
-  const completeSale = () => {
+  const completeSale = async () => {
     const ref = table ? `mesa ${table}` : "mostrador";
     const { affected, depletedItemIds } = applySale(ref, lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })));
     if (depletedItemIds.length > 0) {
@@ -88,6 +91,7 @@ export default function CheckoutPage() {
       occupyTable(table, undefined, waiter.trim() || undefined);
       freeTable(table);
     }
+    await markPaid(); // cierra los Order reales del backend que componían esta cuenta
     clear();
     toast.success("Venta registrada", { description: affected > 0 ? `${st.label} · ${affected} salidas de inventario` : st.label });
   };
@@ -95,7 +99,11 @@ export default function CheckoutPage() {
   const changeTable = (value: string) => {
     const next = value === "none" ? null : Number(value);
     setTableLocal(next);
-    setStoreTable(next); // intercambia lines automáticamente vía store
+    if (next !== null && USE_API) {
+      loadTableOrder(next); // trae la cuenta real del backend (sobrevive recarga / multi-dispositivo)
+    } else {
+      setStoreTable(next); // modo mock o "venta directa": solo memoria local
+    }
   };
 
   return (

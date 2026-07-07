@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { ChefHat, Radio } from "lucide-react";
 import type { KdsStatus } from "@/types";
 import { useKitchenStore } from "@/store/kitchen.store";
+import { useAuthStore } from "@/store/auth.store";
+import { USE_API } from "@/services/http";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,12 +21,24 @@ export default function KitchenPage() {
   const tickets = useKitchenStore((s) => s.tickets);
   const advanceStore = useKitchenStore((s) => s.advance);
   const toggleItem = useKitchenStore((s) => s.toggleItem);
+  const load = useKitchenStore((s) => s.load);
+  const connect = useKitchenStore((s) => s.connect);
+  const wsConnected = useKitchenStore((s) => s.wsConnected);
+  const tenantId = useAuthStore((s) => s.tenantId);
   const [mounted, setMounted] = useState(false);
   const [, forceTick] = useReducer((x) => x + 1, 0);
 
   useEffect(() => setMounted(true), []);
 
-  // Reloj en vivo: recalcula los tiempos de espera — preparado para WebSockets
+  // Carga los pedidos activos y se conecta al WebSocket de cocina en tiempo real.
+  useEffect(() => {
+    load();
+    if (!tenantId) return;
+    const disconnect = connect(tenantId);
+    return disconnect;
+  }, [load, connect, tenantId]);
+
+  // Reloj en vivo: recalcula los tiempos de espera
   useEffect(() => {
     const clock = setInterval(() => forceTick(), 15000);
     return () => clearInterval(clock);
@@ -43,9 +57,12 @@ export default function KitchenPage() {
         description="Tablero de preparación en tiempo real"
         icon={<ChefHat className="h-5 w-5" />}
         actions={
-          <Badge variant="success" className="gap-1.5">
-            <Radio className="h-3.5 w-3.5 animate-pulse" /> Conectado · WebSocket
-          </Badge>
+          !USE_API ? null : (
+            <Badge variant={wsConnected ? "success" : "secondary"} className="gap-1.5">
+              <Radio className={cn("h-3.5 w-3.5", wsConnected && "animate-pulse")} />
+              {wsConnected ? "Conectado · WebSocket" : "Sin conexión en vivo"}
+            </Badge>
+          )
         }
       />
 

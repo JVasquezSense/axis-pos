@@ -12,8 +12,10 @@ export interface CreateOrderPayload {
 }
 
 export const ordersService = {
-  async getActive(): Promise<Order[]> {
-    return USE_API ? request<Order[]>("/orders/?status=pending,preparing,ready") : mockRequest(ORDERS, 550);
+  async getActive(table?: number): Promise<Order[]> {
+    if (!USE_API) return mockRequest(ORDERS, 550);
+    const tableParam = table != null ? `&table=${table}` : "";
+    return request<Order[]>(`/orders/?status=pending,preparing,ready${tableParam}`);
   },
   async createOrder(payload: CreateOrderPayload): Promise<Order> {
     return USE_API

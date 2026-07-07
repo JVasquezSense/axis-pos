@@ -47,6 +47,7 @@ export function TableDrawer({
 }) {
   const router = useRouter();
   const setTable = useOrderStore((s) => s.setTable);
+  const loadTableOrder = useOrderStore((s) => s.loadTableOrder);
   const [mode, setMode] = useState<Mode>("idle");
   const [people, setPeople] = useState(2);
 
@@ -66,7 +67,7 @@ export function TableDrawer({
   };
 
   const goCheckout = () => {
-    setTable(table.mergedInto ?? table.number);
+    loadTableOrder(table.mergedInto ?? table.number);
     close(false);
     router.push("/checkout");
   };

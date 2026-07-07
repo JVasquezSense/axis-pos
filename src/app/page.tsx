@@ -42,6 +42,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       let isSuperAdmin = false;
+      let tenantId: string | null = null;
       if (USE_API) {
         const data = await request<{ access: string; refresh: string }>("/auth/token/", {
           method: "POST",
@@ -52,11 +53,12 @@ export default function LoginPage() {
         try {
           const payload = JSON.parse(atob(data.access.split(".")[1]));
           isSuperAdmin = !!payload.is_superuser;
-        } catch { /* token malformado, isSuperAdmin queda false */ }
+          tenantId = payload.tenant_id ?? null;
+        } catch { /* token malformado, isSuperAdmin/tenantId quedan por defecto */ }
       } else {
         await new Promise((r) => setTimeout(r, 700));
       }
-      login(prettyName(email), isSuperAdmin);
+      login(prettyName(email), isSuperAdmin, tenantId);
       router.push("/dashboard");
     } catch {
       setError("Credenciales inválidas. Verifica tus datos.");
