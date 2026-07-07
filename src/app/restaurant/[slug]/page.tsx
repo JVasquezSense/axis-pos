@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -42,7 +42,7 @@ export default function RestaurantSitePage({
 
   // El tenant actualmente logueado ya conoce su propio restaurante (evita ir a red).
   const currentRestaurant = useAppStore((s) => s.restaurant);
-  const { data: tenants, loading } = useAsync(() => saasService.getTenants(), []);
+  const { data: tenants, loading } = useAsync(() => saasService.getTenants().catch(() => []), []);
   const tenant =
     currentRestaurant.slug === slug
       ? currentRestaurant
@@ -51,6 +51,12 @@ export default function RestaurantSitePage({
   const { cart, add, increment, decrement, submitOrder } = useWebStore();
   const categories = useMenuStore((s) => s.categories);
   const products = useMenuStore((s) => s.products);
+  const loadMenu = useMenuStore((s) => s.load);
+
+  useEffect(() => {
+    if (products.length === 0) loadMenu();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const MENU_CATEGORIES = useMemo(
     () => [{ id: "popular", name: "Popular", icon: "Star" }, ...categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon }))],
     [categories]
