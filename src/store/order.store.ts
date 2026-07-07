@@ -158,7 +158,6 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
           notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
         })),
       };
-      console.log("[sendToKitchen] payload:", JSON.stringify(payload));
       const saved = await ordersService.createOrder(payload);
       get().flushToTable();
       return { id: String(saved.id), code: saved.code };
