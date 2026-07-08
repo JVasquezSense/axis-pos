@@ -52,7 +52,7 @@ export default function CheckoutPage() {
 
   const lines = storeLines;
   const [table, setTableLocal] = useState<number | null>(storeTable ?? null);
-  const [saleType, setSaleType] = useState<SaleTypeId>("dine_in");
+  const [saleType, setSaleType] = useState<SaleTypeId>(storeTable ? "dine_in" : "takeaway");
   const [tipRate, setTipRate] = useState(0.1);
   const [discount, setDiscount] = useState(0);
   const [method, setMethod] = useState<PaymentMethod>("card");
@@ -86,6 +86,8 @@ export default function CheckoutPage() {
 
   const breakdown: PaymentBreakdown = { subtotal, tax, taxRate: st.noTax ? 0 : TAX_RATE, discount: effectiveDiscount, tip, total: remaining };
 
+  const sendToKitchen = useOrderStore((s) => s.sendToKitchen);
+
   const completeSale = async () => {
     const ref = table ? `mesa ${table}` : "mostrador";
     const { affected, depletedItemIds } = applySale(ref, lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })));
@@ -98,6 +100,15 @@ export default function CheckoutPage() {
       if (affected86.length > 0) toast.warning("86 automático", { description: `Agotado: ${affected86.join(", ")}` });
     }
     recordSale({ total, items: orderSelectors.count(lines), method, saleType: st.label, table, tip, waiter: waiter.trim() || "Sin asignar" });
+
+    if (saleType === "takeaway" && !table && lines.length > 0) {
+      try {
+        const ticket = await sendToKitchen("takeaway");
+        auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} · Para llevar · Pagado`, user: waiter.trim() || "Sistema", module: "ventas" });
+        toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: "Para llevar · ya pagado" });
+      } catch { /* error silencioso — la venta ya se registró */ }
+    }
+
     if (table) {
       occupyTable(table, undefined, waiter.trim() || undefined);
       freeTable(table);

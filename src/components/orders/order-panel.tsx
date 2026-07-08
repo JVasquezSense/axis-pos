@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { Minus, Plus, Trash2, ShoppingCart, Send, Hash, ChevronDown, ShoppingBag, Loader2 } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart, Send, Hash, ChevronDown, ShoppingBag, Loader2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/shared/product-image";
 import { Separator } from "@/components/ui/separator";
@@ -165,28 +165,37 @@ export function OrderPanel() {
             >
               Vaciar
             </Button>
-            <Button
-              className="col-span-2"
-              disabled={sending}
-              onClick={async () => {
-                setSending(true);
-                try {
-                  const ticket = await sendToKitchen(tableNumber ? "dine_in" : "takeaway");
-                  if (tableNumber) occupyTable(tableNumber, total);
-                  auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} · ${count} productos · ${formatCurrency(total)}${tableNumber ? ` · Mesa ${tableNumber}` : " · Para llevar"}`, user: "Sistema", module: "ventas" });
-                  toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
-                  router.push("/kitchen");
-                } catch (err) {
-                  const msg = err instanceof Error ? err.message : "Error desconocido";
-                  console.error("[sendToKitchen] error:", err);
-                  toast.error("No se pudo enviar el pedido a cocina", { description: msg.slice(0, 120) });
-                } finally {
-                  setSending(false);
-                }
-              }}
-            >
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar a cocina
-            </Button>
+            {tableNumber ? (
+              <Button
+                className="col-span-2"
+                disabled={sending}
+                onClick={async () => {
+                  setSending(true);
+                  try {
+                    const ticket = await sendToKitchen("dine_in");
+                    occupyTable(tableNumber, total);
+                    auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} · ${count} productos · ${formatCurrency(total)} · Mesa ${tableNumber}`, user: "Sistema", module: "ventas" });
+                    toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
+                    router.push("/kitchen");
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : "Error desconocido";
+                    console.error("[sendToKitchen] error:", err);
+                    toast.error("No se pudo enviar el pedido a cocina", { description: msg.slice(0, 120) });
+                  } finally {
+                    setSending(false);
+                  }
+                }}
+              >
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar a cocina
+              </Button>
+            ) : (
+              <Button
+                className="col-span-2"
+                onClick={() => router.push("/checkout")}
+              >
+                <CreditCard className="h-4 w-4" /> Ir a Caja
+              </Button>
+            )}
           </div>
         </div>
       )}
