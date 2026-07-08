@@ -36,6 +36,13 @@ export const ROLES: Record<Role, RoleConfig> = {
     color: "cyan",
     defaultRoute: "/inventory",
   },
+  delivery: {
+    id: "delivery",
+    label: "Domiciliario",
+    description: "Entregas a domicilio y seguimiento de pedidos",
+    color: "orange",
+    defaultRoute: "/delivery",
+  },
 };
 
 export const ROLE_LIST = Object.values(ROLES);
@@ -45,10 +52,11 @@ export const ROLE_NAV: Record<Role, string[]> = {
   admin: [
     "dashboard", "salon", "reservations", "orders", "kitchen",
     "checkout", "shift", "history", "shift-history", "menu", "inventory", "suppliers",
-    "employees", "audit", "crm", "reports", "weborders", "website", "admin",
+    "employees", "audit", "crm", "reports", "delivery", "delivery-admin", "weborders", "website", "admin",
   ],
   waiter: ["dashboard", "salon", "reservations", "orders", "kitchen"],
   cashier: ["dashboard", "checkout", "shift", "history", "shift-history", "salon", "weborders", "crm", "employees"],
   kitchen: ["dashboard", "kitchen", "menu", "inventory"],
   warehouse: ["dashboard", "inventory", "suppliers", "menu"],
+  delivery: ["delivery"],
 };

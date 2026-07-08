@@ -3,7 +3,7 @@ import { USE_API, apiErrorHandler } from "@/services/http";
 import { employeesService } from "@/services/employees.service";
 import { useAuditStore } from "./audit.store";
 
-export type EmployeeRole = "mesero" | "cocinero" | "cajero" | "admin" | "almacen";
+export type EmployeeRole = "mesero" | "cocinero" | "cajero" | "admin" | "almacen" | "domiciliario";
 
 export interface Employee {
   id: string;
@@ -33,6 +33,7 @@ export const EMPLOYEE_ROLE_LABELS: Record<EmployeeRole, string> = {
   cajero: "Cajero",
   admin: "Administrador",
   almacen: "Almacén",
+  domiciliario: "Domiciliario",
 };
 
 export const EMPLOYEE_ROLE_COLORS: Record<EmployeeRole, string> = {
@@ -41,6 +42,7 @@ export const EMPLOYEE_ROLE_COLORS: Record<EmployeeRole, string> = {
   cajero: "bg-sky-500/15 text-sky-600 border-sky-500/30",
   admin: "bg-violet-500/15 text-violet-600 border-violet-500/30",
   almacen: "bg-cyan-500/15 text-cyan-600 border-cyan-500/30",
+  domiciliario: "bg-orange-500/15 text-orange-600 border-orange-500/30",
 };
 
 export const useEmployeesStore = create<EmployeesState>()((set) => ({

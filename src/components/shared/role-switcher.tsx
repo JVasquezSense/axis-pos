@@ -20,6 +20,7 @@ const DOT: Record<string, string> = {
   sky: "bg-sky-500",
   amber: "bg-amber-500",
   cyan: "bg-cyan-500",
+  orange: "bg-orange-500",
 };
 
 export function RoleSwitcher() {

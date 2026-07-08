@@ -3,7 +3,7 @@
 // Diseñados para mapear 1:1 con los serializers de Django REST Framework.
 // ============================================================================
 
-export type Role = "admin" | "waiter" | "cashier" | "kitchen" | "warehouse";
+export type Role = "admin" | "waiter" | "cashier" | "kitchen" | "warehouse" | "delivery";
 
 export interface RoleConfig {
   id: Role;

@@ -25,6 +25,8 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "audit", label: "Auditoría", href: "/audit", icon: "ClipboardCheck", group: "Gestión" },
   { key: "crm", label: "Clientes", href: "/crm", icon: "Users", group: "Gestión" },
   { key: "reports", label: "Reportes", href: "/reports", icon: "BarChart3", group: "Gestión" },
+  { key: "delivery", label: "Mi ruta", href: "/delivery", icon: "Bike", group: "Operación" },
+  { key: "delivery-admin", label: "Domicilios", href: "/delivery-admin", icon: "MapPin", group: "Gestión" },
   { key: "website", label: "Página web", href: "/website", icon: "Globe", group: "Plataforma" },
   { key: "admin", label: "Super Admin", href: "/admin", icon: "ShieldCheck", group: "Plataforma" },
 ];
