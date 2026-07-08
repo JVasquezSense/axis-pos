@@ -1,21 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Globe, ExternalLink, Wifi, QrCode } from "lucide-react";
+import { Globe, ExternalLink, Wifi, QrCode, ImagePlus, Trash2, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { StoreQR } from "@/components/shared/store-qr";
 import { WebOrdersFeed } from "@/components/website/web-orders-feed";
 import { useAppStore } from "@/store/app.store";
 
 export default function WebsitePage() {
   const restaurant = useAppStore((s) => s.restaurant);
+  const updateRestaurant = useAppStore((s) => s.updateRestaurant);
   const [origin, setOrigin] = useState("https://axispos.co");
   useEffect(() => setOrigin(window.location.origin), []);
   const siteUrl = `${origin}/restaurant/${restaurant.slug}`;
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagen muy grande", { description: "Máximo 5 MB" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateRestaurant({ banner: String(reader.result) });
+      toast.success("Banner actualizado");
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="space-y-6">
@@ -31,6 +50,65 @@ export default function WebsitePage() {
           </Button>
         }
       />
+
+      {/* Personalización */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Pencil className="h-4 w-4" /> Personalización
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">Configura el nombre y banner que ven tus clientes en la página web.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Nombre del restaurante</label>
+              <Input
+                value={restaurant.name}
+                onChange={(e) => updateRestaurant({ name: e.target.value })}
+                placeholder="Mi Restaurante"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Logo (emoji)</label>
+              <Input
+                value={restaurant.logo}
+                onChange={(e) => updateRestaurant({ logo: e.target.value })}
+                placeholder="🍔"
+                className="w-20 text-center text-xl"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Banner superior</label>
+            {restaurant.banner ? (
+              <div className="group relative overflow-hidden rounded-xl border border-border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={restaurant.banner} alt="Banner" className="h-36 w-full object-cover sm:h-48" />
+                <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Button size="sm" variant="secondary" onClick={() => bannerInputRef.current?.click()}>
+                    <ImagePlus className="mr-1 h-4 w-4" /> Cambiar
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => { updateRestaurant({ banner: "" }); toast.success("Banner eliminado"); }}>
+                    <Trash2 className="mr-1 h-4 w-4" /> Quitar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => bannerInputRef.current?.click()}
+                className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5 sm:h-48"
+              >
+                <ImagePlus className="h-8 w-8" />
+                <span className="text-sm font-medium">Subir banner (recomendado: 1200×400)</span>
+                <span className="text-xs">JPG o PNG · máx 5 MB</span>
+              </button>
+            )}
+            <input ref={bannerInputRef} type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         {/* Preview */}

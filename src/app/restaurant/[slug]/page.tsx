@@ -114,6 +114,8 @@ export default function RestaurantSitePage({
     );
   }
 
+  const bannerUrl = currentRestaurant.slug === slug ? currentRestaurant.banner : "";
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       {/* Top bar */}
@@ -171,6 +173,24 @@ export default function RestaurantSitePage({
           </Sheet>
         </div>
       </header>
+
+      {/* Banner hero */}
+      {bannerUrl && (
+        <div className="relative h-36 w-full shrink-0 overflow-hidden sm:h-48">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={bannerUrl} alt={`${tenant.name} banner`} className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+          <div className="absolute bottom-3 left-4 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-background/90 text-2xl shadow-lg backdrop-blur">
+              {tenant.logo}
+            </div>
+            <div>
+              <p className="text-lg font-black text-white drop-shadow-lg">{tenant.name}</p>
+              <p className="text-xs text-white/80 drop-shadow">Pedidos en línea</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Búsqueda móvil */}
       <div className="border-b border-border p-3 md:hidden">

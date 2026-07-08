@@ -14,6 +14,8 @@ const MODULE_COPY: Record<string, { title: string; description: string }> = {
   kitchen: { title: "Cocina KDS", description: "Tablero en vivo para que cocina vea y actualice cada orden sin usar papel." },
   checkout: { title: "Caja", description: "Cobra con propina, descuentos y varios métodos de pago, y genera la factura." },
   shift: { title: "Cierre de turno", description: "Cuadra la caja y cierra el turno con el resumen de ventas y movimientos del día." },
+  history: { title: "Historial de ventas", description: "Consulta todas las ventas pasadas con filtros por fecha, método de pago y mesero." },
+  "shift-history": { title: "Historial de turnos", description: "Revisa cierres de caja anteriores con el desglose completo de cada turno." },
   weborders: { title: "Pedidos web", description: "Recibe y verifica en vivo los pedidos que llegan desde tu página web." },
   menu: { title: "Menú & Recetas", description: "Administra tu carta, precios y las recetas con su costo real por plato." },
   inventory: { title: "Inventario", description: "Controla stock, mínimos y kardex para no quedarte sin insumos a mitad de servicio." },
@@ -22,7 +24,9 @@ const MODULE_COPY: Record<string, { title: string; description: string }> = {
   audit: { title: "Auditoría", description: "Revisa el historial de cambios importantes para tener trazabilidad total." },
   crm: { title: "Clientes", description: "Fideliza con niveles, puntos y el historial de cada cliente." },
   reports: { title: "Reportes", description: "Analiza rentabilidad, ventas por hora y tus productos más vendidos." },
-  website: { title: "Página web", description: "Tu propia tienda online, sincronizada con el POS en tiempo real." },
+  delivery: { title: "Mi ruta", description: "Panel del domiciliario: ve tus pedidos asignados, cambia el estado de cada entrega y consulta tu historial." },
+  "delivery-admin": { title: "Domicilios", description: "Gestiona todos los domicilios: asigna repartidores, crea pedidos y monitorea tiempos de entrega." },
+  website: { title: "Página web", description: "Tu propia tienda online con banner personalizable, sincronizada con el POS en tiempo real." },
   admin: { title: "Super Admin", description: "Panel para administrar todos los restaurantes de la plataforma." },
 };
 
