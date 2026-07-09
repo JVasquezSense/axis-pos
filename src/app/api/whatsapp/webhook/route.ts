@@ -16,6 +16,7 @@ interface TwilioIncoming {
   ProfileName?: string;
   NumMedia?: string;
   MediaContentType0?: string;
+  MediaUrl0?: string;
   To?: string;
   MessageSid?: string;
 }
@@ -205,6 +206,7 @@ export async function POST(req: NextRequest) {
       MessageSid: params.get("MessageSid") ?? undefined,
       NumMedia: params.get("NumMedia") ?? undefined,
       MediaContentType0: params.get("MediaContentType0") ?? undefined,
+      MediaUrl0: params.get("MediaUrl0") ?? undefined,
     };
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
@@ -228,7 +230,8 @@ export async function POST(req: NextRequest) {
 
   // Receipt image detection: customer sends an image after placing an order
   if (hasMedia && mediaType.startsWith("image/")) {
-    const order = markReceiptReceived(slug, from);
+    const mediaUrl = formData.MediaUrl0;
+    const order = markReceiptReceived(slug, from, mediaUrl);
     if (order) {
       const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>✅ ¡Comprobante recibido! Tu pedido ${order.code} está siendo procesado. Te avisaremos cuando esté listo. 🍔</Message></Response>`;
       return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });

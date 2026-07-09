@@ -42,6 +42,7 @@ export function WebOrdersFeed() {
           lines: wa.lines.map((l: { name: string; quantity: number }) => ({ name: l.name, quantity: l.quantity })),
           total: wa.total,
           createdAt: wa.createdAt,
+          receipt: wa.receiptUrl || undefined,
           status: "review",
         };
         useWebStore.setState((s) => ({ liveOrders: [order, ...s.liveOrders].slice(0, 30) }));

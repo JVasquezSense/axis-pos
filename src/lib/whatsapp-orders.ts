@@ -7,6 +7,7 @@ export interface WhatsAppOrder {
   total: number;
   createdAt: number;
   receiptReceived: boolean;
+  receiptUrl?: string;
   synced: boolean;
 }
 
@@ -30,11 +31,12 @@ export function addWhatsAppOrder(slug: string, order: Omit<WhatsAppOrder, "id" |
   return full;
 }
 
-export function markReceiptReceived(slug: string, phone: string): WhatsAppOrder | null {
+export function markReceiptReceived(slug: string, phone: string, receiptUrl?: string): WhatsAppOrder | null {
   const list = whatsappOrders.get(slug) ?? [];
   const order = list.find((o) => o.phone === phone && !o.receiptReceived);
   if (order) {
     order.receiptReceived = true;
+    if (receiptUrl) order.receiptUrl = receiptUrl;
     return order;
   }
   return null;
