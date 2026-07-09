@@ -39,13 +39,8 @@ export default function OrdersPage() {
 
   const handleAdd = (p: Product) => {
     if (!p.available) return;
-    if (p.modifiers?.length) {
-      setModProduct(p);
-      setModOpen(true);
-    } else {
-      addProduct(p);
-      toast.success(`${p.name} agregado`);
-    }
+    setModProduct(p);
+    setModOpen(true);
   };
 
   return (

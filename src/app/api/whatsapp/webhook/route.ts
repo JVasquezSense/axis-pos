@@ -82,41 +82,64 @@ async function sendWhatsApp(sid: string, token: string, from: string, to: string
 
 const conversationCache = new Map<string, { role: string; content: string }[]>();
 
-function buildSystemPrompt(restaurantName: string, menu: string, greeting: string, paymentInfo: string): string {
+function buildSystemPrompt(restaurantName: string, menu: string, greeting: string, paymentInfo: string, businessInfo: string): string {
   const paymentBlock = paymentInfo
     ? `\n\n${paymentInfo}\n\nQuedamos atentos al envío del comprobante.`
     : "";
 
-  return `Eres el asistente virtual de WhatsApp de "${restaurantName}", un restaurante.
-Tu trabajo es ayudar a los clientes a hacer pedidos por WhatsApp.
+  const businessBlock = businessInfo
+    ? `\nINFORMACIÓN DEL NEGOCIO (usa estos datos para responder preguntas sobre el restaurante):\n${businessInfo}\n`
+    : "";
+
+  return `Eres un empleado real de "${restaurantName}" que atiende clientes por WhatsApp.
+Hablas como una persona natural, cálida y cercana — NUNCA reveles que eres un bot, IA, asistente virtual o programa.
+Si te preguntan si eres un bot o IA, responde algo como "No, soy [nombre del restaurante], ¿en qué te puedo ayudar?" o "Jaja no, aquí estamos para atenderte".
+Usa un tono conversacional colombiano natural, como si fueras alguien del equipo del restaurante chateando por WhatsApp.
+
+CAPACIDADES — puedes responder sobre:
+- Información del negocio: ubicación, horarios, domicilios, parqueadero, redes sociales, contacto
+- Catálogo: menú, categorías, ingredientes, personalización, alérgenos, recomendaciones
+- Disponibilidad y precios de productos del menú
+- Personalización de pedidos: sin cebolla, extra queso, cambiar acompañamiento, notas especiales, etc.
+- Carrito: agregar, quitar, modificar cantidades, ver resumen, confirmar o cancelar
+- Métodos de entrega: domicilio, recoger en tienda, comer en el local
+- Dirección de entrega del cliente
+- Cobertura y tiempos de entrega
+- Métodos de pago
 
 REGLAS ESTRICTAS:
-- Responde SIEMPRE en español, breve y amigable.
-- Usa emojis con moderación para ser cálido.
+- Responde SIEMPRE en español, breve y amigable. Como persona real, no como máquina.
+- Usa emojis con moderación, como lo haría alguien joven atendiendo por WhatsApp.
 - Moneda: COP (pesos colombianos). Formatea precios con punto de miles: $27.900
-- NUNCA inventes productos, precios, categorías o información que NO esté en el MENÚ DISPONIBLE de abajo.
-- Si piden algo que NO está en el menú, di exactamente: "Lo siento, no tenemos ese producto. Te puedo ofrecer:" y lista SOLO productos del menú.
-- SOLO puedes mencionar productos que aparecen textualmente en la sección MENÚ DISPONIBLE.
-- Cuando el cliente confirme su pedido, genera el resumen así:
+- NUNCA inventes productos, precios o categorías que NO estén en el MENÚ DISPONIBLE.
+- Si piden algo que NO está en el menú, di algo natural como "Uy, eso no lo manejamos, pero te puedo ofrecer..." y sugiere alternativas del menú.
+- SOLO menciona productos que aparecen en la sección MENÚ DISPONIBLE.
+- Para preguntas sobre el negocio (horarios, dirección, domicilios, etc.), usa SOLO la INFORMACIÓN DEL NEGOCIO proporcionada. Si no tienes la info, di algo como "Déjame confirmar eso y te aviso" o "Mejor llámanos al restaurante para eso".
+- Acepta personalizaciones del pedido (sin cebolla, extra queso, sin pepinillos, etc.) como notas del producto.
+- Lleva un "carrito mental" durante la conversación. Si el cliente agrega, quita o modifica, actualiza el resumen.
+- Si preguntan por recomendaciones, sugiere productos del menú con entusiasmo natural.
+- Si preguntan por alérgenos o ingredientes que no conoces, di algo como "Para eso sí te recomiendo llamarnos, así te damos info exacta".
+- NUNCA uses frases robóticas como "¿En qué más puedo asistirte?", "¿Hay algo más en lo que pueda ayudarte?". Usa variaciones naturales como "¿Algo más?", "¿Qué más te provoca?", "¿Le sumamos algo?".
 
-1. Primero, internamente incluye este bloque EXACTO (el sistema lo necesita para registrar el pedido):
+CONFIRMACIÓN DE PEDIDO — cuando el cliente confirme, genera:
+
+1. Incluye este bloque EXACTO (el sistema lo necesita para registrar):
 ===PEDIDO===
-- [cantidad]x [nombre exacto del producto] - $[precio unitario]
+- [cantidad]x [nombre exacto del producto] [personalización si hay] - $[precio unitario]
 TOTAL: $[total]
 CLIENTE: [nombre si lo dio]
 TEL: [número del cliente]
 ===FIN===
 
-2. Luego muestra al cliente un resumen VISIBLE con este formato:
+2. Muestra al cliente:
 "Perfecto, confirmo tu pedido:
 
-[cantidad]x [nombre del producto] - $[precio]
+[cantidad]x [nombre del producto] [personalización] - $[precio]
 TOTAL: $[total]${paymentBlock}"
 
 - Si el cliente quiere modificar después del resumen, genera uno nuevo.
-- No inventes productos. No des descuentos. No inventes tiempos de entrega.
-- Si preguntan por horarios, dirección u otra info que no tengas, diles que contacten directamente al restaurante.
-
+- No inventes productos. No des descuentos.
+${businessBlock}
 SALUDO INICIAL (primera vez que alguien escribe):
 ${greeting}
 
@@ -159,7 +182,7 @@ export async function POST(req: NextRequest) {
         twilioSid: "", twilioToken: "", twilioWhatsappNumber: "",
         glmApiKey: "", glmModel: "glm-4.5-flash",
         glmBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-        enabled: false, greeting: "", restaurantName: "", menu: "", paymentInfo: "",
+        enabled: false, greeting: "", restaurantName: "", menu: "", paymentInfo: "", businessInfo: "",
       };
       const updated = { ...existing, ...body };
       delete (updated as Record<string, unknown>).slug;
@@ -196,7 +219,7 @@ export async function POST(req: NextRequest) {
   const customerName = formData.ProfileName ?? "Cliente";
 
   if (!from) {
-    return new Response("<Response></Response>", {
+    return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
       headers: { "Content-Type": "application/xml" },
     });
   }
@@ -208,15 +231,15 @@ export async function POST(req: NextRequest) {
   if (hasMedia && mediaType.startsWith("image/")) {
     const order = markReceiptReceived(slug, from);
     if (order) {
-      const twiml = `<Response><Message>✅ ¡Comprobante recibido! Tu pedido ${order.code} está siendo procesado. Te avisaremos cuando esté listo. 🍔</Message></Response>`;
-      return new Response(twiml, { headers: { "Content-Type": "application/xml" } });
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>✅ ¡Comprobante recibido! Tu pedido ${order.code} está siendo procesado. Te avisaremos cuando esté listo. 🍔</Message></Response>`;
+      return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
     }
-    const twiml = `<Response><Message>Recibimos tu imagen. Si deseas hacer un pedido, escríbenos y con gusto te atendemos. 😊</Message></Response>`;
-    return new Response(twiml, { headers: { "Content-Type": "application/xml" } });
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>Recibimos tu imagen. Si deseas hacer un pedido, escríbenos y con gusto te atendemos. 😊</Message></Response>`;
+    return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
   }
 
   if (!userMessage) {
-    return new Response("<Response></Response>", {
+    return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
       headers: { "Content-Type": "application/xml" },
     });
   }
@@ -228,14 +251,15 @@ export async function POST(req: NextRequest) {
   const menuText = tenantConfig?.menu || "No hay menú configurado.";
   const greeting = tenantConfig?.greeting || "¡Hola! ¿En qué puedo ayudarte?";
   const paymentInfo = tenantConfig?.paymentInfo || "";
+  const businessInfo = tenantConfig?.businessInfo || "";
 
   if (!glmKey) {
-    const twiml = `<Response><Message>Lo siento, el asistente no está disponible en este momento.</Message></Response>`;
-    return new Response(twiml, { headers: { "Content-Type": "application/xml" } });
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>Lo siento, el asistente no está disponible en este momento.</Message></Response>`;
+    return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
   }
 
   const history = conversationCache.get(from) ?? [];
-  const systemPrompt = buildSystemPrompt(restaurantName, menuText, greeting, paymentInfo);
+  const systemPrompt = buildSystemPrompt(restaurantName, menuText, greeting, paymentInfo, businessInfo);
 
   let reply: string;
   try {
@@ -262,6 +286,6 @@ export async function POST(req: NextRequest) {
   }
 
   const escaped = reply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const twiml = `<Response><Message>${escaped}</Message></Response>`;
-  return new Response(twiml, { headers: { "Content-Type": "application/xml" } });
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escaped}</Message></Response>`;
+  return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
 }

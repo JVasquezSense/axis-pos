@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     restaurantName: "",
     menu: "",
     paymentInfo: "",
+    businessInfo: "",
   };
 
   const updated = { ...existing, ...body };

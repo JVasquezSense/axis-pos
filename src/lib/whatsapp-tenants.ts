@@ -10,6 +10,7 @@ export interface TenantConfig {
   restaurantName: string;
   menu: string;
   paymentInfo: string;
+  businessInfo: string;
 }
 
 export const tenantConfigs = new Map<string, TenantConfig>();

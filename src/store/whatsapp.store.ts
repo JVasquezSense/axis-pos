@@ -11,6 +11,7 @@ export interface WhatsAppConfig {
   enabled: boolean;
   greeting: string;
   paymentInfo: string;
+  businessInfo: string;
 }
 
 export interface ChatMessage {
@@ -55,6 +56,7 @@ const DEFAULT_CONFIG: WhatsAppConfig = {
     "❓ Responder preguntas\n\n" +
     "¿Qué te gustaría hacer?",
   paymentInfo: "",
+  businessInfo: "",
 };
 
 export const useWhatsAppStore = create<WhatsAppState>()(

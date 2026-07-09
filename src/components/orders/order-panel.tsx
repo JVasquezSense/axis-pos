@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { Minus, Plus, Trash2, ShoppingCart, Send, Hash, ChevronDown, ShoppingBag, Loader2, CreditCard } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart, Send, Hash, ChevronDown, ShoppingBag, Loader2, CreditCard, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/shared/product-image";
 import { Separator } from "@/components/ui/separator";
@@ -24,7 +24,7 @@ import { formatCurrency } from "@/lib/utils";
 
 export function OrderPanel() {
   const router = useRouter();
-  const { lines, tableNumber, increment, decrement, remove, clear, setTable, sendToKitchen } = useOrderStore();
+  const { lines, tableNumber, increment, decrement, remove, clear, setTable, sendToKitchen, setNotes } = useOrderStore();
   const allTables = useTablesStore((s) => s.tables);
   const occupyTable = useTablesStore((s) => s.occupy);
   const subtotal = orderSelectors.subtotal(lines);
@@ -72,7 +72,7 @@ export function OrderPanel() {
                 <button
                   key={t.id}
                   onClick={() => setTable(t.number)}
-                  title={t.status === "occupied" ? `Mesa ${t.number} · Ocupada` : `Mesa ${t.number} · ${t.zone}`}
+                  title={t.status === "occupied" ? `Mesa ${t.number} - Ocupada` : `Mesa ${t.number} - ${t.zone}`}
                   className={`relative flex h-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent ${
                     tableNumber === t.number ? "bg-primary text-primary-foreground" : t.status === "occupied" ? "bg-amber-500/20 text-amber-700 dark:text-amber-400" : "bg-muted"
                   }`}
@@ -92,8 +92,8 @@ export function OrderPanel() {
         {lines.length === 0 ? (
           <EmptyState
             icon={<ShoppingCart />}
-            title="Pedido vacío"
-            description="Selecciona productos del menú para comenzar a armar la orden."
+            title="Pedido vacio"
+            description="Selecciona productos del menu para comenzar a armar la orden."
             className="mt-8 border-0"
           />
         ) : (
@@ -119,11 +119,19 @@ export function OrderPanel() {
                       </div>
                       {l.modifiers.length > 0 && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {l.modifiers.map((m) => m.name).join(" · ")}
+                          {l.modifiers.map((m) => m.name).join(" - ")}
                         </p>
                       )}
-                      {l.notes && <p className="mt-0.5 text-xs italic text-amber-600 dark:text-amber-400">“{l.notes}”</p>}
-                      <div className="mt-2 flex items-center justify-between">
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <MessageSquare className="h-3 w-3 shrink-0 text-amber-500" />
+                        <input
+                          placeholder="Sin pepinillos, extra queso..."
+                          value={l.notes ?? ""}
+                          onChange={(e) => setNotes(l.id, e.target.value)}
+                          className="h-6 w-full rounded border-0 bg-transparent px-0 text-xs italic text-amber-600 placeholder:text-muted-foreground/50 outline-none dark:text-amber-400"
+                        />
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between">
                         <div className="flex items-center gap-1 rounded-lg border border-border">
                           <button onClick={() => decrement(l.id)} className="flex h-7 w-7 items-center justify-center rounded-l-lg hover:bg-muted">
                             <Minus className="h-3.5 w-3.5" />
@@ -174,8 +182,8 @@ export function OrderPanel() {
                   try {
                     const ticket = await sendToKitchen("dine_in");
                     occupyTable(tableNumber, total);
-                    auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} · ${count} productos · ${formatCurrency(total)} · Mesa ${tableNumber}`, user: "Sistema", module: "ventas" });
-                    toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos · ${formatCurrency(total)}` });
+                    auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} - ${count} productos - ${formatCurrency(total)} - Mesa ${tableNumber}`, user: "Sistema", module: "ventas" });
+                    toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos - ${formatCurrency(total)}` });
                     router.push("/kitchen");
                   } catch (err) {
                     const msg = err instanceof Error ? err.message : "Error desconocido";
