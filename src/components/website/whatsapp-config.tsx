@@ -240,6 +240,21 @@ export function WhatsAppBotSection() {
             </p>
           </div>
 
+          {/* Info del negocio */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Información del negocio (horarios, dirección, domicilios, redes, etc.)</label>
+            <textarea
+              value={config.businessInfo}
+              onChange={(e) => updateConfig({ businessInfo: e.target.value })}
+              rows={5}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary"
+              placeholder={"Dirección: Calle 123 #45-67, Bogotá\nHorario: Lunes a Sábado 11am - 10pm\nDomicilios: Sí, zona centro\nParqueadero: Sí, gratuito\nInstagram: @mirestaurante\nTeléfono: 3001234567"}
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              El bot usará esta información para responder preguntas sobre ubicación, horarios, domicilios, parqueadero, redes sociales, etc.
+            </p>
+          </div>
+
           {/* Webhook URL */}
           <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
             <div className="mb-1.5 flex items-center gap-2">
