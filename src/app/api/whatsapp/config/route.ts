@@ -5,21 +5,7 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-
-export interface TenantConfig {
-  twilioSid: string;
-  twilioToken: string;
-  twilioWhatsappNumber: string;
-  glmApiKey: string;
-  glmModel: string;
-  glmBaseUrl: string;
-  enabled: boolean;
-  greeting: string;
-  restaurantName: string;
-  menu: string;
-}
-
-export const tenantConfigs = new Map<string, TenantConfig>();
+import { tenantConfigs, type TenantConfig } from "@/lib/whatsapp-tenants";
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("slug") ?? "demo-burger";

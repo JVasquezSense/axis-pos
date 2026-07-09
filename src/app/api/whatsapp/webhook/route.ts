@@ -6,7 +6,7 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import { tenantConfigs } from "../config/route";
+import { tenantConfigs } from "@/lib/whatsapp-tenants";
 
 interface TwilioIncoming {
   Body?: string;
