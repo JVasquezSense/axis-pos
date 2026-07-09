@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StoreQR } from "@/components/shared/store-qr";
 import { WebOrdersFeed } from "@/components/website/web-orders-feed";
+import { WhatsAppBotSection } from "@/components/website/whatsapp-config";
 import { useAppStore } from "@/store/app.store";
 
 export default function WebsitePage() {
@@ -164,6 +165,8 @@ export default function WebsitePage() {
           </CardContent>
         </Card>
       </div>
+
+      <WhatsAppBotSection />
 
       <Card>
         <CardHeader>

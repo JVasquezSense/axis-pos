@@ -26,7 +26,7 @@ const MODULE_COPY: Record<string, { title: string; description: string }> = {
   reports: { title: "Reportes", description: "Analiza rentabilidad, ventas por hora y tus productos más vendidos." },
   delivery: { title: "Mi ruta", description: "Panel del domiciliario: ve tus pedidos asignados, cambia el estado de cada entrega y consulta tu historial." },
   "delivery-admin": { title: "Domicilios", description: "Gestiona todos los domicilios: asigna repartidores, crea pedidos y monitorea tiempos de entrega." },
-  website: { title: "Página web", description: "Tu propia tienda online con banner personalizable, sincronizada con el POS en tiempo real." },
+  website: { title: "Página web", description: "Tu tienda online con banner, QR, chatbot WhatsApp con IA y pedidos sincronizados al POS." },
   admin: { title: "Super Admin", description: "Panel para administrar todos los restaurantes de la plataforma." },
 };
 
