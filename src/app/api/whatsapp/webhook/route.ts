@@ -215,13 +215,7 @@ export async function POST(req: NextRequest) {
   if (history.length > 20) history.splice(0, history.length - 20);
   conversationCache.set(from, history);
 
-  if (sid && token && whatsappNumber) {
-    await sendWhatsApp(sid, token, whatsappNumber, from, reply);
-    return new Response("<Response></Response>", {
-      headers: { "Content-Type": "application/xml" },
-    });
-  }
-
-  const twiml = `<Response><Message>${reply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</Message></Response>`;
+  const escaped = reply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const twiml = `<Response><Message>${escaped}</Message></Response>`;
   return new Response(twiml, { headers: { "Content-Type": "application/xml" } });
 }
