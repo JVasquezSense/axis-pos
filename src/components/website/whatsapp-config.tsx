@@ -225,6 +225,21 @@ export function WhatsAppBotSection() {
             </p>
           </div>
 
+          {/* Info de pago */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Información de pago (se muestra al confirmar pedido)</label>
+            <textarea
+              value={config.paymentInfo}
+              onChange={(e) => updateConfig({ paymentInfo: e.target.value })}
+              rows={3}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary"
+              placeholder={"Nequi: 3176119357\nDaviplata: 3001234567\nEfectivo contra entrega"}
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Métodos de pago que verá el cliente cuando confirme su pedido. Déjalo vacío para no mostrar info de pago.
+            </p>
+          </div>
+
           {/* Webhook URL */}
           <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
             <div className="mb-1.5 flex items-center gap-2">

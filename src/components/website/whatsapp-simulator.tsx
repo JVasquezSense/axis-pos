@@ -70,6 +70,7 @@ export function WhatsAppSimulator() {
           restaurantName: restaurant.name,
           menu: menuText,
           greeting: config.greeting.replace("{restaurant}", restaurant.name),
+          paymentInfo: config.paymentInfo || undefined,
           glmApiKey: config.glmApiKey || undefined,
           glmBaseUrl: config.glmBaseUrl || undefined,
           glmModel: config.glmModel || undefined,

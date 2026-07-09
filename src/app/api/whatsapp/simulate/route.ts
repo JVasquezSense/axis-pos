@@ -8,7 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 const conversations = new Map<string, { role: string; content: string }[]>();
 
-function buildSystemPrompt(restaurantName: string, menu: string, greeting: string): string {
+function buildSystemPrompt(restaurantName: string, menu: string, greeting: string, paymentInfo: string): string {
+  const paymentBlock = paymentInfo
+    ? `\n\n${paymentInfo}\n\nQuedamos atentos al envío del comprobante.`
+    : "";
+
   return `Eres el asistente virtual de WhatsApp de "${restaurantName}", un restaurante.
 Tu trabajo es ayudar a los clientes a hacer pedidos por WhatsApp.
 
@@ -19,7 +23,21 @@ REGLAS ESTRICTAS:
 - NUNCA inventes productos, precios, categorías o información que NO esté en el MENÚ DISPONIBLE de abajo.
 - Si piden algo que NO está en el menú, di exactamente: "Lo siento, no tenemos ese producto. Te puedo ofrecer:" y lista SOLO productos del menú.
 - SOLO puedes mencionar productos que aparecen textualmente en la sección MENÚ DISPONIBLE.
-- Cuando el cliente confirme su pedido, responde con un resumen usando EXACTAMENTE este formato:
+- Cuando el cliente confirme su pedido, genera el resumen así:
+
+1. Primero, internamente incluye este bloque EXACTO (el sistema lo necesita para registrar el pedido):
+===PEDIDO===
+- [cantidad]x [nombre exacto del producto] - $[precio unitario]
+TOTAL: $[total]
+CLIENTE: [nombre si lo dio]
+TEL: [número del cliente]
+===FIN===
+
+2. Luego muestra al cliente un resumen VISIBLE con este formato:
+"Perfecto, confirmo tu pedido:
+
+[cantidad]x [nombre del producto] - $[precio]
+TOTAL: $[total]${paymentBlock}"
 
 ===PEDIDO===
 - [cantidad]x [nombre exacto del producto] - $[precio unitario]
@@ -47,6 +65,7 @@ export async function POST(req: NextRequest) {
     restaurantName: string;
     menu: string;
     greeting: string;
+    paymentInfo?: string;
     glmApiKey?: string;
     glmBaseUrl?: string;
     glmModel?: string;
@@ -76,7 +95,7 @@ export async function POST(req: NextRequest) {
 
   const sessionKey = phone || "simulator";
   const history = conversations.get(sessionKey) ?? [];
-  const systemPrompt = buildSystemPrompt(restaurantName || "Mi Restaurante", menu || "[]", greeting || "¡Hola!");
+  const systemPrompt = buildSystemPrompt(restaurantName || "Mi Restaurante", menu || "[]", greeting || "¡Hola!", body.paymentInfo || "");
 
   let reply: string;
   try {

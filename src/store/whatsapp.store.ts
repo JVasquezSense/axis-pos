@@ -10,6 +10,7 @@ export interface WhatsAppConfig {
   glmBaseUrl: string;
   enabled: boolean;
   greeting: string;
+  paymentInfo: string;
 }
 
 export interface ChatMessage {
@@ -53,6 +54,7 @@ const DEFAULT_CONFIG: WhatsAppConfig = {
     "🛒 Tomar tu pedido\n" +
     "❓ Responder preguntas\n\n" +
     "¿Qué te gustaría hacer?",
+  paymentInfo: "",
 };
 
 export const useWhatsAppStore = create<WhatsAppState>()(

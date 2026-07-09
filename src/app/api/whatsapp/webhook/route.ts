@@ -79,7 +79,11 @@ async function sendWhatsApp(sid: string, token: string, from: string, to: string
 
 const conversationCache = new Map<string, { role: string; content: string }[]>();
 
-function buildSystemPrompt(restaurantName: string, menu: string, greeting: string): string {
+function buildSystemPrompt(restaurantName: string, menu: string, greeting: string, paymentInfo: string): string {
+  const paymentBlock = paymentInfo
+    ? `\n\n${paymentInfo}\n\nQuedamos atentos al envío del comprobante.`
+    : "";
+
   return `Eres el asistente virtual de WhatsApp de "${restaurantName}", un restaurante.
 Tu trabajo es ayudar a los clientes a hacer pedidos por WhatsApp.
 
@@ -90,8 +94,9 @@ REGLAS ESTRICTAS:
 - NUNCA inventes productos, precios, categorías o información que NO esté en el MENÚ DISPONIBLE de abajo.
 - Si piden algo que NO está en el menú, di exactamente: "Lo siento, no tenemos ese producto. Te puedo ofrecer:" y lista SOLO productos del menú.
 - SOLO puedes mencionar productos que aparecen textualmente en la sección MENÚ DISPONIBLE.
-- Cuando el cliente confirme su pedido, responde con un resumen usando EXACTAMENTE este formato:
+- Cuando el cliente confirme su pedido, genera el resumen así:
 
+1. Primero, internamente incluye este bloque EXACTO (el sistema lo necesita para registrar el pedido):
 ===PEDIDO===
 - [cantidad]x [nombre exacto del producto] - $[precio unitario]
 TOTAL: $[total]
@@ -99,9 +104,14 @@ CLIENTE: [nombre si lo dio]
 TEL: [número del cliente]
 ===FIN===
 
-- Después del resumen, dile que su pedido fue registrado y dará un tiempo estimado.
+2. Luego muestra al cliente un resumen VISIBLE con este formato:
+"Perfecto, confirmo tu pedido:
+
+[cantidad]x [nombre del producto] - $[precio]
+TOTAL: $[total]${paymentBlock}"
+
 - Si el cliente quiere modificar después del resumen, genera uno nuevo.
-- No inventes productos. No des descuentos.
+- No inventes productos. No des descuentos. No inventes tiempos de entrega.
 - Si preguntan por horarios, dirección u otra info que no tengas, diles que contacten directamente al restaurante.
 
 SALUDO INICIAL (primera vez que alguien escribe):
@@ -146,7 +156,7 @@ export async function POST(req: NextRequest) {
         twilioSid: "", twilioToken: "", twilioWhatsappNumber: "",
         glmApiKey: "", glmModel: "glm-4.5-flash",
         glmBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-        enabled: false, greeting: "", restaurantName: "", menu: "",
+        enabled: false, greeting: "", restaurantName: "", menu: "", paymentInfo: "",
       };
       const updated = { ...existing, ...body };
       delete (updated as Record<string, unknown>).slug;
@@ -191,10 +201,7 @@ export async function POST(req: NextRequest) {
   const restaurantName = tenantConfig?.restaurantName || "Restaurante";
   const menuText = tenantConfig?.menu || "No hay menú configurado.";
   const greeting = tenantConfig?.greeting || "¡Hola! ¿En qué puedo ayudarte?";
-
-  const sid = tenantConfig?.twilioSid || "";
-  const token = tenantConfig?.twilioToken || "";
-  const whatsappNumber = tenantConfig?.twilioWhatsappNumber || "";
+  const paymentInfo = tenantConfig?.paymentInfo || "";
 
   if (!glmKey) {
     const twiml = `<Response><Message>Lo siento, el asistente no está disponible en este momento.</Message></Response>`;
@@ -202,7 +209,7 @@ export async function POST(req: NextRequest) {
   }
 
   const history = conversationCache.get(from) ?? [];
-  const systemPrompt = buildSystemPrompt(restaurantName, menuText, greeting);
+  const systemPrompt = buildSystemPrompt(restaurantName, menuText, greeting, paymentInfo);
 
   let reply: string;
   try {
