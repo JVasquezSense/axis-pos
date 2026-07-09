@@ -123,7 +123,6 @@ export async function POST(req: NextRequest) {
         stream: false,
         temperature: 0.5,
         max_tokens: 800,
-        thinking: { type: "disabled" },
         messages: [
           { role: "system", content: systemPrompt },
           ...history.slice(-10),

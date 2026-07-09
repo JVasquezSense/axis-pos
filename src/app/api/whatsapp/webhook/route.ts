@@ -36,7 +36,6 @@ async function callGLM(
       stream: false,
       temperature: 0.5,
       max_tokens: 800,
-      thinking: { type: "disabled" },
       messages: [
         { role: "system", content: systemPrompt },
         ...history.map((m) => ({ role: m.role, content: m.content })),
