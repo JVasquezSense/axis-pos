@@ -8,11 +8,14 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { tenantConfigs, type TenantConfig } from "@/lib/whatsapp-tenants";
+import { addWhatsAppOrder, markReceiptReceived, parseOrderBlock } from "@/lib/whatsapp-orders";
 
 interface TwilioIncoming {
   Body?: string;
   From?: string;
   ProfileName?: string;
+  NumMedia?: string;
+  MediaContentType0?: string;
   To?: string;
   MessageSid?: string;
 }
@@ -178,6 +181,8 @@ export async function POST(req: NextRequest) {
       ProfileName: params.get("ProfileName") ?? undefined,
       To: params.get("To") ?? undefined,
       MessageSid: params.get("MessageSid") ?? undefined,
+      NumMedia: params.get("NumMedia") ?? undefined,
+      MediaContentType0: params.get("MediaContentType0") ?? undefined,
     };
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
@@ -186,14 +191,35 @@ export async function POST(req: NextRequest) {
   const userMessage = formData.Body?.trim();
   const from = formData.From;
   const toNumber = formData.To ?? "";
+  const hasMedia = parseInt(formData.NumMedia || "0") > 0;
+  const mediaType = formData.MediaContentType0 || "";
+  const customerName = formData.ProfileName ?? "Cliente";
 
-  if (!userMessage || !from) {
+  if (!from) {
     return new Response("<Response></Response>", {
       headers: { "Content-Type": "application/xml" },
     });
   }
 
   const tenantConfig = findConfigByWhatsappNumber(toNumber);
+  const slug = tenantConfig ? [...tenantConfigs.entries()].find(([, v]) => v === tenantConfig)?.[0] ?? "demo-burger" : "demo-burger";
+
+  // Receipt image detection: customer sends an image after placing an order
+  if (hasMedia && mediaType.startsWith("image/")) {
+    const order = markReceiptReceived(slug, from);
+    if (order) {
+      const twiml = `<Response><Message>✅ ¡Comprobante recibido! Tu pedido ${order.code} está siendo procesado. Te avisaremos cuando esté listo. 🍔</Message></Response>`;
+      return new Response(twiml, { headers: { "Content-Type": "application/xml" } });
+    }
+    const twiml = `<Response><Message>Recibimos tu imagen. Si deseas hacer un pedido, escríbenos y con gusto te atendemos. 😊</Message></Response>`;
+    return new Response(twiml, { headers: { "Content-Type": "application/xml" } });
+  }
+
+  if (!userMessage) {
+    return new Response("<Response></Response>", {
+      headers: { "Content-Type": "application/xml" },
+    });
+  }
 
   const glmKey = tenantConfig?.glmApiKey || process.env.GLM_API_KEY || "";
   const glmBase = tenantConfig?.glmBaseUrl || process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
@@ -223,6 +249,17 @@ export async function POST(req: NextRequest) {
   history.push({ role: "assistant", content: reply });
   if (history.length > 20) history.splice(0, history.length - 20);
   conversationCache.set(from, history);
+
+  // Detect order in bot response
+  const orderData = parseOrderBlock(reply);
+  if (orderData && orderData.items.length > 0) {
+    addWhatsAppOrder(slug, {
+      customer: orderData.customer || customerName,
+      phone: from,
+      lines: orderData.items.map((i) => ({ name: i.name, quantity: i.qty, price: i.price })),
+      total: orderData.total,
+    });
+  }
 
   const escaped = reply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const twiml = `<Response><Message>${escaped}</Message></Response>`;

@@ -1,13 +1,14 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { ShoppingBag, Phone, FileCheck, Check, X, Truck, ImageOff, Receipt, Globe } from "lucide-react";
+import { ShoppingBag, Phone, FileCheck, Check, X, Truck, ImageOff, Receipt, Globe, MessageCircle } from "lucide-react";
 import type { LiveWebOrder } from "@/store/web.store";
 import { useWebStore, WEB_ORDER_STATUS } from "@/store/web.store";
 import { useKitchenStore } from "@/store/kitchen.store";
+import { useAppStore } from "@/store/app.store";
 import { PAYMENT_LABEL } from "@/lib/payments";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,46 @@ import { formatCurrency } from "@/lib/utils";
 export function WebOrdersFeed() {
   const { liveOrders, verifyOrder, dispatchOrder, rejectOrder } = useWebStore();
   const addWebTicket = useKitchenStore((s) => s.addWebTicket);
+  const slug = useAppStore((s) => s.restaurant.slug);
   const [viewing, setViewing] = useState<LiveWebOrder | null>(null);
+
+  const pollWhatsAppOrders = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/whatsapp/orders?slug=${slug}`);
+      if (!res.ok) return;
+      const { orders } = await res.json();
+      if (!orders?.length) return;
+      const existing = useWebStore.getState().liveOrders;
+      for (const wa of orders) {
+        if (existing.some((o) => o.id === wa.id)) continue;
+        const order: LiveWebOrder = {
+          id: wa.id,
+          code: wa.code,
+          customer: wa.customer,
+          phone: wa.phone,
+          method: "nequi",
+          items: wa.lines.reduce((s: number, l: { quantity: number }) => s + l.quantity, 0),
+          lines: wa.lines.map((l: { name: string; quantity: number }) => ({ name: l.name, quantity: l.quantity })),
+          total: wa.total,
+          createdAt: wa.createdAt,
+          status: "review",
+        };
+        useWebStore.setState((s) => ({ liveOrders: [order, ...s.liveOrders].slice(0, 30) }));
+        fetch("/api/whatsapp/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug, orderId: wa.id }),
+        });
+        toast.info(`Nuevo pedido WhatsApp ${wa.code}`, { description: `${wa.customer} · ${wa.lines.length} producto(s)`, icon: <MessageCircle className="h-4 w-4" /> });
+      }
+    } catch { /* silent */ }
+  }, [slug]);
+
+  useEffect(() => {
+    pollWhatsAppOrders();
+    const interval = setInterval(pollWhatsAppOrders, 10000);
+    return () => clearInterval(interval);
+  }, [pollWhatsAppOrders]);
 
   const verifyAndSend = (o: LiveWebOrder) => {
     verifyOrder(o.id);
