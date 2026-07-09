@@ -49,8 +49,9 @@ async function callGLM(
   return json.choices?.[0]?.message?.content ?? "Lo siento, no pude procesar tu mensaje.";
 }
 
-async function sendWhatsApp(sid: string, token: string, from: string, to: string, body: string) {
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
+async function sendWhatsApp(sid: string, token: string, from: string, to: string, body: string, accountSid?: string) {
+  const acSid = accountSid || (sid.startsWith("AC") ? sid : "");
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${acSid || sid}/Messages.json`;
   const auth = Buffer.from(`${sid}:${token}`).toString("base64");
 
   const params = new URLSearchParams();
