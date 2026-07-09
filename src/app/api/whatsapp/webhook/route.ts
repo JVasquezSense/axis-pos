@@ -284,7 +284,9 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const escaped = reply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Strip internal order block before sending to customer
+  const cleanReply = reply.replace(/===PEDIDO===[\s\S]*?===FIN===\s*/g, "").trim();
+  const escaped = cleanReply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escaped}</Message></Response>`;
   return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
 }

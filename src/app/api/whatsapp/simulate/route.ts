@@ -174,5 +174,6 @@ export async function POST(req: NextRequest) {
     };
   }
 
-  return NextResponse.json({ reply, order });
+  const cleanReply = reply.replace(/===PEDIDO===[\s\S]*?===FIN===\s*/g, "").trim();
+  return NextResponse.json({ reply: cleanReply, order });
 }
