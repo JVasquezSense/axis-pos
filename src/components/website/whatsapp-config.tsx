@@ -50,16 +50,17 @@ export function WhatsAppBotSection() {
   const saveToServer = async () => {
     setSaving(true);
     try {
-      await fetch("/api/whatsapp/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug: restaurant.slug,
-          ...config,
-          restaurantName: restaurant.name,
-          menu: buildMenuText(),
-        }),
+      const payload = JSON.stringify({
+        slug: restaurant.slug,
+        ...config,
+        restaurantName: restaurant.name,
+        menu: buildMenuText(),
       });
+      const headers = { "Content-Type": "application/json" };
+      await Promise.all([
+        fetch("/api/whatsapp/config", { method: "POST", headers, body: payload }),
+        fetch("/api/whatsapp/webhook", { method: "POST", headers, body: payload }),
+      ]);
       toast.success("Configuración y menú sincronizados");
     } catch {
       toast.error("Error al guardar");

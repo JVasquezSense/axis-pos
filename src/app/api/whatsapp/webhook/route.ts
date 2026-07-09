@@ -2,11 +2,12 @@
  * Twilio WhatsApp Webhook
  * GET  → verificación del webhook
  * POST → recibe mensajes entrantes de WhatsApp via Twilio, procesa con GLM, responde
+ *        También acepta JSON (Content-Type: application/json) para config updates
  */
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import { tenantConfigs } from "@/lib/whatsapp-tenants";
+import { tenantConfigs, type TenantConfig } from "@/lib/whatsapp-tenants";
 
 interface TwilioIncoming {
   Body?: string;
@@ -119,7 +120,6 @@ function findConfigByWhatsappNumber(toNumber: string) {
       return config;
     }
   }
-  // Fallback: return first config that has menu (super admin / sandbox)
   for (const [, config] of tenantConfigs) {
     if (config.menu) return config;
   }
@@ -127,10 +127,35 @@ function findConfigByWhatsappNumber(toNumber: string) {
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "ok", service: "axis-whatsapp-webhook" });
+  const count = tenantConfigs.size;
+  const slugs = [...tenantConfigs.keys()];
+  return NextResponse.json({ status: "ok", service: "axis-whatsapp-webhook", tenants: count, slugs });
 }
 
 export async function POST(req: NextRequest) {
+  const contentType = req.headers.get("content-type") || "";
+
+  // JSON = config update (from admin panel)
+  if (contentType.includes("application/json")) {
+    try {
+      const body = await req.json();
+      const slug = body.slug ?? "demo-burger";
+      const existing = tenantConfigs.get(slug) ?? {
+        twilioSid: "", twilioToken: "", twilioWhatsappNumber: "",
+        glmApiKey: "", glmModel: "glm-4.5-flash",
+        glmBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+        enabled: false, greeting: "", restaurantName: "", menu: "",
+      };
+      const updated = { ...existing, ...body };
+      delete (updated as Record<string, unknown>).slug;
+      tenantConfigs.set(slug, updated as TenantConfig);
+      return NextResponse.json({ ok: true, slug, source: "webhook" });
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+  }
+
+  // Form-urlencoded = Twilio incoming message
   let formData: TwilioIncoming = {};
   try {
     const text = await req.text();
@@ -148,7 +173,6 @@ export async function POST(req: NextRequest) {
 
   const userMessage = formData.Body?.trim();
   const from = formData.From;
-  const customerName = formData.ProfileName ?? "Cliente";
   const toNumber = formData.To ?? "";
 
   if (!userMessage || !from) {
@@ -157,20 +181,18 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Try to find tenant config by the WhatsApp number Twilio sent to
   const tenantConfig = findConfigByWhatsappNumber(toNumber);
 
-  // Resolve config: tenant config > custom headers > env vars
-  const glmKey = tenantConfig?.glmApiKey || req.headers.get("x-glm-key") || process.env.GLM_API_KEY || "";
-  const glmBase = tenantConfig?.glmBaseUrl || req.headers.get("x-glm-base") || process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
-  const glmModel = tenantConfig?.glmModel || req.headers.get("x-glm-model") || process.env.GLM_MODEL || "glm-4.5-flash";
-  const restaurantName = tenantConfig?.restaurantName || req.headers.get("x-restaurant-name") || "Restaurante";
-  const menuText = tenantConfig?.menu || req.headers.get("x-menu") || "No hay menú configurado.";
-  const greeting = tenantConfig?.greeting || req.headers.get("x-greeting") || "¡Hola! ¿En qué puedo ayudarte?";
+  const glmKey = tenantConfig?.glmApiKey || process.env.GLM_API_KEY || "";
+  const glmBase = tenantConfig?.glmBaseUrl || process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
+  const glmModel = tenantConfig?.glmModel || process.env.GLM_MODEL || "glm-4.5-flash";
+  const restaurantName = tenantConfig?.restaurantName || "Restaurante";
+  const menuText = tenantConfig?.menu || "No hay menú configurado.";
+  const greeting = tenantConfig?.greeting || "¡Hola! ¿En qué puedo ayudarte?";
 
-  const sid = tenantConfig?.twilioSid || req.headers.get("x-twilio-sid") || "";
-  const token = tenantConfig?.twilioToken || req.headers.get("x-twilio-token") || "";
-  const whatsappNumber = tenantConfig?.twilioWhatsappNumber || req.headers.get("x-twilio-from") || "";
+  const sid = tenantConfig?.twilioSid || "";
+  const token = tenantConfig?.twilioToken || "";
+  const whatsappNumber = tenantConfig?.twilioWhatsappNumber || "";
 
   if (!glmKey) {
     const twiml = `<Response><Message>Lo siento, el asistente no está disponible en este momento.</Message></Response>`;
