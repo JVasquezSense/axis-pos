@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 
-interface TenantConfig {
+export interface TenantConfig {
   twilioSid: string;
   twilioToken: string;
   twilioWhatsappNumber: string;
@@ -15,9 +15,11 @@ interface TenantConfig {
   glmBaseUrl: string;
   enabled: boolean;
   greeting: string;
+  restaurantName: string;
+  menu: string;
 }
 
-const tenantConfigs = new Map<string, TenantConfig>();
+export const tenantConfigs = new Map<string, TenantConfig>();
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("slug") ?? "demo-burger";
@@ -52,6 +54,8 @@ export async function POST(req: NextRequest) {
     glmBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
     enabled: false,
     greeting: "",
+    restaurantName: "",
+    menu: "",
   };
 
   const updated = { ...existing, ...body };

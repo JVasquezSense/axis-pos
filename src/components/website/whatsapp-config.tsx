@@ -10,12 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useWhatsAppStore } from "@/store/whatsapp.store";
 import { useAppStore } from "@/store/app.store";
+import { useMenuStore } from "@/store/menu.store";
 import { WhatsAppSimulator } from "./whatsapp-simulator";
 
 export function WhatsAppBotSection() {
   const config = useWhatsAppStore((s) => s.config);
   const updateConfig = useWhatsAppStore((s) => s.updateConfig);
   const restaurant = useAppStore((s) => s.restaurant);
+  const products = useMenuStore((s) => s.products);
+  const categories = useMenuStore((s) => s.categories);
 
   const [showToken, setShowToken] = useState(false);
   const [showGlmKey, setShowGlmKey] = useState(false);
@@ -32,15 +35,32 @@ export function WhatsAppBotSection() {
   }
   const webhookUrl = `${origin || "https://tu-dominio.com"}/api/whatsapp/webhook`;
 
+  const buildMenuText = () =>
+    categories
+      .map((cat) => {
+        const items = products
+          .filter((p) => p.category === cat.id && p.available)
+          .map((p) => `  - ${p.name}: $${p.price.toLocaleString("es-CO")}${p.description ? ` (${p.description})` : ""}`)
+          .join("\n");
+        return items ? `📂 ${cat.name}\n${items}` : null;
+      })
+      .filter(Boolean)
+      .join("\n\n");
+
   const saveToServer = async () => {
     setSaving(true);
     try {
       await fetch("/api/whatsapp/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: restaurant.slug, ...config }),
+        body: JSON.stringify({
+          slug: restaurant.slug,
+          ...config,
+          restaurantName: restaurant.name,
+          menu: buildMenuText(),
+        }),
       });
-      toast.success("Configuración guardada");
+      toast.success("Configuración y menú sincronizados");
     } catch {
       toast.error("Error al guardar");
     } finally {
