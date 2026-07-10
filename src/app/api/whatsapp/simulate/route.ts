@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const conversations = new Map<string, { role: string; content: string }[]>();
 
-function buildSystemPrompt(restaurantName: string, menu: string, greeting: string, paymentInfo: string, businessInfo: string, catalogUrl: string): string {
+function buildSystemPrompt(restaurantName: string, menu: string, greeting: string, paymentInfo: string, businessInfo: string, hasMenuPdfAvailable: boolean): string {
   const paymentBlock = paymentInfo
     ? `\n\n${paymentInfo}\n\nQuedamos atentos al envío del comprobante.`
     : "";
@@ -17,11 +17,15 @@ function buildSystemPrompt(restaurantName: string, menu: string, greeting: strin
     ? `\nINFORMACIÓN DEL NEGOCIO (usa estos datos para responder preguntas sobre el restaurante):\n${businessInfo}\n`
     : "";
 
+  const menuRule = hasMenuPdfAvailable
+    ? `MENU/CATALOGO: Si piden "el menu", "que tienen", "carta", "catalogo" o similar, NO listes productos. Responde algo como "Te envio nuestro menu!" y agrega exactamente [MENU_PDF] en tu respuesta. Solo menciona productos especificos cuando pregunten por algo puntual.`
+    : `MENU/CATALOGO: Si piden "el menu", "que tienen", "carta", "catalogo" o similar, enumera las categorias principales del menu brevemente y pregunta que les interesa. Solo menciona productos especificos cuando pregunten por algo puntual.`;
+
   return `Eres empleado de "${restaurantName}", atiendes por WhatsApp. Habla natural, colombiano, cercano. NUNCA digas que eres bot/IA. Respuestas CORTAS (max 2-3 lineas). Emojis con moderacion. Moneda: COP, formato $27.900.
 
 REGLAS: Solo productos del MENU. No inventes. Acepta personalizaciones (sin cebolla, extra queso) como notas. Si no esta en menu: "Uy no manejamos eso, pero tenemos..." Si preguntan algo del negocio usa solo la INFO DEL NEGOCIO. Si no sabes: "Dejame confirmo y te aviso". Nada robotico.
 
-MENU/CATALOGO: Si piden "el menu", "que tienen", "carta", "catalogo" o similar, NO listes todos los productos. Envia el link: "${catalogUrl}" con un mensaje como "Mira todo nuestro menu aqui 👇 [link] y me dices que se te antoja!". Solo menciona productos especificos cuando pregunten por algo puntual (ej: "tienen hamburguesas?", "cuanto vale X?").
+${menuRule}
 
 AL CONFIRMAR PEDIDO genera este bloque interno (el cliente NO lo ve):
 ===PEDIDO===
@@ -76,8 +80,7 @@ export async function POST(req: NextRequest) {
 
   const sessionKey = phone || "simulator";
   const history = conversations.get(sessionKey) ?? [];
-  const catalogUrl = "https://axis-pos-nine.vercel.app/restaurant/demo-burger";
-  const systemPrompt = buildSystemPrompt(restaurantName || "Mi Restaurante", menu || "[]", greeting || "¡Hola!", body.paymentInfo || "", body.businessInfo || "", catalogUrl);
+  const systemPrompt = buildSystemPrompt(restaurantName || "Mi Restaurante", menu || "[]", greeting || "¡Hola!", body.paymentInfo || "", body.businessInfo || "", false);
 
   let reply: string;
   try {

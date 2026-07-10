@@ -9,6 +9,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { tenantConfigs, type TenantConfig } from "@/lib/whatsapp-tenants";
 import { addWhatsAppOrder, markReceiptReceived, parseOrderBlock } from "@/lib/whatsapp-orders";
+import { hasMenuPdf, setMenuPdf } from "@/lib/whatsapp-menu-pdf";
 
 interface TwilioIncoming {
   Body?: string;
@@ -86,7 +87,7 @@ async function sendWhatsApp(sid: string, token: string, from: string, to: string
 
 const conversationCache = new Map<string, { role: string; content: string }[]>();
 
-function buildSystemPrompt(restaurantName: string, menu: string, greeting: string, paymentInfo: string, businessInfo: string, catalogUrl: string): string {
+function buildSystemPrompt(restaurantName: string, menu: string, greeting: string, paymentInfo: string, businessInfo: string, hasMenuPdfAvailable: boolean): string {
   const paymentBlock = paymentInfo
     ? `\n\n${paymentInfo}\n\nQuedamos atentos al envío del comprobante.`
     : "";
@@ -95,11 +96,15 @@ function buildSystemPrompt(restaurantName: string, menu: string, greeting: strin
     ? `\nINFORMACIÓN DEL NEGOCIO (usa estos datos para responder preguntas sobre el restaurante):\n${businessInfo}\n`
     : "";
 
+  const menuRule = hasMenuPdfAvailable
+    ? `MENU/CATALOGO: Si piden "el menu", "que tienen", "carta", "catalogo" o similar, NO listes productos. Responde algo como "Te envio nuestro menu!" y agrega exactamente [MENU_PDF] en tu respuesta. Solo menciona productos especificos cuando pregunten por algo puntual.`
+    : `MENU/CATALOGO: Si piden "el menu", "que tienen", "carta", "catalogo" o similar, enumera las categorias principales del menu brevemente y pregunta que les interesa. Solo menciona productos especificos cuando pregunten por algo puntual.`;
+
   return `Eres empleado de "${restaurantName}", atiendes por WhatsApp. Habla natural, colombiano, cercano. NUNCA digas que eres bot/IA. Respuestas CORTAS (max 2-3 lineas). Emojis con moderacion. Moneda: COP, formato $27.900.
 
 REGLAS: Solo productos del MENU. No inventes. Acepta personalizaciones (sin cebolla, extra queso) como notas. Si no esta en menu: "Uy no manejamos eso, pero tenemos..." Si preguntan algo del negocio usa solo la INFO DEL NEGOCIO. Si no sabes: "Dejame confirmo y te aviso". Nada robotico.
 
-MENU/CATALOGO: Si piden "el menu", "que tienen", "carta", "catalogo" o similar, NO listes todos los productos. Envia el link: "${catalogUrl}" con un mensaje como "Mira todo nuestro menu aqui 👇 [link] y me dices que se te antoja!". Solo menciona productos especificos cuando pregunten por algo puntual (ej: "tienen hamburguesas?", "cuanto vale X?").
+${menuRule}
 
 AL CONFIRMAR PEDIDO genera este bloque interno (el cliente NO lo ve):
 ===PEDIDO===
@@ -153,8 +158,12 @@ export async function POST(req: NextRequest) {
         glmBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
         enabled: false, greeting: "", restaurantName: "", menu: "", paymentInfo: "", businessInfo: "",
       };
+      if (body.menuPdf) {
+        setMenuPdf(slug, body.menuPdf);
+      }
       const updated = { ...existing, ...body };
       delete (updated as Record<string, unknown>).slug;
+      delete (updated as Record<string, unknown>).menuPdf;
       tenantConfigs.set(slug, updated as TenantConfig);
       return NextResponse.json({ ok: true, slug, source: "webhook" });
     } catch {
@@ -230,11 +239,8 @@ export async function POST(req: NextRequest) {
   }
 
   const history = conversationCache.get(from) ?? [];
-  const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://axis-pos-nine.vercel.app";
-  const catalogUrl = `${baseUrl}/restaurant/${slug}`;
-  const systemPrompt = buildSystemPrompt(restaurantName, menuText, greeting, paymentInfo, businessInfo, catalogUrl);
+  const hasPdf = hasMenuPdf(slug);
+  const systemPrompt = buildSystemPrompt(restaurantName, menuText, greeting, paymentInfo, businessInfo, hasPdf);
 
   let reply: string;
   try {
@@ -260,9 +266,20 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Strip internal order block before sending to customer
-  const cleanReply = reply.replace(/===PEDIDO===[\s\S]*?===FIN===\s*/g, "").trim();
+  // Strip internal order block and [MENU_PDF] marker before sending to customer
+  let cleanReply = reply.replace(/===PEDIDO===[\s\S]*?===FIN===\s*/g, "").trim();
+  const wantsMenuPdf = cleanReply.includes("[MENU_PDF]") && hasPdf;
+  cleanReply = cleanReply.replace(/\[MENU_PDF\]/g, "").trim();
   const escaped = cleanReply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escaped}</Message></Response>`;
+
+  let mediaTag = "";
+  if (wantsMenuPdf) {
+    const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://axis-pos-nine.vercel.app";
+    mediaTag = `<Media>${baseUrl}/api/whatsapp/menu-pdf?slug=${slug}</Media>`;
+  }
+
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escaped}${mediaTag}</Message></Response>`;
   return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
 }

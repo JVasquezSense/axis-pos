@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageCircle, Eye, EyeOff, Save, TestTube, Webhook, Key, Phone, Bot } from "lucide-react";
+import { MessageCircle, Eye, EyeOff, Save, TestTube, Webhook, Key, Phone, Bot, FileUp, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ export function WhatsAppBotSection() {
   const [showGlmKey, setShowGlmKey] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pdfName, setPdfName] = useState<string | null>(null);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
 
   const hasTwilio = !!(config.twilioSid && config.twilioToken && config.twilioWhatsappNumber);
   const hasGlm = !!(config.glmApiKey);
@@ -34,6 +36,46 @@ export function WhatsAppBotSection() {
     setOrigin(window.location.origin);
   }
   const webhookUrl = `${origin || "https://tu-dominio.com"}/api/whatsapp/webhook`;
+
+  const uploadPdf = async (file: File) => {
+    setUploadingPdf(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const slug = restaurant.slug;
+      const payload = JSON.stringify({ slug, pdf: base64 });
+      const headers = { "Content-Type": "application/json" };
+      await Promise.all([
+        fetch("/api/whatsapp/menu-pdf", { method: "POST", headers, body: payload }),
+        fetch("/api/whatsapp/webhook", { method: "POST", headers, body: JSON.stringify({ slug, menuPdf: base64 }) }),
+      ]);
+      setPdfName(file.name);
+      toast.success("Menu PDF cargado");
+    } catch {
+      toast.error("Error al cargar PDF");
+    } finally {
+      setUploadingPdf(false);
+    }
+  };
+
+  const deletePdf = async () => {
+    try {
+      const slug = restaurant.slug;
+      const headers = { "Content-Type": "application/json" };
+      await fetch("/api/whatsapp/menu-pdf", {
+        method: "POST", headers,
+        body: JSON.stringify({ slug, action: "delete" }),
+      });
+      setPdfName(null);
+      toast.success("PDF eliminado");
+    } catch {
+      toast.error("Error al eliminar PDF");
+    }
+  };
 
   const buildMenuText = () =>
     categories
@@ -252,6 +294,49 @@ export function WhatsAppBotSection() {
             />
             <p className="mt-1 text-[10px] text-muted-foreground">
               El bot usará esta información para responder preguntas sobre ubicación, horarios, domicilios, parqueadero, redes sociales, etc.
+            </p>
+          </div>
+
+          {/* Menu PDF */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-red-500" />
+              <p className="text-sm font-medium">Menu PDF para WhatsApp</p>
+              {pdfName ? (
+                <Badge variant="success" className="text-[10px]">Cargado</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">Sin PDF</Badge>
+              )}
+            </div>
+            {pdfName ? (
+              <div className="flex items-center gap-2 rounded-lg border border-border p-3">
+                <FileText className="h-5 w-5 shrink-0 text-red-500" />
+                <span className="flex-1 truncate text-sm">{pdfName}</span>
+                <Button size="sm" variant="outline" onClick={deletePdf}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed border-border p-6 transition-colors hover:border-primary hover:bg-muted/30">
+                <FileUp className="h-8 w-8 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  {uploadingPdf ? "Subiendo..." : "Haz clic para subir el PDF del menu"}
+                </span>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  disabled={uploadingPdf}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadPdf(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Cuando un cliente pida el menu por WhatsApp, el bot le enviara este PDF en vez de listar productos.
             </p>
           </div>
 
