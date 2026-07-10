@@ -27,12 +27,15 @@ REGLAS: Solo productos del MENU. No inventes. Acepta personalizaciones (sin cebo
 
 ${menuRule}
 
+DATOS DEL CLIENTE: Antes de confirmar pedido necesitas: nombre, direccion de entrega (o pueden enviar su ubicacion/pin de WhatsApp). Si el cliente ya dio su direccion o envio ubicacion antes, no la pidas de nuevo.
+
 AL CONFIRMAR PEDIDO genera este bloque interno (el cliente NO lo ve):
 ===PEDIDO===
 - [cant]x [producto] [nota si hay] - $[precio]
 TOTAL: $[total]
 CLIENTE: [nombre]
 TEL: [telefono]
+DIRECCION: [direccion o "ubicacion enviada"]
 ===FIN===
 Luego muestra al cliente: resumen con productos, total${paymentBlock}
 ${businessBlock}

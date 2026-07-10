@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { ShoppingBag, Phone, FileCheck, Check, X, Truck, ImageOff, Receipt, Globe, MessageCircle } from "lucide-react";
+import { ShoppingBag, Phone, FileCheck, Check, X, Truck, ImageOff, Receipt, Globe, MessageCircle, MapPin } from "lucide-react";
 import type { LiveWebOrder } from "@/store/web.store";
 import { useWebStore, WEB_ORDER_STATUS } from "@/store/web.store";
 import { useKitchenStore } from "@/store/kitchen.store";
@@ -42,6 +42,7 @@ export function WebOrdersFeed() {
           lines: wa.lines.map((l: { name: string; quantity: number }) => ({ name: l.name, quantity: l.quantity })),
           total: wa.total,
           createdAt: wa.createdAt,
+          address: wa.address || undefined,
           receipt: wa.receiptUrl || undefined,
           status: "review",
         };
@@ -127,6 +128,18 @@ export function WebOrdersFeed() {
               <Info label="Método" value={viewing ? PAYMENT_LABEL[viewing.method] : "—"} />
               <Info label="Total" value={viewing ? formatCurrency(viewing.total) : "—"} />
             </div>
+            {viewing?.address && (
+              <div className="rounded-lg border border-border p-2.5 text-sm">
+                <p className="text-[11px] text-muted-foreground">Dirección</p>
+                {viewing.address.startsWith("https://maps.google.com") ? (
+                  <a href={viewing.address} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 font-medium text-blue-500 underline">
+                    <MapPin className="h-3.5 w-3.5" /> Ver en Google Maps
+                  </a>
+                ) : (
+                  <p className="flex items-center gap-1.5 font-medium"><MapPin className="h-3.5 w-3.5" /> {viewing.address}</p>
+                )}
+              </div>
+            )}
             {viewing?.receipt ? (
               <img src={viewing.receipt} alt="Comprobante de pago" className="max-h-[50vh] w-full rounded-xl border border-border object-contain" />
             ) : (
@@ -172,6 +185,16 @@ function OrderRow({ order, onView, onVerify, onReject, onDispatch }: { order: Li
           </div>
           <p className="truncate text-xs text-muted-foreground">{order.customer} · {order.items} ítems · {PAYMENT_LABEL[order.method]}</p>
           <p className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="h-3 w-3" /> {order.phone}</p>
+          {order.address && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3 shrink-0" />
+              {order.address.startsWith("https://maps.google.com") ? (
+                <a href={order.address} target="_blank" rel="noopener noreferrer" className="truncate text-blue-500 underline">Ver ubicacion</a>
+              ) : (
+                <span className="truncate">{order.address}</span>
+              )}
+            </p>
+          )}
         </div>
         <span className="shrink-0 text-sm font-bold">{formatCurrency(order.total)}</span>
       </div>

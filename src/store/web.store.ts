@@ -22,6 +22,7 @@ export interface LiveWebOrder {
   code: string;
   customer: string;
   phone: string;
+  address?: string;
   method: PaymentMethod;
   items: number;
   lines: { name: string; quantity: number }[];

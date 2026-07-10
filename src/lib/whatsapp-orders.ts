@@ -3,6 +3,7 @@ export interface WhatsAppOrder {
   code: string;
   customer: string;
   phone: string;
+  address?: string;
   lines: { name: string; quantity: number; price: number }[];
   total: number;
   createdAt: number;
@@ -53,7 +54,7 @@ export function markSynced(slug: string, orderId: string) {
   if (order) order.synced = true;
 }
 
-export function parseOrderBlock(reply: string): { items: { qty: number; name: string; price: number }[]; total: number; customer: string } | null {
+export function parseOrderBlock(reply: string): { items: { qty: number; name: string; price: number }[]; total: number; customer: string; address: string } | null {
   const match = reply.match(/===PEDIDO===([\s\S]*?)===FIN===/);
   if (!match) return null;
 
@@ -72,9 +73,11 @@ export function parseOrderBlock(reply: string): { items: { qty: number; name: st
 
   const totalMatch = block.match(/TOTAL:\s*\$([0-9.,]+)/);
   const customerMatch = block.match(/CLIENTE:\s*(.+)/);
+  const addressMatch = block.match(/DIRECCION:\s*(.+)/i);
   return {
     items,
     total: totalMatch ? parseInt(totalMatch[1].replace(/\./g, "").replace(/,/g, "")) : items.reduce((s, i) => s + i.qty * i.price, 0),
     customer: customerMatch?.[1]?.trim() || "",
+    address: addressMatch?.[1]?.trim() || "",
   };
 }

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { tenantConfigs, type TenantConfig } from "@/lib/whatsapp-tenants";
 import { addWhatsAppOrder, markReceiptReceived, parseOrderBlock } from "@/lib/whatsapp-orders";
 import { hasMenuPdf, setMenuPdf } from "@/lib/whatsapp-menu-pdf";
+import { upsertCustomer, getCustomer, incrementOrderCount } from "@/lib/whatsapp-customers";
 
 interface TwilioIncoming {
   Body?: string;
@@ -20,6 +21,8 @@ interface TwilioIncoming {
   MediaUrl0?: string;
   To?: string;
   MessageSid?: string;
+  Latitude?: string;
+  Longitude?: string;
 }
 
 async function callGLM(
@@ -106,12 +109,15 @@ REGLAS: Solo productos del MENU. No inventes. Acepta personalizaciones (sin cebo
 
 ${menuRule}
 
+DATOS DEL CLIENTE: Antes de confirmar pedido necesitas: nombre, direccion de entrega (o pueden enviar su ubicacion/pin de WhatsApp). Si el cliente ya dio su direccion o envio ubicacion antes, no la pidas de nuevo.
+
 AL CONFIRMAR PEDIDO genera este bloque interno (el cliente NO lo ve):
 ===PEDIDO===
 - [cant]x [producto] [nota si hay] - $[precio]
 TOTAL: $[total]
 CLIENTE: [nombre]
 TEL: [telefono]
+DIRECCION: [direccion o "ubicacion enviada"]
 ===FIN===
 Luego muestra al cliente: resumen con productos, total${paymentBlock}
 ${businessBlock}
@@ -185,6 +191,8 @@ export async function POST(req: NextRequest) {
       NumMedia: params.get("NumMedia") ?? undefined,
       MediaContentType0: params.get("MediaContentType0") ?? undefined,
       MediaUrl0: params.get("MediaUrl0") ?? undefined,
+      Latitude: params.get("Latitude") ?? undefined,
+      Longitude: params.get("Longitude") ?? undefined,
     };
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
@@ -205,6 +213,19 @@ export async function POST(req: NextRequest) {
 
   const tenantConfig = findConfigByWhatsappNumber(toNumber);
   const slug = tenantConfig ? [...tenantConfigs.entries()].find(([, v]) => v === tenantConfig)?.[0] ?? "demo-burger" : "demo-burger";
+
+  // Always upsert customer with name from profile
+  upsertCustomer(slug, from, { name: customerName });
+
+  // Location detection: Twilio sends Latitude/Longitude when customer shares location
+  if (formData.Latitude && formData.Longitude) {
+    const lat = parseFloat(formData.Latitude);
+    const lng = parseFloat(formData.Longitude);
+    const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+    upsertCustomer(slug, from, { latitude: lat, longitude: lng, address: mapsUrl });
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>📍 Ubicacion recibida, gracias! Ya la tenemos guardada para tu pedido 👍</Message></Response>`;
+    return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
+  }
 
   // Receipt image detection: customer sends an image after placing an order
   if (hasMedia && mediaType.startsWith("image/")) {
@@ -258,9 +279,21 @@ export async function POST(req: NextRequest) {
   // Detect order in bot response
   const orderData = parseOrderBlock(reply);
   if (orderData && orderData.items.length > 0) {
+    // Resolve address: from order block, or from saved customer location
+    let address = orderData.address || "";
+    if (!address || address === "ubicacion enviada") {
+      const savedCustomer = getCustomer(slug, from);
+      if (savedCustomer?.address) address = savedCustomer.address;
+    }
+    if (orderData.address && orderData.address !== "ubicacion enviada") {
+      upsertCustomer(slug, from, { address: orderData.address });
+    }
+    incrementOrderCount(slug, from);
+
     const orderPayload = {
       customer: orderData.customer || customerName,
       phone: from,
+      address: address || undefined,
       lines: orderData.items.map((i) => ({ name: i.name, quantity: i.qty, price: i.price })),
       total: orderData.total,
     };
