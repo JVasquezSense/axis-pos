@@ -258,12 +258,22 @@ export async function POST(req: NextRequest) {
   // Detect order in bot response
   const orderData = parseOrderBlock(reply);
   if (orderData && orderData.items.length > 0) {
-    addWhatsAppOrder(slug, {
+    const orderPayload = {
       customer: orderData.customer || customerName,
       phone: from,
       lines: orderData.items.map((i) => ({ name: i.name, quantity: i.qty, price: i.price })),
       total: orderData.total,
-    });
+    };
+    addWhatsAppOrder(slug, orderPayload);
+    // Bridge serverless isolation: also register in orders API instance
+    const ordersBase = process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://axis-pos-nine.vercel.app";
+    fetch(`${ordersBase}/api/whatsapp/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, order: orderPayload }),
+    }).catch(() => {});
   }
 
   // Strip internal order block and [MENU_PDF] marker before sending to customer

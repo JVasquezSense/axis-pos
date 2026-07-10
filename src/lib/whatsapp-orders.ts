@@ -44,7 +44,7 @@ export function markReceiptReceived(slug: string, phone: string, receiptUrl?: st
 
 export function getUnsyncedOrders(slug: string): WhatsAppOrder[] {
   const list = whatsappOrders.get(slug) ?? [];
-  return list.filter((o) => o.receiptReceived && !o.synced);
+  return list.filter((o) => !o.synced);
 }
 
 export function markSynced(slug: string, orderId: string) {
