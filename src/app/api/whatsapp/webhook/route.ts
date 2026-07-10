@@ -39,7 +39,7 @@ async function callGLM(
       model,
       stream: false,
       temperature: 0.7,
-      max_tokens: 400,
+      max_tokens: 250,
       messages: [
         { role: "system", content: systemPrompt },
         ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -232,10 +232,10 @@ export async function POST(req: NextRequest) {
 
   let reply: string;
   try {
-    reply = await callGLM(glmKey, glmBase, glmModel, systemPrompt, history.slice(-10), userMessage);
+    reply = await callGLM(glmKey, glmBase, glmModel, systemPrompt, history.slice(-6), userMessage);
   } catch (err) {
     console.error("GLM error:", err);
-    reply = "Disculpa, tengo un problema técnico. Por favor intenta de nuevo en un momento. 🙏";
+    reply = "Uy perdona, se me fue la conexion 😅 Escribeme de nuevo porfa";
   }
 
   history.push({ role: "user", content: userMessage });
