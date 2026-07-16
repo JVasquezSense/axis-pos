@@ -90,6 +90,16 @@ async function sendWhatsApp(sid: string, token: string, from: string, to: string
 
 const conversationCache = new Map<string, { role: string; content: string }[]>();
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.axispos.co/v1";
+
+function persistToBackend(path: string, data: Record<string, unknown>) {
+  fetch(`${BACKEND_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }).catch((err) => console.error(`Backend persist ${path}:`, err.message));
+}
+
 function buildSystemPrompt(restaurantName: string, menu: string, greeting: string, paymentInfo: string, businessInfo: string, hasMenuPdfAvailable: boolean): string {
   const paymentBlock = paymentInfo
     ? `\n\n${paymentInfo}\n\nQuedamos atentos al envío del comprobante.`
@@ -214,8 +224,9 @@ export async function POST(req: NextRequest) {
   const tenantConfig = findConfigByWhatsappNumber(toNumber);
   const slug = tenantConfig ? [...tenantConfigs.entries()].find(([, v]) => v === tenantConfig)?.[0] ?? "demo-burger" : "demo-burger";
 
-  // Always upsert customer with name from profile
+  // Always upsert customer with name from profile (local cache + backend)
   upsertCustomer(slug, from, { name: customerName });
+  persistToBackend("/whatsapp/customers/upsert/", { phone: from, name: customerName });
 
   // Location detection: Twilio sends Latitude/Longitude when customer shares location
   if (formData.Latitude && formData.Longitude) {
@@ -223,6 +234,7 @@ export async function POST(req: NextRequest) {
     const lng = parseFloat(formData.Longitude);
     const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
     upsertCustomer(slug, from, { latitude: lat, longitude: lng, address: mapsUrl });
+    persistToBackend("/whatsapp/customers/upsert/", { phone: from, name: customerName, address: mapsUrl, latitude: lat, longitude: lng });
     const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>📍 Ubicacion recibida, gracias! Ya la tenemos guardada para tu pedido 👍</Message></Response>`;
     return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
   }
@@ -232,6 +244,7 @@ export async function POST(req: NextRequest) {
     const mediaUrl = formData.MediaUrl0;
     const order = markReceiptReceived(slug, from, mediaUrl);
     if (order) {
+      // TODO: persist receipt URL to backend when order IDs are synced
       const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>✅ ¡Comprobante recibido! Tu pedido ${order.code} está siendo procesado. Te avisaremos cuando esté listo. 🍔</Message></Response>`;
       return new Response(twiml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
     }
@@ -287,6 +300,7 @@ export async function POST(req: NextRequest) {
     }
     if (orderData.address && orderData.address !== "ubicacion enviada") {
       upsertCustomer(slug, from, { address: orderData.address });
+      persistToBackend("/whatsapp/customers/upsert/", { phone: from, address: orderData.address });
     }
     incrementOrderCount(slug, from);
 
@@ -298,6 +312,18 @@ export async function POST(req: NextRequest) {
       total: orderData.total,
     };
     addWhatsAppOrder(slug, orderPayload);
+
+    // Persist order to Django backend
+    const waCode = `#WA${Date.now().toString(36).toUpperCase()}`;
+    persistToBackend("/whatsapp/orders/", {
+      code: waCode,
+      customerName: orderData.customer || customerName,
+      phone: from,
+      address: address || "",
+      total: orderData.total,
+      lines: orderData.items.map((i) => ({ name: i.name, quantity: i.qty, price: i.price })),
+    });
+
     // Bridge serverless isolation: also register in orders API instance
     const ordersBase = process.env.VERCEL_PROJECT_PRODUCTION_URL
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
