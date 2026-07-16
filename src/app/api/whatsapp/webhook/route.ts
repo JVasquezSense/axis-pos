@@ -90,7 +90,7 @@ async function sendWhatsApp(sid: string, token: string, from: string, to: string
 
 const conversationCache = new Map<string, { role: string; content: string }[]>();
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.axispos.co/v1";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://axis-pos-production.up.railway.app/api/v1";
 
 function persistToBackend(path: string, data: Record<string, unknown>) {
   fetch(`${BACKEND_URL}${path}`, {

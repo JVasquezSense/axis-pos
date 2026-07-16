@@ -9,7 +9,7 @@
 import { delay } from "@/lib/utils";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "https://api.axispos.co/v1";
+  process.env.NEXT_PUBLIC_API_URL ?? "https://axis-pos-production.up.railway.app/api/v1";
 
 /** Bandera para conmutar entre mocks y backend real sin tocar componentes. */
 export const USE_API = process.env.NEXT_PUBLIC_USE_API === "true";
