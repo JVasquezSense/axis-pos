@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { Recipe, RecipeIngredient, RecipeVariation } from "@/types";
 import { RECIPES } from "@/mock/recipes";
 import { USE_API, apiErrorHandler } from "@/services/http";
@@ -15,13 +16,17 @@ interface RecipesState {
   duplicate: (id: string) => void;
 }
 
-export const useRecipesStore = create<RecipesState>()((set, get) => ({
+export const useRecipesStore = create<RecipesState>()(
+  persist(
+  (set, get) => ({
   recipes: USE_API ? [] : structuredClone(RECIPES),
 
   load: async () => {
     if (!USE_API) return;
-    const recipes = await recipesService.list();
-    set({ recipes });
+    try {
+      const recipes = await recipesService.list();
+      set({ recipes });
+    } catch { /* keep persisted state */ }
   },
 
   create: (recipe) => {
@@ -59,7 +64,7 @@ export const useRecipesStore = create<RecipesState>()((set, get) => ({
         id: uid("r"),
         name: `${original.name} (copia)`,
         status: "draft",
-        productId: undefined, // la copia no queda ligada al producto del original
+        productId: undefined,
         updatedAt: "Justo ahora",
       };
       if (USE_API) recipesService.create(copy).catch(apiErrorHandler("duplicar receta"));
@@ -68,7 +73,12 @@ export const useRecipesStore = create<RecipesState>()((set, get) => ({
       next.splice(idx + 1, 0, copy);
       return { recipes: next };
     }),
-}));
+}),
+  {
+    name: "axis-recipes",
+    partialize: (s) => ({ recipes: s.recipes }),
+  },
+));
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;

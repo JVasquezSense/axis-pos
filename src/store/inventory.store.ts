@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { InventoryItem, InventoryMovement, StockStatus } from "@/types";
 import { INVENTORY } from "@/mock/datasets";
 import { MOVEMENTS } from "@/mock/kardex";
@@ -34,17 +35,21 @@ interface InventoryState {
   reset: () => void;
 }
 
-export const useInventoryStore = create<InventoryState>()((set, get) => ({
+export const useInventoryStore = create<InventoryState>()(
+  persist(
+  (set, get) => ({
   items: USE_API ? [] : structuredClone(INVENTORY),
   movements: USE_API ? [] : structuredClone(MOVEMENTS),
 
   load: async () => {
     if (!USE_API) return;
-    const [items, movements] = await Promise.all([
-      inventoryService.getItems(),
-      inventoryService.getMovements(),
-    ]);
-    set({ items, movements });
+    try {
+      const [items, movements] = await Promise.all([
+        inventoryService.getItems(),
+        inventoryService.getMovements(),
+      ]);
+      set({ items, movements });
+    } catch { /* keep persisted state */ }
   },
 
   addItem: (item) => {
@@ -164,4 +169,9 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   },
 
   reset: () => set({ items: structuredClone(INVENTORY), movements: structuredClone(MOVEMENTS) }),
-}));
+}),
+  {
+    name: "axis-inventory",
+    partialize: (s) => ({ items: s.items, movements: s.movements }),
+  },
+));

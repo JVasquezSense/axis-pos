@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { Category, Product } from "@/types";
 import { CATEGORIES, PRODUCTS } from "@/mock/menu";
 import { USE_API, apiErrorHandler } from "@/services/http";
@@ -20,17 +21,21 @@ interface MenuState {
   setAvailable: (id: string, available: boolean) => void;
 }
 
-export const useMenuStore = create<MenuState>()((set, get) => ({
+export const useMenuStore = create<MenuState>()(
+  persist(
+  (set, get) => ({
   categories: USE_API ? [] : structuredClone(CATEGORIES),
   products: USE_API ? [] : structuredClone(PRODUCTS),
 
   load: async () => {
     if (!USE_API) return;
-    const [categories, products] = await Promise.all([
-      menuService.getCategories(),
-      menuService.getProducts(),
-    ]);
-    set({ categories, products });
+    try {
+      const [categories, products] = await Promise.all([
+        menuService.getCategories(),
+        menuService.getProducts(),
+      ]);
+      set({ categories, products });
+    } catch { /* keep persisted state */ }
   },
 
   addCategory: (c) => {
@@ -107,7 +112,12 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
       if (p) menuService.updateProduct({ ...p, available }).catch(apiErrorHandler("disponibilidad"));
     }
   },
-}));
+}),
+  {
+    name: "axis-menu",
+    partialize: (s) => ({ categories: s.categories, products: s.products }),
+  },
+));
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
