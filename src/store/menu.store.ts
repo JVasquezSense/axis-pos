@@ -13,6 +13,7 @@ function saveCache(get: () => MenuState) {
   try {
     const { categories, products } = get();
     localStorage.setItem(LS_KEY, JSON.stringify({ categories, products }));
+    import("@/services/backend-sync").then(m => m.markNeedsSync()).catch(() => {});
   } catch { /* storage full or unavailable */ }
 }
 

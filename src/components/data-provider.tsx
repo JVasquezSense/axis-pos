@@ -10,11 +10,8 @@ import { useSuppliersStore } from "@/store/suppliers.store";
 import { useSalesStore } from "@/store/sales.store";
 import { useReservationsStore } from "@/store/reservations.store";
 import { useEmployeesStore } from "@/store/employees.store";
+import { startBackgroundSync, stopBackgroundSync } from "@/services/backend-sync";
 
-/**
- * Carga inicial de todos los stores desde la API de Django.
- * Debe montarse DENTRO de <AuthGuard> para garantizar que el token JWT ya existe.
- */
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const loaded = useRef(false);
 
@@ -40,7 +37,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loadSales(),
       loadReservations(),
       loadEmployees(),
-    ]).catch(console.error);
+    ]).then(() => {
+      startBackgroundSync();
+    }).catch(console.error);
+
+    return () => stopBackgroundSync();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

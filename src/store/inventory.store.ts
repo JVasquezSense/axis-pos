@@ -15,6 +15,7 @@ function saveCache(get: () => InventoryState) {
   try {
     const { items, movements } = get();
     localStorage.setItem(LS_KEY, JSON.stringify({ items, movements }));
+    import("@/services/backend-sync").then(m => m.markNeedsSync()).catch(() => {});
   } catch { /* storage full */ }
 }
 

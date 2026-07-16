@@ -11,6 +11,7 @@ const LS_KEY = "axis-recipes";
 function saveCache(get: () => RecipesState) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify({ recipes: get().recipes }));
+    import("@/services/backend-sync").then(m => m.markNeedsSync()).catch(() => {});
   } catch { /* storage full */ }
 }
 
