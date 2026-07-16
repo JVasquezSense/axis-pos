@@ -62,6 +62,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     const cached = readCache();
     if (cached && cached.items.length > 0) {
       set({ items: cached.items, movements: cached.movements });
+      return;
     }
     try {
       const [items, movements] = await Promise.all([
@@ -70,7 +71,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       ]);
       set({ items, movements });
       saveCache(get);
-    } catch { /* API down — cached data already loaded */ }
+    } catch { /* API down, no cache available */ }
   },
 
   addItem: (item) => {

@@ -49,6 +49,7 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
     const cached = readCache();
     if (cached && cached.products.length > 0) {
       set({ categories: cached.categories, products: cached.products });
+      return;
     }
     try {
       const [categories, products] = await Promise.all([
@@ -57,7 +58,7 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
       ]);
       set({ categories, products });
       saveCache(get);
-    } catch { /* API down — cached data already loaded above */ }
+    } catch { /* API down, no cache available */ }
   },
 
   addCategory: (c) => {

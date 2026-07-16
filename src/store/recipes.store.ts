@@ -42,12 +42,13 @@ export const useRecipesStore = create<RecipesState>()((set, get) => ({
     const cached = readCache();
     if (cached && cached.length > 0) {
       set({ recipes: cached });
+      return;
     }
     try {
       const recipes = await recipesService.list();
       set({ recipes });
       saveCache(get);
-    } catch { /* API down — cached data already loaded */ }
+    } catch { /* API down, no cache available */ }
   },
 
   create: (recipe) => {
