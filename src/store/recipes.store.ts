@@ -26,7 +26,15 @@ export const useRecipesStore = create<RecipesState>()(
     try {
       const recipes = await recipesService.list();
       set({ recipes });
-    } catch { /* keep persisted state */ }
+    } catch {
+      const cached = localStorage.getItem("axis-recipes");
+      if (cached) {
+        try {
+          const { state } = JSON.parse(cached);
+          if (state?.recipes?.length) set({ recipes: state.recipes });
+        } catch { /* corrupt cache */ }
+      }
+    }
   },
 
   create: (recipe) => {

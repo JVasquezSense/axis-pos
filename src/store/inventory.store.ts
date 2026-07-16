@@ -49,7 +49,15 @@ export const useInventoryStore = create<InventoryState>()(
         inventoryService.getMovements(),
       ]);
       set({ items, movements });
-    } catch { /* keep persisted state */ }
+    } catch {
+      const cached = localStorage.getItem("axis-inventory");
+      if (cached) {
+        try {
+          const { state } = JSON.parse(cached);
+          if (state?.items?.length) set({ items: state.items, movements: state.movements ?? [] });
+        } catch { /* corrupt cache */ }
+      }
+    }
   },
 
   addItem: (item) => {

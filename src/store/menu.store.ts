@@ -35,7 +35,15 @@ export const useMenuStore = create<MenuState>()(
         menuService.getProducts(),
       ]);
       set({ categories, products });
-    } catch { /* keep persisted state */ }
+    } catch {
+      const cached = localStorage.getItem("axis-menu");
+      if (cached) {
+        try {
+          const { state } = JSON.parse(cached);
+          if (state?.products?.length) set({ categories: state.categories ?? [], products: state.products });
+        } catch { /* corrupt cache */ }
+      }
+    }
   },
 
   addCategory: (c) => {
