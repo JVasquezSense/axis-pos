@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { Category, Product } from "@/types";
 import { CATEGORIES, PRODUCTS } from "@/mock/menu";
 import { USE_API, apiErrorHandler } from "@/services/http";
@@ -7,6 +6,26 @@ import { menuService } from "@/services/menu.service";
 import { useAuditStore } from "./audit.store";
 import { useRecipesStore } from "./recipes.store";
 import { recipesService } from "@/services/recipes.service";
+
+const LS_KEY = "axis-menu";
+
+function saveCache(get: () => MenuState) {
+  try {
+    const { categories, products } = get();
+    localStorage.setItem(LS_KEY, JSON.stringify({ categories, products }));
+  } catch { /* storage full or unavailable */ }
+}
+
+function readCache(): { categories: Category[]; products: Product[] } | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data?.state) return { categories: data.state.categories ?? [], products: data.state.products ?? [] };
+    if (data?.products) return data;
+    return null;
+  } catch { return null; }
+}
 
 interface MenuState {
   categories: Category[];
@@ -21,37 +40,34 @@ interface MenuState {
   setAvailable: (id: string, available: boolean) => void;
 }
 
-export const useMenuStore = create<MenuState>()(
-  persist(
-  (set, get) => ({
+export const useMenuStore = create<MenuState>()((set, get) => ({
   categories: USE_API ? [] : structuredClone(CATEGORIES),
   products: USE_API ? [] : structuredClone(PRODUCTS),
 
   load: async () => {
     if (!USE_API) return;
+    const cached = readCache();
+    if (cached && cached.products.length > 0) {
+      set({ categories: cached.categories, products: cached.products });
+    }
     try {
       const [categories, products] = await Promise.all([
         menuService.getCategories(),
         menuService.getProducts(),
       ]);
       set({ categories, products });
-    } catch {
-      const cached = localStorage.getItem("axis-menu");
-      if (cached) {
-        try {
-          const { state } = JSON.parse(cached);
-          if (state?.products?.length) set({ categories: state.categories ?? [], products: state.products });
-        } catch { /* corrupt cache */ }
-      }
-    }
+      saveCache(get);
+    } catch { /* API down — cached data already loaded above */ }
   },
 
   addCategory: (c) => {
     set((s) => ({ categories: [...s.categories, c] }));
     useAuditStore.getState().log({ action: "Categoría creada", details: c.name, user: "Sistema", module: "menu" });
-    if (USE_API) menuService.createCategory(c).then((saved) =>
-      set((s) => ({ categories: s.categories.map((x) => (x.id === c.id ? saved : x)) }))
-    ).catch(apiErrorHandler("categoría"));
+    saveCache(get);
+    if (USE_API) menuService.createCategory(c).then((saved) => {
+      set((s) => ({ categories: s.categories.map((x) => (x.id === c.id ? saved : x)) }));
+      saveCache(get);
+    }).catch(apiErrorHandler("categoría"));
   },
 
   removeCategory: (id) => {
@@ -62,8 +78,8 @@ export const useMenuStore = create<MenuState>()(
       products: s.products.filter((p) => p.category !== id),
     }));
     useAuditStore.getState().log({ action: "Categoría eliminada", details: `${cat?.name ?? id} · ${removedProducts.length} productos`, user: "Sistema", module: "menu" });
+    saveCache(get);
     if (USE_API) menuService.deleteCategory(id).catch(apiErrorHandler("eliminar categoría"));
-    // Cascada: elimina las fichas técnicas de los productos que se van con la categoría.
     removedProducts.forEach((p) => {
       const recipe = useRecipesStore.getState().recipes.find((r) => String(r.productId) === String(p.id));
       if (!recipe) return;
@@ -75,21 +91,20 @@ export const useMenuStore = create<MenuState>()(
   addProduct: (p) => {
     set((s) => ({ products: [p, ...s.products] }));
     useAuditStore.getState().log({ action: "Producto creado", details: `${p.name} · $${p.price}`, user: "Sistema", module: "menu" });
-    if (USE_API) menuService.createProduct(p).then((saved) =>
-      set((s) => ({ products: s.products.map((x) => (x.id === p.id ? saved : x)) }))
-    ).catch(apiErrorHandler("producto"));
+    saveCache(get);
+    if (USE_API) menuService.createProduct(p).then((saved) => {
+      set((s) => ({ products: s.products.map((x) => (x.id === p.id ? saved : x)) }));
+      saveCache(get);
+    }).catch(apiErrorHandler("producto"));
   },
 
   updateProduct: (p) => {
     set((s) => ({ products: s.products.map((x) => (x.id === p.id ? p : x)) }));
     useAuditStore.getState().log({ action: "Producto actualizado", details: `${p.name} · $${p.price}`, user: "Sistema", module: "menu" });
+    saveCache(get);
     if (USE_API) menuService.updateProduct(p).catch(apiErrorHandler("producto"));
   },
 
-  /** Sincroniza el precio hacia la ficha técnica vinculada (si existe).
-   * Vive fuera de updateProduct para no disparase también cuando quien
-   * llama a updateProduct es el propio recipe-editor (que ya maneja su
-   * lado de la sincronización) — evita dos PATCH /recipes/ en carrera. */
   syncRecipePrice: (productId, price) => {
     const recipe = useRecipesStore.getState().recipes.find((r) => String(r.productId) === String(productId));
     if (recipe && recipe.price !== price) {
@@ -104,8 +119,8 @@ export const useMenuStore = create<MenuState>()(
     const name = get().products.find((p) => p.id === id)?.name ?? id;
     set((s) => ({ products: s.products.filter((p) => p.id !== id) }));
     useAuditStore.getState().log({ action: "Producto eliminado", details: name, user: "Sistema", module: "menu" });
+    saveCache(get);
     if (USE_API) menuService.deleteProduct(id).catch(apiErrorHandler("eliminar producto"));
-    // Cascada: el producto y su ficha técnica son la misma entidad conceptual.
     const recipe = useRecipesStore.getState().recipes.find((r) => String(r.productId) === String(id));
     if (recipe) {
       useRecipesStore.setState((s) => ({ recipes: s.recipes.filter((r) => r.id !== recipe.id) }));
@@ -115,17 +130,13 @@ export const useMenuStore = create<MenuState>()(
 
   setAvailable: (id, available) => {
     set((s) => ({ products: s.products.map((p) => (p.id === id ? { ...p, available } : p)) }));
+    saveCache(get);
     if (USE_API) {
       const p = get().products.find((x) => x.id === id);
       if (p) menuService.updateProduct({ ...p, available }).catch(apiErrorHandler("disponibilidad"));
     }
   },
-}),
-  {
-    name: "axis-menu",
-    partialize: (s) => ({ categories: s.categories, products: s.products }),
-  },
-));
+}));
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;

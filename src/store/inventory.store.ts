@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { InventoryItem, InventoryMovement, StockStatus } from "@/types";
 import { INVENTORY } from "@/mock/datasets";
 import { MOVEMENTS } from "@/mock/kardex";
@@ -10,6 +9,25 @@ import { inventoryService } from "@/services/inventory.service";
 import { useAuditStore } from "./audit.store";
 
 const r = (n: number) => Math.round(n * 100) / 100;
+const LS_KEY = "axis-inventory";
+
+function saveCache(get: () => InventoryState) {
+  try {
+    const { items, movements } = get();
+    localStorage.setItem(LS_KEY, JSON.stringify({ items, movements }));
+  } catch { /* storage full */ }
+}
+
+function readCache(): { items: InventoryItem[]; movements: InventoryMovement[] } | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data?.state?.items) return { items: data.state.items, movements: data.state.movements ?? [] };
+    if (data?.items) return data;
+    return null;
+  } catch { return null; }
+}
 
 export function statusFor(stock: number, min: number): StockStatus {
   if (stock <= min * 0.4) return "critical";
@@ -35,51 +53,51 @@ interface InventoryState {
   reset: () => void;
 }
 
-export const useInventoryStore = create<InventoryState>()(
-  persist(
-  (set, get) => ({
+export const useInventoryStore = create<InventoryState>()((set, get) => ({
   items: USE_API ? [] : structuredClone(INVENTORY),
   movements: USE_API ? [] : structuredClone(MOVEMENTS),
 
   load: async () => {
     if (!USE_API) return;
+    const cached = readCache();
+    if (cached && cached.items.length > 0) {
+      set({ items: cached.items, movements: cached.movements });
+    }
     try {
       const [items, movements] = await Promise.all([
         inventoryService.getItems(),
         inventoryService.getMovements(),
       ]);
       set({ items, movements });
-    } catch {
-      const cached = localStorage.getItem("axis-inventory");
-      if (cached) {
-        try {
-          const { state } = JSON.parse(cached);
-          if (state?.items?.length) set({ items: state.items, movements: state.movements ?? [] });
-        } catch { /* corrupt cache */ }
-      }
-    }
+      saveCache(get);
+    } catch { /* API down — cached data already loaded */ }
   },
 
   addItem: (item) => {
     set((s) => ({ items: [item, ...s.items] }));
     useAuditStore.getState().log({ action: "Insumo creado", details: `${item.name} · ${item.stock} ${item.unit}`, user: "Sistema", module: "inventario" });
-    if (USE_API) inventoryService.createItem(item).then((saved) =>
-      set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }))
-    ).catch(apiErrorHandler("inventario"));
+    saveCache(get);
+    if (USE_API) inventoryService.createItem(item).then((saved) => {
+      set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }));
+      saveCache(get);
+    }).catch(apiErrorHandler("inventario"));
   },
 
   updateItem: (item) => {
     set((s) => ({ items: s.items.map((x) => (x.id === item.id ? item : x)) }));
     useAuditStore.getState().log({ action: "Insumo actualizado", details: item.name, user: "Sistema", module: "inventario" });
-    if (USE_API) inventoryService.updateItem(item).then((saved) =>
-      set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }))
-    ).catch(apiErrorHandler("inventario"));
+    saveCache(get);
+    if (USE_API) inventoryService.updateItem(item).then((saved) => {
+      set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }));
+      saveCache(get);
+    }).catch(apiErrorHandler("inventario"));
   },
 
   deleteItem: (id) => {
     const name = get().items.find((x) => x.id === id)?.name ?? id;
     set((s) => ({ items: s.items.filter((x) => x.id !== id) }));
     useAuditStore.getState().log({ action: "Insumo eliminado", details: name, user: "Sistema", module: "inventario" });
+    saveCache(get);
     if (USE_API) inventoryService.deleteItem(id).catch(apiErrorHandler("eliminar insumo"));
   },
 
@@ -119,7 +137,10 @@ export const useInventoryStore = create<InventoryState>()(
     });
 
     const depletedItemIds = items.filter((i) => i.stock === 0).map((i) => i.id);
-    if (moves.length) set({ items, movements: [...get().movements, ...moves] });
+    if (moves.length) {
+      set({ items, movements: [...get().movements, ...moves] });
+      saveCache(get);
+    }
     return { affected, depletedItemIds };
   },
 
@@ -144,7 +165,10 @@ export const useInventoryStore = create<InventoryState>()(
         reason: `Compra ${reference}`,
       });
     });
-    if (moves.length) set({ items, movements: [...get().movements, ...moves] });
+    if (moves.length) {
+      set({ items, movements: [...get().movements, ...moves] });
+      saveCache(get);
+    }
   },
 
   applyPhysicalCount: (adjustments) => {
@@ -172,14 +196,12 @@ export const useInventoryStore = create<InventoryState>()(
       applied++;
       if (USE_API) inventoryService.adjustStock(it.id, newStock, "Conteo físico").catch(apiErrorHandler("ajuste stock"));
     });
-    if (moves.length) set({ items, movements: [...get().movements, ...moves] });
+    if (moves.length) {
+      set({ items, movements: [...get().movements, ...moves] });
+      saveCache(get);
+    }
     return applied;
   },
 
   reset: () => set({ items: structuredClone(INVENTORY), movements: structuredClone(MOVEMENTS) }),
-}),
-  {
-    name: "axis-inventory",
-    partialize: (s) => ({ items: s.items, movements: s.movements }),
-  },
-));
+}));

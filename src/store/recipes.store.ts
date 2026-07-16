@@ -1,11 +1,29 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { Recipe, RecipeIngredient, RecipeVariation } from "@/types";
 import { RECIPES } from "@/mock/recipes";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { recipesService } from "@/services/recipes.service";
 import { useMenuStore } from "./menu.store";
 import { menuService } from "@/services/menu.service";
+
+const LS_KEY = "axis-recipes";
+
+function saveCache(get: () => RecipesState) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({ recipes: get().recipes }));
+  } catch { /* storage full */ }
+}
+
+function readCache(): Recipe[] | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data?.state?.recipes) return data.state.recipes;
+    if (data?.recipes) return data.recipes;
+    return null;
+  } catch { return null; }
+}
 
 interface RecipesState {
   recipes: Recipe[];
@@ -16,46 +34,44 @@ interface RecipesState {
   duplicate: (id: string) => void;
 }
 
-export const useRecipesStore = create<RecipesState>()(
-  persist(
-  (set, get) => ({
+export const useRecipesStore = create<RecipesState>()((set, get) => ({
   recipes: USE_API ? [] : structuredClone(RECIPES),
 
   load: async () => {
     if (!USE_API) return;
+    const cached = readCache();
+    if (cached && cached.length > 0) {
+      set({ recipes: cached });
+    }
     try {
       const recipes = await recipesService.list();
       set({ recipes });
-    } catch {
-      const cached = localStorage.getItem("axis-recipes");
-      if (cached) {
-        try {
-          const { state } = JSON.parse(cached);
-          if (state?.recipes?.length) set({ recipes: state.recipes });
-        } catch { /* corrupt cache */ }
-      }
-    }
+      saveCache(get);
+    } catch { /* API down — cached data already loaded */ }
   },
 
   create: (recipe) => {
     set((s) => ({ recipes: [recipe, ...s.recipes] }));
-    if (USE_API) recipesService.create(recipe).then((saved) =>
-      set((s) => ({ recipes: s.recipes.map((r) => (r.id === recipe.id ? saved : r)) }))
-    ).catch(apiErrorHandler("receta"));
+    saveCache(get);
+    if (USE_API) recipesService.create(recipe).then((saved) => {
+      set((s) => ({ recipes: s.recipes.map((r) => (r.id === recipe.id ? saved : r)) }));
+      saveCache(get);
+    }).catch(apiErrorHandler("receta"));
   },
 
   update: (recipe) => {
     set((s) => ({
       recipes: s.recipes.map((r) => (r.id === recipe.id ? { ...recipe, updatedAt: "Justo ahora" } : r)),
     }));
+    saveCache(get);
     if (USE_API) recipesService.update(recipe).catch(apiErrorHandler("receta"));
   },
 
   remove: (id) => {
     const recipe = get().recipes.find((r) => r.id === id);
     set((s) => ({ recipes: s.recipes.filter((r) => r.id !== id) }));
+    saveCache(get);
     if (USE_API) recipesService.remove(id).catch(apiErrorHandler("eliminar receta"));
-    // Cascada: la ficha técnica y el producto son la misma entidad conceptual.
     if (recipe?.productId) {
       const pid = recipe.productId;
       useMenuStore.setState((s) => ({ products: s.products.filter((p) => String(p.id) !== String(pid)) }));
@@ -79,14 +95,10 @@ export const useRecipesStore = create<RecipesState>()(
       const idx = s.recipes.findIndex((r) => r.id === id);
       const next = [...s.recipes];
       next.splice(idx + 1, 0, copy);
+      saveCache(get);
       return { recipes: next };
     }),
-}),
-  {
-    name: "axis-recipes",
-    partialize: (s) => ({ recipes: s.recipes }),
-  },
-));
+}));
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
