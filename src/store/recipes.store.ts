@@ -11,7 +11,6 @@ const LS_KEY = "axis-recipes";
 function saveCache(get: () => RecipesState) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify({ recipes: get().recipes }));
-    import("@/services/backend-sync").then(m => m.markNeedsSync()).catch(() => {});
   } catch { /* storage full */ }
 }
 
@@ -40,16 +39,16 @@ export const useRecipesStore = create<RecipesState>()((set, get) => ({
 
   load: async () => {
     if (!USE_API) return;
+    // Cache = hidratación rápida offline; backend = fuente de verdad.
     const cached = readCache();
     if (cached && cached.length > 0) {
       set({ recipes: cached });
-      return;
     }
     try {
       const recipes = await recipesService.list();
       set({ recipes });
       saveCache(get);
-    } catch { /* API down, no cache available */ }
+    } catch { /* offline: se conserva lo cacheado */ }
   },
 
   create: (recipe) => {

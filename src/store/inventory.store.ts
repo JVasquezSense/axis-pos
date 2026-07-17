@@ -15,7 +15,6 @@ function saveCache(get: () => InventoryState) {
   try {
     const { items, movements } = get();
     localStorage.setItem(LS_KEY, JSON.stringify({ items, movements }));
-    import("@/services/backend-sync").then(m => m.markNeedsSync()).catch(() => {});
   } catch { /* storage full */ }
 }
 
@@ -60,10 +59,10 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   load: async () => {
     if (!USE_API) return;
+    // Cache = hidratación rápida offline; backend = fuente de verdad.
     const cached = readCache();
     if (cached && cached.items.length > 0) {
       set({ items: cached.items, movements: cached.movements });
-      return;
     }
     try {
       const [items, movements] = await Promise.all([
@@ -72,7 +71,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       ]);
       set({ items, movements });
       saveCache(get);
-    } catch { /* API down, no cache available */ }
+    } catch { /* offline: se conserva lo cacheado */ }
   },
 
   addItem: (item) => {

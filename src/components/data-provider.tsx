@@ -10,7 +10,6 @@ import { useSuppliersStore } from "@/store/suppliers.store";
 import { useSalesStore } from "@/store/sales.store";
 import { useReservationsStore } from "@/store/reservations.store";
 import { useEmployeesStore } from "@/store/employees.store";
-import { startBackgroundSync, stopBackgroundSync } from "@/services/backend-sync";
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const loaded = useRef(false);
@@ -37,11 +36,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loadSales(),
       loadReservations(),
       loadEmployees(),
-    ]).then(() => {
-      startBackgroundSync();
-    }).catch(console.error);
-
-    return () => stopBackgroundSync();
+    ]).catch(console.error);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

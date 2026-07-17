@@ -13,7 +13,6 @@ function saveCache(get: () => MenuState) {
   try {
     const { categories, products } = get();
     localStorage.setItem(LS_KEY, JSON.stringify({ categories, products }));
-    import("@/services/backend-sync").then(m => m.markNeedsSync()).catch(() => {});
   } catch { /* storage full or unavailable */ }
 }
 
@@ -47,10 +46,11 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
 
   load: async () => {
     if (!USE_API) return;
+    // Hidrata rápido desde cache (UX instantánea) PERO el backend es la
+    // fuente de verdad: siempre reconcilia. El cache solo sobrevive offline.
     const cached = readCache();
     if (cached && cached.products.length > 0) {
       set({ categories: cached.categories, products: cached.products });
-      return;
     }
     try {
       const [categories, products] = await Promise.all([
@@ -59,7 +59,7 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
       ]);
       set({ categories, products });
       saveCache(get);
-    } catch { /* API down, no cache available */ }
+    } catch { /* offline: se conserva lo cacheado */ }
   },
 
   addCategory: (c) => {
