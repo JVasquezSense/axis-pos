@@ -36,6 +36,19 @@ function readTenantId(): string | null {
   return window.localStorage.getItem("axis-tenant-id");
 }
 
+/**
+ * Borra los caches de datos por-tenant. Debe ejecutarse al iniciar o cerrar
+ * sesión para que un usuario nunca vea datos cacheados de otro restaurante en
+ * el mismo navegador (los stores volverán a hidratarse desde el backend).
+ */
+function clearDataCaches() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem("axis-menu");
+  window.localStorage.removeItem("axis-recipes");
+  window.localStorage.removeItem("axis-inventory");
+  window.localStorage.removeItem("axis-sync-pending");
+}
+
 export const useAuthStore = create<AuthState>()((set) => ({
   loggedIn: readToken(),
   name: readName(),
@@ -45,9 +58,14 @@ export const useAuthStore = create<AuthState>()((set) => ({
   login: (name, isSuperAdmin = false, tenantId = null) => {
     const display = name ?? "Usuario";
     if (typeof window !== "undefined") {
+      // Si cambia el tenant respecto a la sesión previa, purgar caches para no
+      // arrastrar datos de otro restaurante.
+      const prevTenant = window.localStorage.getItem("axis-tenant-id");
+      if (prevTenant !== (tenantId ?? null)) clearDataCaches();
       window.localStorage.setItem("axis-name", display);
       window.localStorage.setItem("axis-superadmin", isSuperAdmin ? "1" : "0");
       if (tenantId) window.localStorage.setItem("axis-tenant-id", tenantId);
+      else window.localStorage.removeItem("axis-tenant-id");
     }
     set({ loggedIn: true, name: display, isSuperAdmin, tenantId });
   },
@@ -59,6 +77,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
       window.localStorage.removeItem("axis-name");
       window.localStorage.removeItem("axis-superadmin");
       window.localStorage.removeItem("axis-tenant-id");
+      clearDataCaches();
     }
     set({ loggedIn: false, name: "Usuario", isSuperAdmin: false, tenantId: null });
   },
