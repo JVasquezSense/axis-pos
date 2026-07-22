@@ -99,7 +99,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   },
 
   deleteItem: (id) => {
-    const name = get().items.find((x) => x.id === id)?.name ?? id;
+    const name = get().items.find((x) => String(x.id) === String(id))?.name ?? id;
     set((s) => ({ items: s.items.filter((x) => x.id !== id) }));
     useAuditStore.getState().log({ action: "Insumo eliminado", details: name, user: "Sistema", module: "inventario" });
     saveCache(get);
@@ -113,11 +113,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     let affected = 0;
 
     lines.forEach((line) => {
-      const recipe = recipes.find((rc) => rc.productId === line.productId);
+      // Los ids llegan como number desde la API y como string cuando se crean
+      // en el cliente: comparar sin coercionar dejaba la venta sin descontar stock.
+      const recipe = recipes.find((rc) => String(rc.productId) === String(line.productId));
       if (!recipe) return;
       const portions = Math.max(recipe.portions, 1);
       recipe.ingredients.forEach((ing) => {
-        const idx = items.findIndex((i) => i.id === ing.inventoryId);
+        const idx = items.findIndex((i) => String(i.id) === String(ing.inventoryId));
         if (idx < 0) return;
         const consumed = r((effectiveQty(ing) / portions) * line.quantity);
         if (consumed <= 0) return;
@@ -153,7 +155,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     const items = [...get().items];
     const moves: InventoryMovement[] = [];
     lines.forEach((line, n) => {
-      const idx = items.findIndex((i) => i.id === line.inventoryId);
+      const idx = items.findIndex((i) => String(i.id) === String(line.inventoryId));
       if (idx < 0 || line.quantity <= 0) return;
       const it = items[idx];
       // Number() explicito: si stock llega como string, `+` concatenaria.
@@ -182,7 +184,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     const moves: InventoryMovement[] = [];
     let applied = 0;
     adjustments.forEach(({ inventoryId, physical }) => {
-      const idx = items.findIndex((i) => i.id === inventoryId);
+      const idx = items.findIndex((i) => String(i.id) === String(inventoryId));
       if (idx < 0) return;
       const it = items[idx];
       const diff = r(physical - it.stock);
