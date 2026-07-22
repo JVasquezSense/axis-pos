@@ -140,7 +140,10 @@ export function ProductFormDialog({
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Categoría</label>
-              <Select value={draft.category} onValueChange={(v) => set({ category: v })}>
+              {/* La API devuelve el id de categoria como number y los SelectItem
+                  usan String(id): sin coercionar, el Select no encuentra la
+                  opcion y se muestra vacio. */}
+              <Select value={String(draft.category ?? "")} onValueChange={(v) => set({ category: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}

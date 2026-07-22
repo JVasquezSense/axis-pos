@@ -411,7 +411,7 @@ export function RecipeEditor({
 
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Categoría">
-                    <Select value={draft.category} onValueChange={(v) => set({ category: v })}>
+                    <Select value={String(draft.category ?? "")} onValueChange={(v) => set({ category: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {categories.map((c) => (
@@ -422,7 +422,9 @@ export function RecipeEditor({
                   </Field>
                   {!isNew && (
                     <Field label="Producto del menú">
-                      <Select value={draft.productId ?? "none"} onValueChange={(v) => set({ productId: v === "none" ? undefined : v })}>
+                      {/* productId llega como number desde la API y los SelectItem
+                          usan String(id): hay que coercionar para que preseleccione. */}
+                      <Select value={draft.productId != null ? String(draft.productId) : "none"} onValueChange={(v) => set({ productId: v === "none" ? undefined : v })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Sin vincular</SelectItem>

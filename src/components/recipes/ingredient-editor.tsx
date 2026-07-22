@@ -58,7 +58,10 @@ export function IngredientEditor({
         <div key={ing.id} className="space-y-2 rounded-xl border border-border p-3">
           {/* Fila 1: insumo + eliminar */}
           <div className="flex items-center gap-2">
-            <Select value={ing.inventoryId} onValueChange={(v) => pickItem(ing.id, v)}>
+            {/* inventoryId llega como number desde la API; los SelectItem usan
+                String(id). Sin coercionar, al editar una receta existente el
+                insumo aparece sin seleccionar. */}
+            <Select value={ing.inventoryId ? String(ing.inventoryId) : ""} onValueChange={(v) => pickItem(ing.id, v)}>
               <SelectTrigger className="h-9 flex-1">
                 <SelectValue placeholder="Selecciona el insumo del inventario" />
               </SelectTrigger>

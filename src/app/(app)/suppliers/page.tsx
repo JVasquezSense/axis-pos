@@ -263,7 +263,7 @@ function PurchaseDialog({
             {lines.map((l, i) => (
               <div key={i} className="space-y-2 rounded-xl border border-border p-2.5">
                 <div className="flex items-center gap-2">
-                  <Select value={l.inventoryId} onValueChange={(v) => pickItem(i, v)}>
+                  <Select value={l.inventoryId ? String(l.inventoryId) : ""} onValueChange={(v) => pickItem(i, v)}>
                     <SelectTrigger className="h-9 flex-1"><SelectValue placeholder="Insumo" /></SelectTrigger>
                     <SelectContent>
                       {inventory.map((it) => <SelectItem key={it.id} value={String(it.id)}>{it.name} · {it.unit}</SelectItem>)}
