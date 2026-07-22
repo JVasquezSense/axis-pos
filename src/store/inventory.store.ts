@@ -30,8 +30,12 @@ function readCache(): { items: InventoryItem[]; movements: InventoryMovement[] }
 }
 
 export function statusFor(stock: number, min: number): StockStatus {
-  if (stock <= min * 0.4) return "critical";
-  if (stock < min) return "low";
+  // Los decimales llegan como string desde DRF ("12.000"); comparar dos strings
+  // con `<` es lexicografico ("12.000" < "3.000" === true). Coercionar siempre.
+  const s = Number(stock);
+  const m = Number(min);
+  if (s <= m * 0.4) return "critical";
+  if (s < m) return "low";
   return "normal";
 }
 
@@ -137,7 +141,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       });
     });
 
-    const depletedItemIds = items.filter((i) => i.stock === 0).map((i) => i.id);
+    const depletedItemIds = items.filter((i) => Number(i.stock) === 0).map((i) => i.id);
     if (moves.length) {
       set({ items, movements: [...get().movements, ...moves] });
       saveCache(get);
@@ -152,7 +156,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       const idx = items.findIndex((i) => i.id === line.inventoryId);
       if (idx < 0 || line.quantity <= 0) return;
       const it = items[idx];
-      const newStock = r(it.stock + line.quantity);
+      // Number() explicito: si stock llega como string, `+` concatenaria.
+      const newStock = r(Number(it.stock) + Number(line.quantity));
       const cost = line.unitCost > 0 ? line.unitCost : it.cost;
       items[idx] = { ...it, stock: newStock, cost, status: statusFor(newStock, it.minStock), updatedAt: "Justo ahora" };
       moves.push({

@@ -3,9 +3,25 @@ import { INVENTORY } from "@/mock/datasets";
 import { MOVEMENTS, PHYSICAL_COUNTS } from "@/mock/kardex";
 import { USE_API, request, mockRequest } from "./http";
 
+/**
+ * DRF serializa los DecimalField como string ("12.000"). Si esos strings entran
+ * al store, la aritmetica se rompe silenciosamente: `stock + qty` concatena y
+ * `stock < min` compara lexicograficamente. Normalizar en el borde.
+ */
+function normalizeItem(i: InventoryItem): InventoryItem {
+  return {
+    ...i,
+    stock: Number(i.stock),
+    minStock: Number(i.minStock),
+    cost: Number(i.cost),
+  };
+}
+
 export const inventoryService = {
   async getItems(): Promise<InventoryItem[]> {
-    return USE_API ? request<InventoryItem[]>("/inventory/") : mockRequest(INVENTORY, 600);
+    if (!USE_API) return mockRequest(INVENTORY, 600);
+    const items = await request<InventoryItem[]>("/inventory/");
+    return items.map(normalizeItem);
   },
   async getMovements(): Promise<InventoryMovement[]> {
     return USE_API ? request<InventoryMovement[]>("/inventory/movements/") : mockRequest(MOVEMENTS, 500);
@@ -15,14 +31,14 @@ export const inventoryService = {
     return request<PhysicalCount[]>("/inventory/physical-count/").catch(() => []);
   },
   async createItem(item: InventoryItem): Promise<InventoryItem> {
-    return USE_API
-      ? request<InventoryItem>("/inventory/", { method: "POST", body: JSON.stringify(item) })
-      : mockRequest(item, 200);
+    if (!USE_API) return mockRequest(item, 200);
+    const saved = await request<InventoryItem>("/inventory/", { method: "POST", body: JSON.stringify(item) });
+    return normalizeItem(saved);
   },
   async updateItem(item: InventoryItem): Promise<InventoryItem> {
-    return USE_API
-      ? request<InventoryItem>(`/inventory/${item.id}/`, { method: "PATCH", body: JSON.stringify(item) })
-      : mockRequest(item, 200);
+    if (!USE_API) return mockRequest(item, 200);
+    const saved = await request<InventoryItem>(`/inventory/${item.id}/`, { method: "PATCH", body: JSON.stringify(item) });
+    return normalizeItem(saved);
   },
   async deleteItem(id: string): Promise<void> {
     if (USE_API) await request<void>(`/inventory/${id}/`, { method: "DELETE" });

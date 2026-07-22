@@ -21,8 +21,12 @@ const CATEGORIES = ["Carnes", "Lácteos", "Verduras", "Frutas", "Panadería", "A
 const UNITS = ["Kg", "Gr", "Lt", "Ml", "Und"];
 
 function statusFor(stock: number, min: number): StockStatus {
-  if (stock <= min * 0.4) return "critical";
-  if (stock < min) return "low";
+  // El backend serializa los decimales como string ("12.000"), y comparar dos
+  // strings con `<` es lexicografico ("12.000" < "3.000" === true). Coercionar.
+  const s = Number(stock);
+  const m = Number(min);
+  if (s <= m * 0.4) return "critical";
+  if (s < m) return "low";
   return "normal";
 }
 
@@ -61,10 +65,11 @@ export function AddSupplyDialog({
       if (initialItem) {
         setName(initialItem.name);
         setCategory(initialItem.category);
-        setStock(initialItem.stock);
+        // Los decimales llegan como string desde la API: normalizar a number.
+        setStock(Number(initialItem.stock));
         setUnit(initialItem.unit);
-        setMinStock(initialItem.minStock);
-        setCost(initialItem.cost);
+        setMinStock(Number(initialItem.minStock));
+        setCost(Number(initialItem.cost));
         setSupplier(initialItem.supplier ?? "");
       } else {
         setName(""); setCategory(CATEGORIES[0]); setStock(0); setUnit("Kg"); setMinStock(0); setCost(0); setSupplier("");
