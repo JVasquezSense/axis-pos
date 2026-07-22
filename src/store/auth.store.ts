@@ -37,16 +37,30 @@ function readTenantId(): string | null {
 }
 
 /**
- * Borra los caches de datos por-tenant. Debe ejecutarse al iniciar o cerrar
- * sesión para que un usuario nunca vea datos cacheados de otro restaurante en
- * el mismo navegador (los stores volverán a hidratarse desde el backend).
+ * Claves de localStorage con datos de UN restaurante. Incluye los caches que
+ * se rehidratan desde el backend y los stores `persist` que hoy viven solo en
+ * el navegador (historial de ventas y turnos, domicilios, web, WhatsApp) y el
+ * branding del restaurante.
+ */
+const TENANT_SCOPED_KEYS = [
+  "axis-menu",
+  "axis-recipes",
+  "axis-inventory",
+  "axis-sync-pending",
+  "axis-history",     // historial de ventas + cierres de turno
+  "axis-deliveries",
+  "axis-web",
+  "axis-whatsapp",
+  "axis-app-store",   // nombre/logo del restaurante
+];
+
+/**
+ * Borra los datos por-tenant. Debe ejecutarse al iniciar o cerrar sesión para
+ * que un usuario nunca vea datos de otro restaurante en el mismo navegador.
  */
 function clearDataCaches() {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem("axis-menu");
-  window.localStorage.removeItem("axis-recipes");
-  window.localStorage.removeItem("axis-inventory");
-  window.localStorage.removeItem("axis-sync-pending");
+  TENANT_SCOPED_KEYS.forEach((k) => window.localStorage.removeItem(k));
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
