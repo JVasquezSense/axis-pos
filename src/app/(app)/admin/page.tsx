@@ -693,11 +693,14 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">Email <span className="text-destructive">*</span></label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@resto.co" />
+              {/* autoComplete off: el navegador rellenaba estos campos con
+                  credenciales guardadas del propio admin, lo que llevaba a
+                  enviar un email ya existente sin darse cuenta. */}
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@resto.co" autoComplete="off" name="tenant-user-email" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">Nombre <span className="text-muted-foreground/60">(opcional)</span></label>
-              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ej: María Gómez" />
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ej: María Gómez" autoComplete="off" name="tenant-user-name" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -712,6 +715,8 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={isEdit ? "Nueva contraseña (opcional)" : "mínimo 8 caracteres"}
                   className="pr-9"
+                  autoComplete="new-password"
+                  name="tenant-user-password"
                 />
                 <button type="button" onClick={() => setShowPass((v) => !v)}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
