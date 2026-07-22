@@ -34,6 +34,8 @@ interface MenuState {
   addCategory: (c: Category) => void;
   removeCategory: (id: string) => void;
   addProduct: (p: Product) => void;
+  /** Inserta un producto YA persistido en el backend (no vuelve a hacer POST). */
+  addProductLocal: (p: Product) => void;
   updateProduct: (p: Product) => void;
   syncRecipePrice: (productId: string, price: number) => void;
   removeProduct: (id: string) => void;
@@ -98,6 +100,12 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
       set((s) => ({ products: s.products.map((x) => (x.id === p.id ? saved : x)) }));
       saveCache(get);
     }).catch(apiErrorHandler("producto"));
+  },
+
+  addProductLocal: (p) => {
+    set((s) => ({ products: [p, ...s.products] }));
+    useAuditStore.getState().log({ action: "Producto creado", details: `${p.name} · $${p.price}`, user: "Sistema", module: "menu" });
+    saveCache(get);
   },
 
   updateProduct: (p) => {

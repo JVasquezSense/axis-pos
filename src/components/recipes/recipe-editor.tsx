@@ -47,6 +47,7 @@ export function RecipeEditor({
   const categories = useMenuStore((s) => s.categories);
   const products = useMenuStore((s) => s.products);
   const addProduct = useMenuStore((s) => s.addProduct);
+  const addProductLocal = useMenuStore((s) => s.addProductLocal);
   const updateProduct = useMenuStore((s) => s.updateProduct);
   const liveInventory = useInventoryStore((s) => s.items);
   const items = liveInventory.length > 0 ? liveInventory : INVENTORY;
@@ -251,7 +252,9 @@ export function RecipeEditor({
       if (USE_API) {
         try {
           const savedProduct = await menuService.createProduct(newProduct);
-          addProduct(savedProduct);
+          // addProduct() volveria a hacer POST y crearia un duplicado: el
+          // producto ya esta persistido, solo hay que insertarlo en el estado.
+          addProductLocal(savedProduct);
           finalDraft = { ...finalDraft, productId: String(savedProduct.id) };
         } catch {
           toast.error("Error al guardar el producto en el servidor");
