@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { History, Search, CalendarDays, Filter } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { History, Search, CalendarDays, Loader2 } from "lucide-react";
 import { useHistoryStore, type ArchivedSale } from "@/store/history.store";
+import { USE_API } from "@/services/http";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,10 +59,15 @@ function fmtTime(ts: number) {
 
 export default function HistoryPage() {
   const sales = useHistoryStore((s) => s.sales);
+  const loading = useHistoryStore((s) => s.loading);
+  const load = useHistoryStore((s) => s.load);
   const [range, setRange] = useState<Range>("all");
   const [search, setSearch] = useState("");
   const [methodFilter, setMethodFilter] = useState<string>("all");
   const [waiterFilter, setWaiterFilter] = useState<string>("all");
+
+  // Carga las ventas reales del backend al montar.
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     const from = startOf(range);
@@ -163,9 +169,15 @@ export default function HistoryPage() {
         <CardContent className="p-0">
           {filtered.length === 0 ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
-              <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-              <p className="font-medium">Sin ventas en este periodo</p>
-              <p className="mt-1 text-xs">Las ventas aparecen aquí al cerrar un turno.</p>
+              {USE_API && loading ? (
+                <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-muted-foreground/40" />
+              ) : (
+                <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+              )}
+              <p className="font-medium">
+                {USE_API && loading ? "Cargando ventas…" : "Sin ventas en este periodo"}
+              </p>
+              {!USE_API && <p className="mt-1 text-xs">Las ventas aparecen aquí al cerrar un turno.</p>}
             </div>
           ) : (
             <div className="max-h-[60vh] overflow-y-auto">
@@ -186,7 +198,7 @@ export default function HistoryPage() {
                   {filtered.map((s) => (
                     <tr key={s.id} className="hover:bg-muted/40 transition-colors">
                       <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                        {s.id.slice(-6).toUpperCase()}
+                        {s.invoiceNumber || s.id.slice(-6).toUpperCase()}
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="text-xs">{fmtDate(s.ts)}</div>
