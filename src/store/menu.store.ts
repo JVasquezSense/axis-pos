@@ -40,6 +40,8 @@ interface MenuState {
   syncRecipePrice: (productId: string, price: number) => void;
   removeProduct: (id: string) => void;
   setAvailable: (id: string, available: boolean) => void;
+  /** Suscribe al WS del tenant para reflejar "Agotado" en vivo. Devuelve un desconectador. */
+  connectRealtime: (tenantId: string) => () => void;
 }
 
 export const useMenuStore = create<MenuState>()((set, get) => ({
@@ -145,6 +147,46 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
       const p = get().products.find((x) => x.id === id);
       if (p) menuService.updateProduct({ ...p, available }).catch(apiErrorHandler("disponibilidad"));
     }
+  },
+
+  connectRealtime: (tenantId) => {
+    const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
+    if (!USE_API || !WS_BASE || !tenantId || typeof window === "undefined") return () => {};
+    let ws: WebSocket | null = null;
+    let closed = false;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+
+    const open = () => {
+      if (closed) return;
+      ws = new WebSocket(`${WS_BASE}/ws/kitchen/${tenantId}/`);
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.event !== "product.availability" || !Array.isArray(data.products)) return;
+          const map = new Map<string, boolean>(
+            data.products.map((u: { id: string; available: boolean }) => [String(u.id), u.available])
+          );
+          set((s) => ({
+            products: s.products.map((p) =>
+              map.has(String(p.id)) ? { ...p, available: map.get(String(p.id))! } : p
+            ),
+          }));
+          saveCache(get);
+        } catch { /* fragmento inválido */ }
+      };
+      // Reintenta la conexión si se cae (una sola conexión por sesión).
+      ws.onclose = () => {
+        if (closed) return;
+        retry = setTimeout(open, 3000);
+      };
+    };
+    open();
+
+    return () => {
+      closed = true;
+      if (retry) clearTimeout(retry);
+      ws?.close();
+    };
   },
 }));
 

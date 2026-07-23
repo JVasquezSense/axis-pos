@@ -10,6 +10,7 @@ import { useSuppliersStore } from "@/store/suppliers.store";
 import { useSalesStore } from "@/store/sales.store";
 import { useReservationsStore } from "@/store/reservations.store";
 import { useEmployeesStore } from "@/store/employees.store";
+import { useAuthStore } from "@/store/auth.store";
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const loaded = useRef(false);
@@ -22,6 +23,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadSales = useSalesStore((s) => s.load);
   const loadReservations = useReservationsStore((s) => s.load);
   const loadEmployees = useEmployeesStore((s) => s.load);
+  const connectRealtime = useMenuStore((s) => s.connectRealtime);
+  const tenantId = useAuthStore((s) => s.tenantId);
 
   useEffect(() => {
     if (loaded.current || !USE_API) return;
@@ -39,6 +42,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     ]).catch(console.error);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Disponibilidad de productos ("Agotado") en tiempo real vía WebSocket.
+  useEffect(() => {
+    if (!USE_API || !tenantId) return;
+    return connectRealtime(tenantId);
+  }, [connectRealtime, tenantId]);
 
   return <>{children}</>;
 }
