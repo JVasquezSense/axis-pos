@@ -29,6 +29,8 @@ interface OrderState {
   sendToKitchen: (channel: OrderChannel) => Promise<{ id: string; code: string }>;
   /** Marca como pagados los Order reales que componen la cuenta actual. */
   markPaid: () => Promise<void>;
+  /** Backlog #4: guarda los cambios de una orden ya enviada (modo edición). */
+  saveOrderChanges: () => Promise<void>;
   clear: () => void;
 }
 
@@ -173,6 +175,22 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
     await Promise.all(
       activeOrderIds.map((id) => ordersService.updateStatus(id, "paid").catch(apiErrorHandler("cerrar pedido")))
     );
+  },
+
+  saveOrderChanges: async () => {
+    // Backlog #4: persiste las líneas editadas de una orden ya enviada.
+    // Si hay varias órdenes activas en la mesa, actualiza la primera (la cuenta
+    // se trata como un solo ticket en el POS). Idempotente.
+    const { activeOrderIds, lines } = get();
+    if (!USE_API || activeOrderIds.length === 0) return;
+    const orderId = activeOrderIds[0];
+    const payload = lines.map((l) => ({
+      productId: Number(l.product.id),
+      quantity: l.quantity,
+      unitPrice: Number((Number(l.unitPrice) + l.modifiers.reduce((s, m) => s + Number(m.price), 0)).toFixed(2)),
+      notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
+    }));
+    await ordersService.updateLines(orderId, payload);
   },
 
   clear: () =>

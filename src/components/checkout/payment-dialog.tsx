@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Check, Loader2, Printer, Mail } from "lucide-react";
-import type { PaymentMethod, PaymentBreakdown } from "@/types";
+import type { PaymentMethod, PaymentBreakdown, OrderLine } from "@/types";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -22,6 +22,8 @@ export function PaymentDialog({
   table,
   saleType,
   waiter,
+  invoiceNumber,
+  lines,
   onComplete,
 }: {
   open: boolean;
@@ -31,12 +33,12 @@ export function PaymentDialog({
   table?: number | null;
   saleType?: string;
   waiter?: string;
+  invoiceNumber?: string;
+  lines?: OrderLine[];
   onComplete: () => void;
 }) {
   const restaurant = useAppStore((s) => s.restaurant);
   const [phase, setPhase] = useState<Phase>("processing");
-  const codeRef = useRef(`FV-${Math.floor(1000 + Math.random() * 9000)}`);
-  const code = codeRef.current;
 
   // Reinicia el flujo cada vez que se abre
   const handleOpen = (v: boolean) => {
@@ -47,8 +49,7 @@ export function PaymentDialog({
   useEffect(() => {
     if (!open) return;
     setPhase("processing");
-    codeRef.current = `FV-${Math.floor(1000 + Math.random() * 9000)}`;
-    const t = setTimeout(() => setPhase("done"), 1800);
+    const t = setTimeout(() => setPhase("done"), 1400);
     return () => clearTimeout(t);
   }, [open]);
 
@@ -83,19 +84,62 @@ export function PaymentDialog({
                 <Check className="h-9 w-9" />
               </motion.div>
               <h3 className="text-lg font-semibold">Pago aprobado</h3>
-              <p className="text-sm text-muted-foreground">Factura {code}</p>
+              <p className="text-sm text-muted-foreground">{invoiceNumber ? `Factura ${invoiceNumber}` : "Venta registrada"}</p>
             </div>
 
-            {/* Recibo */}
+            {/* Recibo fiscal (backlog #1) */}
             <div className="print-area rounded-xl border border-dashed border-border bg-muted/30 p-4 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">Axis POS · {restaurant.name}</span>
-                <span className="text-xs text-muted-foreground">{code}</span>
+              {/* Encabezado fiscal */}
+              <div className="text-center">
+                <p className="text-base font-bold">{restaurant.legalName || restaurant.name}</p>
+                {restaurant.taxId && <p className="text-xs text-muted-foreground">NIT: {restaurant.taxId}</p>}
+                {restaurant.address && <p className="text-xs text-muted-foreground">{restaurant.address}</p>}
+                {restaurant.phone && <p className="text-xs text-muted-foreground">Tel: {restaurant.phone}</p>}
+                {restaurant.resolution && (
+                  <p className="mt-1 text-[10px] leading-tight text-muted-foreground">{restaurant.resolution}</p>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {table ? `Mesa ${table} · ` : ""}{saleType ? `${saleType} · ` : ""}{new Date().toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}, {new Date().toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" })}
-              </p>
-              <Separator className="my-3" />
+              <Separator className="my-2" />
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-mono font-semibold">{invoiceNumber || "—"}</span>
+                <span className="text-muted-foreground">
+                  {new Date().toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
+                  {new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                {table ? <span>Mesa: <strong className="text-foreground">{table}</strong></span> : null}
+                {saleType ? <span>Tipo: <strong className="text-foreground">{saleType}</strong></span> : null}
+                {waiter && waiter !== "Sin asignar" ? <span>Mesero: <strong className="text-foreground">{waiter}</strong></span> : null}
+              </div>
+              <Separator className="my-2" />
+
+              {/* Líneas de productos */}
+              {(lines ?? []).length > 0 && (
+                <div className="mb-2 space-y-1">
+                  <div className="flex justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <span>Producto</span>
+                    <span>Cant · Valor</span>
+                  </div>
+                  {(lines ?? []).map((l, i) => {
+                    const mods = l.modifiers.reduce((s, m) => s + m.price, 0);
+                    const v = (l.unitPrice + mods) * l.quantity;
+                    return (
+                      <div key={i} className="flex justify-between gap-2 text-xs">
+                        <span className="flex-1">
+                          {l.product.name}
+                          {l.notes && <span className="block text-[10px] italic text-amber-600 dark:text-amber-400">{l.notes}</span>}
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          {l.quantity}× · {formatCurrency(v)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  <Separator className="my-1" />
+                </div>
+              )}
+
               <Row label="Subtotal" value={formatCurrency(breakdown.subtotal)} />
               {breakdown.discount > 0 && <Row label="Descuento" value={`- ${formatCurrency(breakdown.discount)}`} />}
               <Row label={`IVA (${Math.round(breakdown.taxRate * 100)}%)`} value={formatCurrency(breakdown.tax)} />
@@ -110,13 +154,14 @@ export function PaymentDialog({
               <p className="mt-2 text-center text-xs text-muted-foreground">
                 Pagado con {PAYMENT_LABEL[method]}
               </p>
+              <p className="mt-1 text-center text-[10px] text-muted-foreground">¡Gracias por su compra!</p>
             </div>
 
             <div className="print-hidden mt-4 grid grid-cols-2 gap-2">
               <Button variant="outline" size="sm" onClick={() => window.print()}>
                 <Printer className="h-4 w-4" /> Imprimir
               </Button>
-              <Button variant="outline" size="sm" onClick={() => toast.success("Factura enviada", { description: `${code} por correo` })}>
+              <Button variant="outline" size="sm" onClick={() => toast.success("Factura enviada", { description: `${invoiceNumber || ""} por correo` })}>
                 <Mail className="h-4 w-4" /> Enviar
               </Button>
             </div>

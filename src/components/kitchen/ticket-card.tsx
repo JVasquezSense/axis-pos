@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, Clock, Flame, ArrowRight, Globe, Bike, Utensils } from "lucide-react";
+import { Check, Clock, Flame, ArrowRight, Globe, Bike, Utensils, Minus, Plus, Trash2 } from "lucide-react";
 import type { KdsTicket, OrderChannel } from "@/types";
 import { Button } from "@/components/ui/button";
 import { cn, minutesAgo } from "@/lib/utils";
@@ -25,14 +25,20 @@ export function TicketCard({
   ticket,
   onAdvance,
   onToggleItem,
+  onSetItemQty,
+  onRemoveItem,
 }: {
   ticket: KdsTicket;
   onAdvance: (id: string) => void;
   onToggleItem: (ticketId: string, index: number) => void;
+  onSetItemQty: (ticketId: string, index: number, quantity: number) => void;
+  onRemoveItem: (ticketId: string, index: number) => void;
 }) {
   const minutes = minutesAgo(new Date(ticket.createdAt));
   const ChannelIcon = CHANNEL_ICON[ticket.channel];
   const late = minutes >= 15 && ticket.status !== "ready";
+  // Backlog #5: las ediciones solo aplican a líneas con productId (Order real).
+  const editable = ticket.status !== "ready";
 
   return (
     <motion.div
@@ -74,24 +80,51 @@ export function TicketCard({
           {ticket.channel === "dine_in" ? "En mesa" : ticket.channel === "web" ? "Pedido web" : ticket.channel === "delivery" ? "Domicilio" : "Para llevar"}
         </p>
         {ticket.items.map((item, idx) => (
-          <button
-            key={idx}
-            onClick={() => onToggleItem(ticket.id, idx)}
-            className="flex w-full items-start gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-muted"
-          >
-            <span
-              className={cn(
-                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                item.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground/40"
-              )}
+          <div key={idx} className="group flex items-start gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-muted">
+            <button
+              onClick={() => onToggleItem(ticket.id, idx)}
+              className="flex w-full items-start gap-2 text-left"
             >
-              {item.done && <Check className="h-3 w-3" />}
-            </span>
-            <span className={cn("flex-1 text-sm", item.done && "text-muted-foreground line-through")}>
-              <span className="font-semibold">{item.quantity}×</span> {item.name}
-              {item.notes && <span className="block text-xs italic text-amber-600 dark:text-amber-400">{item.notes}</span>}
-            </span>
-          </button>
+              <span
+                className={cn(
+                  "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                  item.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground/40"
+                )}
+              >
+                {item.done && <Check className="h-3 w-3" />}
+              </span>
+              <span className={cn("flex-1 text-sm", item.done && "text-muted-foreground line-through")}>
+                <span className="font-semibold">{item.quantity}×</span> {item.name}
+                {item.notes && <span className="block text-xs italic text-amber-600 dark:text-amber-400">{item.notes}</span>}
+              </span>
+            </button>
+            {editable && item.productId != null && (
+              <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <button
+                  onClick={() => onSetItemQty(ticket.id, idx, item.quantity - 1)}
+                  disabled={item.quantity <= 1}
+                  className="flex h-6 w-6 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-background disabled:opacity-40"
+                  title="Reducir"
+                >
+                  <Minus className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => onSetItemQty(ticket.id, idx, item.quantity + 1)}
+                  className="flex h-6 w-6 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-background"
+                  title="Aumentar"
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => onRemoveItem(ticket.id, idx)}
+                  className="flex h-6 w-6 items-center justify-center rounded-md border border-border text-destructive hover:bg-destructive/10"
+                  title="Eliminar"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+          </div>
         ))}
       </div>
 

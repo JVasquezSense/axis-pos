@@ -27,4 +27,10 @@ export const ordersService = {
       ? request<Order>(`/orders/${id}/`, { method: "PATCH", body: JSON.stringify({ status }) })
       : mockRequest({ id, status } as unknown as Order, 200);
   },
+  /** Reemplaza las líneas de una orden (ediciones del KDS / Órdenes: backlog #4, #5). */
+  async updateLines(id: string, lines: { productId: number; quantity: number; unitPrice: number; notes?: string }[]): Promise<Order> {
+    return USE_API
+      ? request<Order>(`/orders/${id}/`, { method: "PATCH", body: JSON.stringify({ lines }) })
+      : mockRequest({ id, lines: [] } as unknown as Order, 200);
+  },
 };

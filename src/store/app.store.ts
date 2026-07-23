@@ -8,6 +8,12 @@ export interface Restaurant {
   plan: string;
   logo: string;
   banner: string;
+  /** Datos fiscales para el ticket (backlog #1). Opcionales: vienen del Tenant. */
+  taxId?: string;
+  legalName?: string;
+  address?: string;
+  phone?: string;
+  resolution?: string;
 }
 
 interface AppState {

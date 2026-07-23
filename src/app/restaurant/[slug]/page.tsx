@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -30,15 +30,30 @@ import { useAppStore } from "@/store/app.store";
 import { MyOrdersSheet } from "@/components/website/my-orders-sheet";
 import { useAsync } from "@/hooks/use-async";
 import { saasService } from "@/services/saas.service";
+import { publicService, type PublicOrderResult } from "@/services/public.service";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
 
-export default function RestaurantSitePage({
+export default function RestaurantSitePage(props: { params: Promise<{ slug: string }> }) {
+  // useSearchParams requiere boundary Suspense en build estático.
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <RestaurantSiteInner {...props} />
+    </Suspense>
+  );
+}
+
+function RestaurantSiteInner({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
+  const searchParams = useSearchParams();
+  // Backlog #8: QR por mesa — el parámetro ?table=N indica la mesa escaneada.
+  const tableFromQR = searchParams.get("table");
+  const tableNumber = tableFromQR ? Number(tableFromQR) : null;
 
   // El tenant actualmente logueado ya conoce su propio restaurante (evita ir a red).
   const currentRestaurant = useAppStore((s) => s.restaurant);
@@ -69,6 +84,7 @@ export default function RestaurantSitePage({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("nequi");
+  const [placing, setPlacing] = useState(false);
 
   const count = cart.reduce((s, l) => s + l.quantity, 0);
   const total = cart.reduce((s, l) => s + l.product.price * l.quantity, 0);
@@ -82,15 +98,38 @@ export default function RestaurantSitePage({
     return products.filter((p) => p.category === activeCat);
   }, [products, query, activeCat]);
 
-  const placeOrder = () => {
+  const placeOrder = async () => {
     if (!phone.trim() || phone.replace(/\D/g, "").length < 7) {
       toast.error("Ingresa un número de teléfono válido");
       return;
     }
-    const order = submitOrder(name || "Cliente web", phone.trim(), method);
-    setDoneId(order.id);
-    setCheckout(false);
-    setCartOpen(false);
+    setPlacing(true);
+    try {
+      // Backlog #8: envía el pedido al backend público (asocia la mesa del QR).
+      const result: PublicOrderResult = await publicService.createOrder(slug, {
+        table: tableNumber,
+        items: cart.map((l) => ({ productId: Number(l.product.id), quantity: l.quantity })),
+        customer: name || "Cliente web",
+        phone: phone.trim(),
+      });
+      toast.success(`Pedido ${result.code} enviado a cocina`, {
+        description: result.table ? `Mesa ${result.table} · ~${result.estimatedWait} min de espera` : `~${result.estimatedWait} min de espera`,
+      });
+      setDoneId(result.orderId);
+      setCheckout(false);
+      setCartOpen(false);
+      // Limpia el carrito tras enviar al backend real.
+      useWebStore.getState().clear();
+    } catch (err) {
+      // Fallback: flujo mock local si el backend no responde.
+      const order = submitOrder(name || "Cliente web", phone.trim(), method);
+      setDoneId(order.id);
+      setCheckout(false);
+      setCartOpen(false);
+      toast.error("No se pudo conectar con el restaurante", { description: "Pedido guardado localmente" });
+    } finally {
+      setPlacing(false);
+    }
   };
 
   if (!tenant) {
@@ -164,6 +203,7 @@ export default function RestaurantSitePage({
               setPhone={setPhone}
               method={method}
               setMethod={setMethod}
+              placing={placing}
               onCheckout={() => setCheckout(true)}
               onBack={() => setCheckout(false)}
               onPlace={placeOrder}
@@ -204,6 +244,17 @@ export default function RestaurantSitePage({
           />
         </div>
       </div>
+
+      {/* Backlog #8: banner de mesa escaneada por QR */}
+      {tableNumber && (
+        <div className="flex items-center gap-2 border-b border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+            {tableNumber}
+          </span>
+          <span className="font-medium">Pedido para la Mesa {tableNumber}</span>
+          <span className="text-muted-foreground">· se enviará directo a cocina</span>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         {/* Rail de categorías (desktop) */}
@@ -322,6 +373,49 @@ export default function RestaurantSitePage({
       <AnimatePresence>
         {doneId && <OrderConfirmation orderId={doneId} onClose={() => setDoneId(null)} />}
       </AnimatePresence>
+
+      {/* Backlog #8: estado del pedido web en vivo (cuando viene del backend) */}
+      <AnimatePresence>
+        {doneId && <LiveOrderStatus orderId={doneId} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+const STATUS_FLOW: Record<string, { label: string; color: string }> = {
+  pending: { label: "En cola", color: "bg-amber-500" },
+  preparing: { label: "Preparando", color: "bg-sky-500" },
+  ready: { label: "Listo para servir", color: "bg-emerald-500" },
+  served: { label: "Servido", color: "bg-emerald-600" },
+  paid: { label: "Completado", color: "bg-zinc-500" },
+};
+
+/** Estado del pedido web en vivo, consultando el endpoint público (backlog #8). */
+function LiveOrderStatus({ orderId }: { orderId: string }) {
+  const [status, setStatus] = useState<{ code: string; status: string; estimatedWait: number } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const poll = async () => {
+      try {
+        const s = await publicService.getStatus(orderId);
+        if (alive) setStatus({ code: s.code, status: s.status, estimatedWait: s.estimatedWait });
+      } catch { /* ignora: puede ser un id mock local */ }
+    };
+    poll();
+    const t = setInterval(poll, 8000);
+    return () => { alive = false; clearInterval(t); };
+  }, [orderId]);
+
+  if (!status) return null;
+  const info = STATUS_FLOW[status.status] ?? { label: status.status, color: "bg-muted" };
+  return (
+    <div className="fixed bottom-4 right-4 z-40 hidden max-w-xs rounded-xl border border-border bg-card p-3 shadow-lg lg:block">
+      <p className="text-xs font-semibold">Tu pedido <span className="font-mono">{status.code}</span></p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <span className={cn("h-2 w-2 animate-pulse rounded-full", info.color)} />
+        <span className="text-sm font-medium">{info.label}</span>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">Tiempo estimado de espera: ~{status.estimatedWait} min</p>
     </div>
   );
 }
@@ -419,6 +513,7 @@ function CartSheet({
   setPhone,
   method,
   setMethod,
+  placing,
   onCheckout,
   onBack,
   onPlace,
@@ -554,8 +649,9 @@ function CartSheet({
             <span className="text-xl font-bold">{formatCurrency(total)}</span>
           </div>
           {checkout ? (
-            <Button className="w-full" size="lg" onClick={onPlace}>
-              Confirmar pedido · {formatCurrency(total)}
+            <Button className="w-full" size="lg" onClick={onPlace} disabled={placing}>
+              {placing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {placing ? "Enviando…" : `Confirmar pedido · ${formatCurrency(total)}`}
             </Button>
           ) : (
             <Button className="w-full" size="lg" onClick={onCheckout}>

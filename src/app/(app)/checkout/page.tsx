@@ -19,11 +19,8 @@ import { SplitBillDialog } from "@/components/checkout/split-bill-dialog";
 import { PAYMENT_METHODS, PAYMENT_LABEL } from "@/lib/payments";
 import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
-import { useInventoryStore } from "@/store/inventory.store";
-import { useMenuStore } from "@/store/menu.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useSalesStore } from "@/store/sales.store";
-import { useRecipesStore } from "@/store/recipes.store";
 import { useAuditStore } from "@/store/audit.store";
 import { useAppStore } from "@/store/app.store";
 import { USE_API } from "@/services/http";
@@ -38,13 +35,10 @@ export default function CheckoutPage() {
   const setStoreTable = useOrderStore((s) => s.setTable);
   const loadTableOrder = useOrderStore((s) => s.loadTableOrder);
   const markPaid = useOrderStore((s) => s.markPaid);
-  const applySale = useInventoryStore((s) => s.applySale);
   const allTables = useTablesStore((s) => s.tables);
   const freeTable = useTablesStore((s) => s.free);
   const occupyTable = useTablesStore((s) => s.occupy);
   const recordSale = useSalesStore((s) => s.record);
-  const setAvailable = useMenuStore((s) => s.setAvailable);
-  const recipes = useRecipesStore((s) => s.recipes);
   const auditLog = useAuditStore((s) => s.log);
   const allEmployees = useEmployeesStore((s) => s.employees);
   const role = useAppStore((s) => s.role);
@@ -63,6 +57,7 @@ export default function CheckoutPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitCollected, setSplitCollected] = useState(0);
+  const [invoiceNumber, setInvoiceNumber] = useState<string>("");
 
   // Sincronizar table local cuando el store cambia (ej. navegando desde salón)
   useEffect(() => { setTableLocal(storeTable ?? null); }, [storeTable]);
@@ -88,18 +83,28 @@ export default function CheckoutPage() {
 
   const sendToKitchen = useOrderStore((s) => s.sendToKitchen);
 
+  // Backlog #1: crea la venta en el backend para obtener el número de factura
+  // correlativo y luego abre el dialog de pago con ese número.
+  const charge = async () => {
+    if (remaining <= 0 || !waiter.trim()) return;
+    try {
+      const saved = await recordSale({
+        total, subtotal: breakdown.subtotal, tax: breakdown.tax, discount: breakdown.discount,
+        items: orderSelectors.count(lines), method, saleType: st.label, table, tip,
+        waiter: waiter.trim() || "Sin asignar",
+      });
+      setInvoiceNumber(saved.invoiceNumber ?? "");
+      setPayOpen(true);
+    } catch {
+      setInvoiceNumber("");
+      setPayOpen(true);
+    }
+  };
+
   const completeSale = async () => {
     const ref = table ? `mesa ${table}` : "mostrador";
-    const { affected, depletedItemIds } = applySale(ref, lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })));
-    if (depletedItemIds.length > 0) {
-      const affected86: string[] = [];
-      recipes.forEach((rc) => {
-        const uses = rc.ingredients.some((ing) => depletedItemIds.includes(ing.inventoryId));
-        if (uses && rc.productId) { setAvailable(rc.productId, false); affected86.push(rc.name); }
-      });
-      if (affected86.length > 0) toast.warning("86 automático", { description: `Agotado: ${affected86.join(", ")}` });
-    }
-    recordSale({ total, items: orderSelectors.count(lines), method, saleType: st.label, table, tip, waiter: waiter.trim() || "Sin asignar" });
+    // BACKLOG #5: el inventario se descuenta cuando la cocina prepara el pedido
+    // (backend consume_order_inventory), NUNCA al cobrar.
 
     if (saleType === "takeaway" && !table && lines.length > 0) {
       try {
@@ -115,8 +120,9 @@ export default function CheckoutPage() {
     }
     await markPaid();
     clear();
-    auditLog({ action: "Venta cobrada", details: `${st.label} · ${formatCurrency(total)} · ${PAYMENT_LABEL[method]}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}`, user: waiter.trim() || "Sistema", module: "ventas" });
-    toast.success("Venta registrada", { description: affected > 0 ? `${st.label} · ${affected} salidas de inventario` : st.label });
+    auditLog({ action: "Venta cobrada", details: `${st.label} · ${formatCurrency(total)} · ${PAYMENT_LABEL[method]}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}${invoiceNumber ? ` · ${invoiceNumber}` : ""}`, user: waiter.trim() || "Sistema", module: "ventas" });
+    toast.success("Venta registrada", { description: st.label });
+    setInvoiceNumber("");
   };
 
   const changeTable = (value: string) => {
@@ -342,7 +348,7 @@ export default function CheckoutPage() {
                   </button>
                 ))}
               </div>
-              <Button size="lg" className="mt-4 w-full text-base" onClick={() => setPayOpen(true)} disabled={remaining <= 0 || !waiter.trim()}>
+              <Button size="lg" className="mt-4 w-full text-base" onClick={charge} disabled={remaining <= 0 || !waiter.trim()}>
                 Cobrar {formatCurrency(remaining)}
               </Button>
               {!waiter.trim() && remaining > 0 && (
@@ -371,6 +377,8 @@ export default function CheckoutPage() {
         table={table}
         saleType={st.label}
         waiter={waiter.trim() || "Sin asignar"}
+        invoiceNumber={invoiceNumber}
+        lines={lines}
         onComplete={completeSale}
       />
     </div>

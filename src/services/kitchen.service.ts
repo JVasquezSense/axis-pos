@@ -18,6 +18,9 @@ function orderToTicket(o: Order): KdsTicket {
       quantity: l.quantity,
       notes: l.notes || undefined,
       done: status === "ready",
+      lineId: l.id,
+      productId: l.product.id,
+      unitPrice: l.unitPrice,
     })),
     priority: false,
   };

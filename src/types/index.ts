@@ -125,6 +125,8 @@ export interface Product {
   prepMinutes: number;
   modifiers?: ModifierGroup[];
   popular?: boolean;
+  /** Backlog #6: ¿reintegra stock al devolverse? (bebida sellada sí, comida no). */
+  restockable?: boolean;
 }
 
 export interface Category {
@@ -176,7 +178,17 @@ export interface KdsTicket {
   channel: OrderChannel;
   status: KdsStatus;
   createdAt: string; // ISO
-  items: { name: string; quantity: number; notes?: string; done?: boolean }[];
+  items: {
+    name: string;
+    quantity: number;
+    notes?: string;
+    done?: boolean;
+    /** Datos para edición/eliminación desde el KDS (backlog #5). Opcionales: solo
+     *  se rellenan cuando el ticket viene de un Order real del backend. */
+    lineId?: string;
+    productId?: string;
+    unitPrice?: number;
+  }[];
   priority: boolean;
 }
 

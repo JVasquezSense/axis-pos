@@ -17,6 +17,12 @@ function normalizeItem(i: InventoryItem): InventoryItem {
   };
 }
 
+export interface DishConsumptionReport {
+  period: { from: string; to: string };
+  dishes: { id: string; name: string; units: number; revenue: number }[];
+  supplies: { id: string; name: string; unit: string; consumed: number; cost: number }[];
+}
+
 export const inventoryService = {
   async getItems(): Promise<InventoryItem[]> {
     if (!USE_API) return mockRequest(INVENTORY, 600);
@@ -25,6 +31,12 @@ export const inventoryService = {
   },
   async getMovements(): Promise<InventoryMovement[]> {
     return USE_API ? request<InventoryMovement[]>("/inventory/movements/") : mockRequest(MOVEMENTS, 500);
+  },
+  /** Salida por Plato (backlog #2): consumo de insumos por plato, filtrado por tenant. */
+  async getDishConsumption(days = 30): Promise<DishConsumptionReport> {
+    return USE_API
+      ? request<DishConsumptionReport>(`/reports/dish-consumption/?days=${days}`)
+      : mockRequest({ period: { from: "", to: "" }, dishes: [], supplies: [] } as DishConsumptionReport, 500);
   },
   async getPhysicalCounts(): Promise<PhysicalCount[]> {
     if (!USE_API) return mockRequest(PHYSICAL_COUNTS, 500);

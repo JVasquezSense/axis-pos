@@ -16,6 +16,10 @@ interface KitchenState {
   addWebTicket: (input: { code: string; items: { name: string; quantity: number }[]; customer?: string }) => void;
   advance: (id: string) => void;
   toggleItem: (id: string, index: number) => void;
+  /** Backlog #5: editar cantidad de un item del ticket desde el KDS. */
+  setItemQty: (id: string, index: number, quantity: number) => void;
+  /** Backlog #5: eliminar un item del ticket desde el KDS. */
+  removeItem: (id: string, index: number) => void;
 }
 
 export const useKitchenStore = create<KitchenState>()((set, get) => ({
@@ -101,4 +105,47 @@ export const useKitchenStore = create<KitchenState>()((set, get) => ({
         t.id === id ? { ...t, items: t.items.map((it, i) => (i === index ? { ...it, done: !it.done } : it)) } : t
       ),
     })),
+
+  setItemQty: (id, index, quantity) => {
+    if (quantity < 1) return;
+    const ticket = get().tickets.find((t) => t.id === id);
+    if (!ticket) return;
+    set((s) => ({
+      tickets: s.tickets.map((t) =>
+        t.id === id ? { ...t, items: t.items.map((it, i) => (i === index ? { ...it, quantity } : it)) } : t
+      ),
+    }));
+    persistTicketLines(ticket.id);
+  },
+
+  removeItem: (id, index) => {
+    const ticket = get().tickets.find((t) => t.id === id);
+    if (!ticket) return;
+    set((s) => ({
+      tickets: s.tickets.map((t) =>
+        t.id === id ? { ...t, items: t.items.filter((_, i) => i !== index) } : t
+      ),
+    }));
+    persistTicketLines(ticket.id);
+  },
 }));
+
+/**
+ * Persiste las líneas actuales de un ticket al backend (PATCH /orders/{id}/).
+ * Solo aplica a tickets reales (id numérico). Se usa tras editar/eliminar items
+ * del KDS (backlog #5). Filtra items que no tengan productId (mock/web).
+ */
+function persistTicketLines(id: string) {
+  if (!USE_API || !/^\d+$/.test(id)) return;
+  const ticket = useKitchenStore.getState().tickets.find((t) => t.id === id);
+  if (!ticket) return;
+  const lines = ticket.items
+    .filter((it) => it.productId != null && it.unitPrice != null)
+    .map((it) => ({
+      productId: Number(it.productId),
+      quantity: it.quantity,
+      unitPrice: Number(it.unitPrice),
+      notes: it.notes,
+    }));
+  ordersService.updateLines(id, lines).catch(apiErrorHandler("editar pedido"));
+}

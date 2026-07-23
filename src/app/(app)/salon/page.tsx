@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Armchair, Plus, LayoutGrid, Layers, Copy, Pencil, Trash2, X, Check } from "lucide-react";
+import { Armchair, Plus, LayoutGrid, Layers, Copy, Pencil, Trash2, X, Check, QrCode } from "lucide-react";
 import type { RestaurantTable, TableStatus, SalonZone } from "@/types";
 import { useTablesStore } from "@/store/tables.store";
 import { useAppStore } from "@/store/app.store";
 import { PageHeader } from "@/components/shared/page-header";
+import { TableQrDialog } from "@/components/salon/table-qr-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,6 +50,7 @@ function nextPosition(tables: RestaurantTable[], zones: SalonZone[], zone: strin
 export default function SalonPage() {
   const role = useAppStore((s) => s.role);
   const isAdmin = role === "admin";
+  const restaurant = useAppStore((s) => s.restaurant);
 
   const tables = useTablesStore((s) => s.tables);
   const zones = useTablesStore((s) => s.zones);
@@ -69,6 +71,7 @@ export default function SalonPage() {
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [zonesOpen, setZonesOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState(false);
   const [layoutSelectedId, setLayoutSelectedId] = useState<string | null>(null);
   const layoutSelected = tables.find((t) => t.id === layoutSelectedId) ?? null;
@@ -193,6 +196,9 @@ export default function SalonPage() {
             )}
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4" /> Nueva mesa
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setQrOpen(true)}>
+              <QrCode className="h-4 w-4" /> QR por mesa
             </Button>
           </div>
         }
@@ -382,6 +388,8 @@ export default function SalonPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TableQrDialog open={qrOpen} onOpenChange={setQrOpen} tables={tables} slug={restaurant.slug} />
     </div>
   );
 }

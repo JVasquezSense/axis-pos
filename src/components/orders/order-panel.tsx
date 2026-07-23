@@ -24,7 +24,7 @@ import { formatCurrency } from "@/lib/utils";
 
 export function OrderPanel() {
   const router = useRouter();
-  const { lines, tableNumber, increment, decrement, remove, clear, setTable, sendToKitchen, setNotes } = useOrderStore();
+  const { lines, tableNumber, increment, decrement, remove, clear, setTable, sendToKitchen, setNotes, activeOrderIds, saveOrderChanges } = useOrderStore();
   const allTables = useTablesStore((s) => s.tables);
   const occupyTable = useTablesStore((s) => s.occupy);
   const subtotal = orderSelectors.subtotal(lines);
@@ -33,6 +33,8 @@ export function OrderPanel() {
   const count = orderSelectors.count(lines);
   const auditLog = useAuditStore((s) => s.log);
   const [sending, setSending] = useState(false);
+  // Backlog #4: modo edición cuando hay órdenes ya enviadas para esta mesa.
+  const editing = activeOrderIds.length > 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -40,6 +42,11 @@ export function OrderPanel() {
         <div className="flex items-center gap-2">
           <ShoppingCart className="h-5 w-5 text-primary" />
           <h2 className="font-semibold">Pedido actual</h2>
+          {editing && (
+            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+              Editando
+            </span>
+          )}
           {count > 0 && (
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
               {count}
@@ -174,6 +181,28 @@ export function OrderPanel() {
               Vaciar
             </Button>
             {tableNumber ? (
+              editing ? (
+                <Button
+                  className="col-span-2"
+                  disabled={sending}
+                  onClick={async () => {
+                    setSending(true);
+                    try {
+                      await saveOrderChanges();
+                      auditLog({ action: "Pedido editado", details: `${count} productos - ${formatCurrency(total)} - Mesa ${tableNumber}`, user: "Sistema", module: "ventas" });
+                      toast.success("Cambios guardados", { description: `Mesa ${tableNumber} actualizada` });
+                      router.push("/kitchen");
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : "Error desconocido";
+                      toast.error("No se pudieron guardar los cambios", { description: msg.slice(0, 120) });
+                    } finally {
+                      setSending(false);
+                    }
+                  }}
+                >
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Guardar cambios
+                </Button>
+              ) : (
               <Button
                 className="col-span-2"
                 disabled={sending}
@@ -196,6 +225,7 @@ export function OrderPanel() {
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar a cocina
               </Button>
+              )
             ) : (
               <Button
                 className="col-span-2"

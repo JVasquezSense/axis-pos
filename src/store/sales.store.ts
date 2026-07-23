@@ -8,19 +8,25 @@ export const SALES_BASE = { sales: 0, orders: 0 };
 export interface SaleRecord {
   id: string;
   total: number;
+  subtotal?: number;
+  tax?: number;
+  discount?: number;
   items: number;
   method: PaymentMethod;
   saleType: string;
   table: number | null;
   tip: number;
   waiter: string;
+  customer?: string;
+  observations?: string;
+  invoiceNumber?: string;
   ts: number;
 }
 
 interface SalesState {
   records: SaleRecord[];
   load: () => Promise<void>;
-  record: (s: Omit<SaleRecord, "id" | "ts">) => void;
+  record: (s: Omit<SaleRecord, "id" | "ts">) => Promise<SaleRecord>;
   reset: () => void;
 }
 
@@ -33,12 +39,20 @@ export const useSalesStore = create<SalesState>()((set) => ({
     set({ records });
   },
 
-  record: (s) => {
+  record: async (s) => {
     const entry: SaleRecord = { ...s, id: `sale-${Date.now()}`, ts: Date.now() };
     set((st) => ({ records: [entry, ...st.records] }));
-    if (USE_API) salesService.record(s).then((saved) =>
-      set((st) => ({ records: st.records.map((r) => (r.id === entry.id ? saved : r)) }))
-    ).catch(apiErrorHandler("venta"));
+    if (USE_API) {
+      try {
+        const saved = await salesService.record(s);
+        set((st) => ({ records: st.records.map((r) => (r.id === entry.id ? saved : r)) }));
+        return saved;
+      } catch (e) {
+        apiErrorHandler("venta")(e);
+        return entry;
+      }
+    }
+    return entry;
   },
 
   reset: () => set({ records: [] }),

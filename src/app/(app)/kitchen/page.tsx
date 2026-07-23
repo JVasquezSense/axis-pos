@@ -21,6 +21,8 @@ export default function KitchenPage() {
   const tickets = useKitchenStore((s) => s.tickets);
   const advanceStore = useKitchenStore((s) => s.advance);
   const toggleItem = useKitchenStore((s) => s.toggleItem);
+  const setItemQty = useKitchenStore((s) => s.setItemQty);
+  const removeItem = useKitchenStore((s) => s.removeItem);
   const load = useKitchenStore((s) => s.load);
   const connect = useKitchenStore((s) => s.connect);
   const wsConnected = useKitchenStore((s) => s.wsConnected);
@@ -86,7 +88,21 @@ export default function KitchenPage() {
                 ) : (
                   <AnimatePresence mode="popLayout">
                     {colTickets.map((t) => (
-                      <TicketCard key={t.id} ticket={t} onAdvance={advance} onToggleItem={toggleItem} />
+                      <TicketCard
+                        key={t.id}
+                        ticket={t}
+                        onAdvance={advance}
+                        onToggleItem={toggleItem}
+                        onSetItemQty={(ticketId, idx, qty) => {
+                          setItemQty(ticketId, idx, qty);
+                          toast.message(`${t.items[idx]?.name}: ${qty}×`);
+                        }}
+                        onRemoveItem={(ticketId, idx) => {
+                          const name = t.items[idx]?.name;
+                          removeItem(ticketId, idx);
+                          toast.success(`Producto eliminado${name ? `: ${name}` : ""}`);
+                        }}
+                      />
                     ))}
                   </AnimatePresence>
                 )}
