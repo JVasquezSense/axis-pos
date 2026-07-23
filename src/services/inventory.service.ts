@@ -17,10 +17,27 @@ function normalizeItem(i: InventoryItem): InventoryItem {
   };
 }
 
+export interface DishConsumptionSupply {
+  id: string;
+  name: string;
+  unit: string;
+  consumed: number;
+  cost: number;
+}
+
 export interface DishConsumptionReport {
   period: { from: string; to: string };
-  dishes: { id: string; name: string; units: number; revenue: number }[];
-  supplies: { id: string; name: string; unit: string; consumed: number; cost: number }[];
+  dishes: {
+    id: string;
+    name: string;
+    emoji?: string;
+    units: number;
+    revenue: number;
+    cost?: number;
+    /** Desglose de insumos consumidos por este plato (lo calcula el backend). */
+    supplies?: DishConsumptionSupply[];
+  }[];
+  supplies: DishConsumptionSupply[];
 }
 
 export const inventoryService = {

@@ -63,46 +63,36 @@ export function ConsumptionView() {
     return () => { alive = false; };
   }, []);
 
-  // En modo API cruzamos insumos consumidos con las recetas del catálogo para
-  // mostrar el desglose por plato. Si el backend trae dishes + supplies ya
-  // agregados, los presentamos directamente.
+  // En modo API el backend ya calcula, por plato, los insumos consumidos con su
+  // cantidad y costo (cruzando OrderLine × Recipe × InventoryItem del tenant).
+  // Lo renderizamos directamente: NO recalculamos desde los mocks.
   const cards: DishCard[] = (() => {
-    if (!USE_API || !report) {
-      // fallback mock
+    if (!USE_API) {
+      // fallback mock (modo demo sin backend)
       return RECIPES.map((r) => {
         const c = recipeConsumption(r.id);
         return { id: r.id, emoji: r.emoji, name: r.name, sold: c.sold, items: c.items, total: c.total };
       });
     }
-    // Datos reales: un card por plato vendido, con los insumos del reporte
-    // que pertenezcan a su receta. Si no hay cruce posible, mostramos el agregado.
-    return report.dishes.map((d) => {
-      const recipe = RECIPES.find((r) => String(r.productId) === String(d.id));
-      const portions = Math.max(recipe?.portions ?? 1, 1);
-      const items: Consumed[] = recipe
-        ? recipe.ingredients.map((ing) => {
-            const inv = getInventoryItem(ing.inventoryId);
-            const sup = report.supplies.find((s) => String(s.id) === String(ing.inventoryId));
-            const consumedPerPortion = effectiveQty(ing) / portions;
-            const qty = Math.round(consumedPerPortion * d.units * 100) / 100;
-            const unitCost = inv?.cost ?? (sup ? sup.cost / Math.max(d.units, 1) : 0);
-            return {
-              name: ing.name || inv?.name || sup?.name || "—",
-              unit: ing.unit || inv?.unit || sup?.unit || "",
-              qty,
-              cost: Math.round(qty * unitCost),
-            };
-          })
-        : report.supplies.slice(0, 0).map((s) => ({ name: s.name, unit: s.unit, qty: 0, cost: 0 }));
-      return {
-        id: d.id,
-        emoji: recipe?.emoji ?? "🍽️",
-        name: d.name,
-        sold: d.units,
-        items,
-        total: items.reduce((s, i) => s + i.cost, 0),
-      };
-    }).filter((c) => c.sold > 0);
+    if (!report) return [];
+    return report.dishes
+      .filter((d) => d.units > 0)
+      .map((d) => {
+        const items: Consumed[] = (d.supplies ?? []).map((s) => ({
+          name: s.name,
+          unit: s.unit,
+          qty: s.consumed,
+          cost: s.cost,
+        }));
+        return {
+          id: d.id,
+          emoji: d.emoji ?? "🍽️",
+          name: d.name,
+          sold: d.units,
+          items,
+          total: d.cost ?? items.reduce((sum, i) => sum + i.cost, 0),
+        };
+      });
   })();
 
   const grandTotal = cards.reduce((s, d) => s + d.total, 0);
