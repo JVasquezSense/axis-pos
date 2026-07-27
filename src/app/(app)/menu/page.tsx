@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductFormDialog } from "@/components/menu/product-form-dialog";
+import { ComboFormDialog } from "@/components/menu/combo-form-dialog";
 import { MenuScanDialog } from "@/components/menu/menu-scan-dialog";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -82,6 +83,8 @@ function CartaTab() {
   const [formOpen, setFormOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [comboOpen, setComboOpen] = useState(false);
+  const [comboEditing, setComboEditing] = useState<Product | null>(null);
   const [toDelete, setToDelete] = useState<Product | null>(null);
   const [recipeEditing, setRecipeEditing] = useState<Recipe | null>(null);
   const [recipeIsNew, setRecipeIsNew] = useState(false);
@@ -141,6 +144,9 @@ function CartaTab() {
         <Button variant="outline" size="sm" onClick={() => setScanOpen(true)}>
           <ScanLine className="h-4 w-4" /> Importar desde foto
         </Button>
+        <Button size="sm" variant="outline" onClick={() => { setComboEditing(null); setComboOpen(true); }}>
+          <Package className="h-4 w-4" /> Combo
+        </Button>
         <Button size="sm" onClick={openNew}>
           <Plus className="h-4 w-4" /> Producto
         </Button>
@@ -180,18 +186,27 @@ function CartaTab() {
           <Card key={p.id} className={cn("group flex flex-col overflow-hidden", !p.available && "opacity-60")}>
             <div className="relative">
               <ProductImage emoji={p.image} category={p.category} className="h-24 w-full rounded-b-none" />
-              {p.popular && <Badge variant="warning" className="absolute left-2 top-2">★ Destacado</Badge>}
+              {p.isCombo && <Badge variant="secondary" className="absolute left-2 top-2 gap-1"><Package className="h-3 w-3" /> Combo</Badge>}
+              {p.popular && !p.isCombo && <Badge variant="warning" className="absolute left-2 top-2">★ Destacado</Badge>}
               <DropdownMenu>
                 <DropdownMenuTrigger className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-background/90 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100">
                   <MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => { setEditing(p); setFormOpen(true); }}>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (p.isCombo) { setComboEditing(p); setComboOpen(true); }
+                      else { setEditing(p); setFormOpen(true); }
+                    }}
+                  >
                     <Pencil className="h-4 w-4" /> Editar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openRecipe(p)}>
-                    <BookOpen className="h-4 w-4" /> {recipeFor(p.id) ? "Ver receta" : "Crear receta"}
-                  </DropdownMenuItem>
+                  {/* Un combo no lleva ficha técnica propia: la aportan sus componentes. */}
+                  {!p.isCombo && (
+                    <DropdownMenuItem onClick={() => openRecipe(p)}>
+                      <BookOpen className="h-4 w-4" /> {recipeFor(p.id) ? "Ver receta" : "Crear receta"}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => setToDelete(p)} className="text-destructive focus:text-destructive">
                     <Trash2 className="h-4 w-4" /> Eliminar
                   </DropdownMenuItem>
@@ -235,6 +250,23 @@ function CartaTab() {
       )}
 
       <ProductFormDialog product={editing} categories={categories} open={formOpen} onOpenChange={setFormOpen} onSave={save} />
+
+      <ComboFormDialog
+        open={comboOpen}
+        onOpenChange={setComboOpen}
+        combo={comboEditing}
+        products={products}
+        categories={categories}
+        onSave={(c) => {
+          if (comboEditing) {
+            updateProduct(c);
+            toast.success("Combo actualizado", { description: c.name });
+          } else {
+            addProduct({ ...c, id: uid("p") });
+            toast.success("Combo creado", { description: c.name });
+          }
+        }}
+      />
       <RecipeEditor recipe={recipeEditing} isNew={recipeIsNew} open={recipeOpen} onOpenChange={setRecipeOpen} />
       <AddCategoryDialog open={catOpen} onOpenChange={setCatOpen} onCreate={(c) => { addCategory(c); toast.success(`Categoría "${c.name}" creada`); }} />
       <MenuScanDialog

@@ -127,6 +127,22 @@ export interface Product {
   popular?: boolean;
   /** Backlog #6: ¿reintegra stock al devolverse? (bebida sellada sí, comida no). */
   restockable?: boolean;
+  /** Combo: producto vendible compuesto por otros productos. */
+  isCombo?: boolean;
+  comboItems?: ComboItem[];
+  /** Suma del precio de los componentes (para mostrar el ahorro). */
+  componentsTotal?: number | null;
+}
+
+export interface ComboItem {
+  id?: number | string;
+  productId: number | string;
+  /** Solo lectura, lo devuelve el backend. */
+  name?: string;
+  price?: number;
+  image?: string;
+  available?: boolean;
+  quantity: number;
 }
 
 export interface Category {
