@@ -9,6 +9,9 @@ import type { LiveWebOrder } from "@/store/web.store";
 import { useWebStore, WEB_ORDER_STATUS } from "@/store/web.store";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useAppStore } from "@/store/app.store";
+import { ordersService } from "@/services/orders.service";
+import { USE_API } from "@/services/http";
+import type { Order } from "@/types";
 import { PAYMENT_LABEL } from "@/lib/payments";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +79,10 @@ export function WebOrdersFeed() {
 
   return (
     <div className="space-y-4">
+      {/* Pedidos reales de la carta pública / QR por mesa (sin pago, solo
+          solicitud). Vienen del backend y ya están filtrados por tenant. */}
+      <QrOrdersSection />
+
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Por verificar" value={`${counts.review}`} tone="text-amber-500" />
         <Stat label="Verificados" value={`${counts.verified}`} tone="text-emerald-500" />
@@ -219,6 +226,75 @@ function OrderRow({ order, onView, onVerify, onReject, onDispatch }: { order: Li
         <p className="mt-2 rounded-lg bg-destructive/10 px-2.5 py-1.5 text-center text-xs font-medium text-destructive">Comprobante rechazado · contactar al cliente</p>
       )}
     </motion.div>
+  );
+}
+
+const QR_STATUS: Record<string, { label: string; tone: string }> = {
+  pending: { label: "En cola", tone: "bg-amber-500" },
+  preparing: { label: "Preparando", tone: "bg-sky-500" },
+  ready: { label: "Listo", tone: "bg-emerald-500" },
+  served: { label: "Servido", tone: "bg-emerald-600" },
+};
+
+/**
+ * Pedidos hechos desde la carta pública (QR por mesa). No llevan pago: son
+ * solicitudes que ya están en cocina. El backend los filtra por tenant.
+ */
+function QrOrdersSection() {
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    if (!USE_API) return;
+    let alive = true;
+    const load = () =>
+      ordersService.getWebOrders()
+        .then((o) => { if (alive) setOrders(o); })
+        .catch(() => { /* sin conexión: se conserva lo último */ });
+    load();
+    const t = setInterval(load, 10000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  if (orders.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-border bg-muted/30 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Globe className="h-4 w-4 text-primary" />
+        <p className="text-sm font-semibold">Pedidos desde la carta / QR</p>
+        <Badge variant="secondary">{orders.length}</Badge>
+      </div>
+      <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+        {orders.map((o) => {
+          const st = QR_STATUS[o.status] ?? { label: o.status, tone: "bg-muted" };
+          const items = o.lines.reduce((s, l) => s + l.quantity, 0);
+          const total = o.lines.reduce((s, l) => s + Number(l.unitPrice) * l.quantity, 0);
+          return (
+            <div key={o.id} className="rounded-lg border border-border bg-card p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">
+                  {o.code}
+                  {o.tableNumber != null && (
+                    <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium">
+                      Mesa {o.tableNumber}
+                    </span>
+                  )}
+                </p>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${st.tone}`}>
+                  {st.label}
+                </span>
+              </div>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {o.lines.map((l) => `${l.quantity}× ${l.product.name}`).join(" · ")}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {items} ítem(s) · {formatCurrency(total)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

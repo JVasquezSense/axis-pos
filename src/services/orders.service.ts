@@ -17,6 +17,11 @@ export const ordersService = {
     const tableParam = table != null ? `&table=${table}` : "";
     return request<Order[]>(`/orders/?status=pending,preparing,ready${tableParam}`);
   },
+  /** Pedidos web reales (carta pública / QR por mesa). Filtrados por tenant en el backend. */
+  async getWebOrders(): Promise<Order[]> {
+    if (!USE_API) return mockRequest([], 300);
+    return request<Order[]>("/orders/?channel=web&status=pending,preparing,ready,served");
+  },
   async createOrder(payload: CreateOrderPayload): Promise<Order> {
     return USE_API
       ? request<Order>("/orders/", { method: "POST", body: JSON.stringify(payload) })
