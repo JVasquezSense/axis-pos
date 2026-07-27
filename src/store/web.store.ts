@@ -37,12 +37,16 @@ export interface LiveWebOrder {
 interface WebState {
   cart: WebCartLine[];
   liveOrders: LiveWebOrder[];
+  /** IDs de pedidos web enviados desde este dispositivo (persistido). */
+  myOrderIds: string[];
   add: (product: Product) => void;
   increment: (id: string) => void;
   decrement: (id: string) => void;
   /** Notas por item del carrito web (ej. "sin cebolla"). */
   setNotes: (id: string, notes: string) => void;
   clear: () => void;
+  /** Registra un pedido enviado para poder seguirlo en 'Mis pedidos'. */
+  addMyOrder: (orderId: string) => void;
   submitOrder: (customer: string, phone: string, method: PaymentMethod) => LiveWebOrder;
   uploadReceipt: (id: string, receipt: string) => void;
   verifyOrder: (id: string) => void;
@@ -57,6 +61,7 @@ export const useWebStore = create<WebState>()(
     (set, get) => ({
   cart: [],
   liveOrders: [],
+  myOrderIds: [],
   add: (product) =>
     set((s) => {
       const existing = s.cart.find((l) => l.product.id === product.id);
@@ -84,6 +89,10 @@ export const useWebStore = create<WebState>()(
       cart: s.cart.map((l) => (l.product.id === id ? { ...l, notes } : l)),
     })),
   clear: () => set({ cart: [] }),
+  addMyOrder: (orderId) =>
+    set((s) => ({
+      myOrderIds: s.myOrderIds.includes(orderId) ? s.myOrderIds : [orderId, ...s.myOrderIds].slice(0, 50),
+    })),
 
   submitOrder: (customer, phone, method) => {
     const { cart } = get();
@@ -134,6 +143,7 @@ export const useWebStore = create<WebState>()(
       partialize: (s) => ({
         cart: s.cart,
         liveOrders: s.liveOrders.map((o) => ({ ...o, receipt: undefined })),
+        myOrderIds: s.myOrderIds,
       }),
     }
   )

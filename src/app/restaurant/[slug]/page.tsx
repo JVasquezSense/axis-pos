@@ -117,6 +117,8 @@ function RestaurantSiteInner({
       setDoneId(result.orderId);
       setCheckout(false);
       setCartOpen(false);
+      // Registra el pedido para poder seguirlo en 'Mis pedidos'.
+      useWebStore.getState().addMyOrder(result.orderId);
       // Limpia el carrito tras enviar al backend real.
       useWebStore.getState().clear();
     } catch (err) {
