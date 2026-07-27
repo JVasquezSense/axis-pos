@@ -11,6 +11,8 @@ import { useSalesStore } from "@/store/sales.store";
 import { useReservationsStore } from "@/store/reservations.store";
 import { useEmployeesStore } from "@/store/employees.store";
 import { useAuthStore } from "@/store/auth.store";
+import { useAppStore } from "@/store/app.store";
+import { meService } from "@/services/me.service";
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const loaded = useRef(false);
@@ -25,6 +27,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadEmployees = useEmployeesStore((s) => s.load);
   const connectRealtime = useMenuStore((s) => s.connectRealtime);
   const tenantId = useAuthStore((s) => s.tenantId);
+  const updateRestaurant = useAppStore((s) => s.updateRestaurant);
 
   useEffect(() => {
     if (loaded.current || !USE_API) return;
@@ -40,6 +43,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loadReservations(),
       loadEmployees(),
     ]).catch(console.error);
+
+    // Hidrata el restaurante real del usuario. Sin esto, `restaurant.slug`
+    // conserva el valor por defecto ("demo-burger") y el QR por mesa y el
+    // enlace a la carta pública apuntan a un restaurante inexistente.
+    meService.get()
+      .then((me) => {
+        if (!me?.tenantSlug) return;
+        // Solo se envían las claves presentes: pasar `undefined` explícito
+        // borraría el valor actual al hacer spread en el store.
+        const patch: Record<string, string> = { slug: me.tenantSlug };
+        if (me.tenantName) patch.name = me.tenantName;
+        if (me.tenantLogo) patch.logo = me.tenantLogo;
+        if (me.tenantPlan) patch.plan = me.tenantPlan;
+        updateRestaurant(patch);
+      })
+      .catch(() => { /* sin sesión válida: se conserva lo que haya */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
