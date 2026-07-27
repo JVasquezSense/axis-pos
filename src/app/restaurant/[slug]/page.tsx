@@ -25,11 +25,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useWebStore } from "@/store/web.store";
-import { useMenuStore } from "@/store/menu.store";
 import { useAppStore } from "@/store/app.store";
 import { MyOrdersSheet } from "@/components/website/my-orders-sheet";
 import { useAsync } from "@/hooks/use-async";
-import { saasService } from "@/services/saas.service";
 import { publicService, type PublicOrderResult } from "@/services/public.service";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
@@ -55,22 +53,18 @@ function RestaurantSiteInner({
   const tableFromQR = searchParams.get("table");
   const tableNumber = tableFromQR ? Number(tableFromQR) : null;
 
-  // El tenant actualmente logueado ya conoce su propio restaurante (evita ir a red).
+  // Carta pública: SIEMPRE por el endpoint sin autenticación. El cliente que
+  // escanea el QR no tiene sesión, así que no puede usar /admin/tenants/ ni
+  // /menu/products/ (ambos 401). /public/<slug>/menu/ trae restaurante,
+  // categorías, productos disponibles y mesas en una sola llamada.
   const currentRestaurant = useAppStore((s) => s.restaurant);
-  const { data: tenants, loading } = useAsync(() => saasService.getTenants().catch(() => []), []);
-  const tenant =
-    currentRestaurant.slug === slug
-      ? currentRestaurant
-      : tenants?.find((t) => t.slug === slug);
+  const { data: menu, loading } = useAsync(() => publicService.getMenu(slug), [slug]);
+
+  const tenant = menu?.restaurant;
+  const categories = useMemo(() => menu?.categories ?? [], [menu]);
+  const products = useMemo(() => (menu?.products ?? []) as unknown as Product[], [menu]);
 
   const { cart, add, increment, decrement, submitOrder } = useWebStore();
-  const categories = useMenuStore((s) => s.categories);
-  const products = useMenuStore((s) => s.products);
-  const loadMenu = useMenuStore((s) => s.load);
-
-  useEffect(() => {
-    if (products.length === 0) loadMenu();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const MENU_CATEGORIES = useMemo(
     () => [{ id: "popular", name: "Popular", icon: "Star" }, ...categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon }))],
@@ -94,8 +88,13 @@ function RestaurantSiteInner({
     if (query.trim()) {
       return products.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
     }
-    if (activeCat === "popular") return products.filter((p) => p.popular);
-    return products.filter((p) => p.category === activeCat);
+    if (activeCat === "popular") {
+      // Si el restaurante no marcó destacados, mostrar toda la carta en vez de
+      // dejar la pantalla vacía al cliente que acaba de escanear el QR.
+      const populars = products.filter((p) => p.popular);
+      return populars.length > 0 ? populars : products;
+    }
+    return products.filter((p) => String(p.category) === String(activeCat));
   }, [products, query, activeCat]);
 
   const placeOrder = async () => {
@@ -392,30 +391,44 @@ const STATUS_FLOW: Record<string, { label: string; color: string }> = {
 
 /** Estado del pedido web en vivo, consultando el endpoint público (backlog #8). */
 function LiveOrderStatus({ orderId }: { orderId: string }) {
-  const [status, setStatus] = useState<{ code: string; status: string; estimatedWait: number } | null>(null);
+  const [status, setStatus] = useState<
+    { code: string; status: string; estimatedWait: number; table: number | null } | null
+  >(null);
   useEffect(() => {
     let alive = true;
     const poll = async () => {
       try {
         const s = await publicService.getStatus(orderId);
-        if (alive) setStatus({ code: s.code, status: s.status, estimatedWait: s.estimatedWait });
+        if (alive) setStatus({ code: s.code, status: s.status, estimatedWait: s.estimatedWait, table: s.table });
       } catch { /* ignora: puede ser un id mock local */ }
     };
     poll();
-    const t = setInterval(poll, 8000);
+    // Sondeo corto: el cliente ve el avance de cocina casi en vivo.
+    const t = setInterval(poll, 5000);
     return () => { alive = false; clearInterval(t); };
   }, [orderId]);
 
   if (!status) return null;
   const info = STATUS_FLOW[status.status] ?? { label: status.status, color: "bg-muted" };
+  const done = status.status === "ready" || status.status === "served";
+  // Visible también en móvil: es el dispositivo con el que se escanea el QR.
   return (
-    <div className="fixed bottom-4 right-4 z-40 hidden max-w-xs rounded-xl border border-border bg-card p-3 shadow-lg lg:block">
-      <p className="text-xs font-semibold">Tu pedido <span className="font-mono">{status.code}</span></p>
-      <div className="mt-1.5 flex items-center gap-2">
-        <span className={cn("h-2 w-2 animate-pulse rounded-full", info.color)} />
-        <span className="text-sm font-medium">{info.label}</span>
+    <div className="fixed inset-x-3 bottom-3 z-40 rounded-xl border border-border bg-card p-3 shadow-lg lg:inset-x-auto lg:right-4 lg:max-w-xs">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold">
+          Tu pedido <span className="font-mono">{status.code}</span>
+          {status.table != null && <span className="text-muted-foreground"> · Mesa {status.table}</span>}
+        </p>
+        <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white", info.color)}>
+          {info.label}
+        </span>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">Tiempo estimado de espera: ~{status.estimatedWait} min</p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <span className={cn("h-2 w-2 rounded-full", info.color, !done && "animate-pulse")} />
+        <span className="text-sm text-muted-foreground">
+          {done ? "¡Tu pedido está listo!" : `Tiempo estimado: ~${status.estimatedWait} min`}
+        </span>
+      </div>
     </div>
   );
 }

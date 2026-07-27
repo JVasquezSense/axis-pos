@@ -36,7 +36,19 @@ export interface PublicOrderStatus {
  */
 export const publicService = {
   async getMenu(slug: string): Promise<PublicMenu> {
-    return request<PublicMenu>(`/public/${slug}/menu/`);
+    const data = await request<PublicMenu>(`/public/${slug}/menu/`);
+    // DRF serializa los decimales como string ("29900.00"): normalizar para que
+    // la aritmética del carrito (totales, comparaciones) no se rompa.
+    return {
+      ...data,
+      products: (data.products ?? []).map((p) => ({
+        ...p,
+        id: String(p.id),
+        price: Number(p.price),
+        category: String(p.category),
+      })),
+      categories: (data.categories ?? []).map((c) => ({ ...c, id: String(c.id) })),
+    };
   },
   async createOrder(
     slug: string,
