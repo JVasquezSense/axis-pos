@@ -5,6 +5,8 @@ import type { Product, PaymentMethod } from "@/types";
 export interface WebCartLine {
   product: Product;
   quantity: number;
+  /** Notas por item del pedido web (ej. "sin cebolla"). */
+  notes?: string;
 }
 
 /**
@@ -38,6 +40,8 @@ interface WebState {
   add: (product: Product) => void;
   increment: (id: string) => void;
   decrement: (id: string) => void;
+  /** Notas por item del carrito web (ej. "sin cebolla"). */
+  setNotes: (id: string, notes: string) => void;
   clear: () => void;
   submitOrder: (customer: string, phone: string, method: PaymentMethod) => LiveWebOrder;
   uploadReceipt: (id: string, receipt: string) => void;
@@ -74,6 +78,10 @@ export const useWebStore = create<WebState>()(
       cart: s.cart
         .map((l) => (l.product.id === id ? { ...l, quantity: l.quantity - 1 } : l))
         .filter((l) => l.quantity > 0),
+    })),
+  setNotes: (id, notes) =>
+    set((s) => ({
+      cart: s.cart.map((l) => (l.product.id === id ? { ...l, notes } : l)),
     })),
   clear: () => set({ cart: [] }),
 

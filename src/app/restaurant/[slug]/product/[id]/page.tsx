@@ -1,39 +1,80 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Clock, ShoppingBag, Plus, Minus, Star } from "lucide-react";
+import { ArrowLeft, Clock, ShoppingBag, Plus, Minus, Star, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/shared/product-image";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { useMenuStore } from "@/store/menu.store";
 import { useWebStore } from "@/store/web.store";
+import { publicService } from "@/services/public.service";
 import { formatCurrency } from "@/lib/utils";
+import type { Product } from "@/types";
 
-export default function ProductDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string; id: string }>;
-}) {
+export default function ProductDetailPage(props: { params: Promise<{ slug: string; id: string }> }) {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <ProductDetailInner {...props} />
+    </Suspense>
+  );
+}
+
+function ProductDetailInner({ params }: { params: Promise<{ slug: string; id: string }> }) {
   const { slug, id } = use(params);
   const router = useRouter();
-  const products = useMenuStore((s) => s.products);
-  const categories = useMenuStore((s) => s.categories);
   const { cart, add, increment, decrement } = useWebStore();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [categoryName, setCategoryName] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
-  const product = useMemo(() => products.find((p) => String(p.id) === id), [products, id]);
-  const category = useMemo(
-    () => categories.find((c) => String(c.id) === String(product?.category)),
-    [categories, product]
-  );
+  // Carga el producto desde el MENÚ PÚBLICO del slug (no del store del POS).
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    publicService.getMenu(slug)
+      .then((menu) => {
+        if (!alive) return;
+        const found = menu.products.find((p) => String(p.id) === String(id));
+        if (found) {
+          // Mapear a tipo Product del frontend
+          setProduct({
+            id: String(found.id),
+            name: found.name,
+            description: found.description,
+            price: Number(found.price),
+            category: String(found.category),
+            image: found.image,
+            tags: [],
+            available: found.available,
+            prepMinutes: found.prepMinutes,
+            popular: found.popular,
+          } as Product);
+          const cat = menu.categories.find((c) => String(c.id) === String(found.category));
+          setCategoryName(cat?.name ?? "");
+        } else {
+          setProduct(null);
+        }
+      })
+      .catch(() => { if (alive) setProduct(null); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [slug, id]);
 
   const cartItem = cart.find((l) => String(l.product.id) === id);
   const qty = cartItem?.quantity ?? 0;
   const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
 
   const back = () => router.push(`/restaurant/${slug}`);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -109,8 +150,8 @@ export default function ProductDetailPage({
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold leading-tight">{product.name}</h1>
-            {category && (
-              <p className="mt-1 text-sm text-muted-foreground">{category.name}</p>
+            {categoryName && (
+              <p className="mt-1 text-sm text-muted-foreground">{categoryName}</p>
             )}
           </div>
           <p className="shrink-0 text-2xl font-black text-primary">

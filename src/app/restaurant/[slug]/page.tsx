@@ -13,11 +13,10 @@ import {
   ArrowLeft,
   Trash2,
   Search,
-  Upload,
-  Phone,
+  Send,
   Loader2,
 } from "lucide-react";
-import type { PaymentMethod, Product } from "@/types";
+import type { Product } from "@/types";
 import { Icon } from "@/components/shared/icon";
 import { ProductImage } from "@/components/shared/product-image";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -64,7 +63,7 @@ function RestaurantSiteInner({
   const categories = useMemo(() => menu?.categories ?? [], [menu]);
   const products = useMemo(() => (menu?.products ?? []) as unknown as Product[], [menu]);
 
-  const { cart, add, increment, decrement, submitOrder } = useWebStore();
+  const { cart, add, increment, decrement } = useWebStore();
 
   const MENU_CATEGORIES = useMemo(
     () => [{ id: "popular", name: "Popular", icon: "Star" }, ...categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon }))],
@@ -76,8 +75,6 @@ function RestaurantSiteInner({
   const [checkout, setCheckout] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [method, setMethod] = useState<PaymentMethod>("nequi");
   const [placing, setPlacing] = useState(false);
 
   const count = cart.reduce((s, l) => s + l.quantity, 0);
@@ -98,21 +95,22 @@ function RestaurantSiteInner({
   }, [products, query, activeCat]);
 
   const placeOrder = async () => {
-    if (!phone.trim() || phone.replace(/\D/g, "").length < 7) {
-      toast.error("Ingresa un número de teléfono válido");
+    if (cart.length === 0) {
+      toast.error("Tu carrito está vacío");
       return;
     }
     setPlacing(true);
     try {
-      // Backlog #8: envía el pedido al backend público (asocia la mesa del QR).
+      // Pedido web directo a cocina (sin pago). Se asocia a la mesa del QR y
+      // envía las notas por item. El backend lo emite al KDS vía WebSocket.
       const result: PublicOrderResult = await publicService.createOrder(slug, {
         table: tableNumber,
-        items: cart.map((l) => ({ productId: Number(l.product.id), quantity: l.quantity })),
-        customer: name || "Cliente web",
-        phone: phone.trim(),
-      });
-      toast.success(`Pedido ${result.code} enviado a cocina`, {
-        description: result.table ? `Mesa ${result.table} · ~${result.estimatedWait} min de espera` : `~${result.estimatedWait} min de espera`,
+        items: cart.map((l) => ({
+          productId: Number(l.product.id),
+          quantity: l.quantity,
+          notes: l.notes?.trim() || undefined,
+        })),
+        customer: name.trim() || "Cliente web",
       });
       setDoneId(result.orderId);
       setCheckout(false);
@@ -120,12 +118,9 @@ function RestaurantSiteInner({
       // Limpia el carrito tras enviar al backend real.
       useWebStore.getState().clear();
     } catch (err) {
-      // Fallback: flujo mock local si el backend no responde.
-      const order = submitOrder(name || "Cliente web", phone.trim(), method);
-      setDoneId(order.id);
-      setCheckout(false);
-      setCartOpen(false);
-      toast.error("No se pudo conectar con el restaurante", { description: "Pedido guardado localmente" });
+      toast.error("No se pudo enviar el pedido", {
+        description: err instanceof Error ? err.message.slice(0, 100) : "Intenta de nuevo",
+      });
     } finally {
       setPlacing(false);
     }
@@ -198,16 +193,14 @@ function RestaurantSiteInner({
               restaurantName={tenant.name}
               name={name}
               setName={setName}
-              phone={phone}
-              setPhone={setPhone}
-              method={method}
-              setMethod={setMethod}
+              tableNumber={tableNumber}
               placing={placing}
               onCheckout={() => setCheckout(true)}
               onBack={() => setCheckout(false)}
               onPlace={placeOrder}
               increment={increment}
               decrement={decrement}
+              setNotes={useWebStore.getState().setNotes}
             />
           </Sheet>
         </div>
@@ -509,12 +502,6 @@ function MenuCard({
   );
 }
 
-const WEB_METHODS: { id: PaymentMethod; label: string; emoji: string }[] = [
-  { id: "nequi", label: "Nequi", emoji: "💜" },
-  { id: "daviplata", label: "Daviplata", emoji: "❤️" },
-  { id: "cash", label: "Efectivo", emoji: "💵" },
-];
-
 function CartSheet({
   cart,
   total,
@@ -522,19 +509,15 @@ function CartSheet({
   restaurantName,
   name,
   setName,
-  phone,
-  setPhone,
-  method,
-  setMethod,
+  tableNumber,
   placing,
   onCheckout,
   onBack,
   onPlace,
   increment,
   decrement,
+  setNotes,
 }: any) {
-  const freeShipping = total >= 40000;
-  const isTransfer = method !== "cash";
   return (
     <SheetContent className="flex flex-col gap-0 p-0">
       <SheetHeader className="border-b border-border">
@@ -544,7 +527,7 @@ function CartSheet({
               <ArrowLeft className="h-4 w-4" />
             </button>
           )}
-          {checkout ? "Finalizar pedido" : "Tu carrito"}
+          {checkout ? "Confirmar pedido" : "Tu carrito"}
         </SheetTitle>
       </SheetHeader>
 
@@ -556,83 +539,59 @@ function CartSheet({
           </div>
         ) : checkout ? (
           <div className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Nombre</label>
-              <Input placeholder="¿A nombre de quién?" value={name} onChange={(e: any) => setName(e.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">
-                Teléfono <span className="text-destructive">*</span>
-              </label>
-              <div className="relative">
-                <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="tel"
-                  placeholder="300 123 4567"
-                  value={phone}
-                  onChange={(e: any) => setPhone(e.target.value)}
-                  className="pl-9"
-                />
+            {/* Mesa del QR (si aplica) */}
+            {tableNumber && (
+              <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                  {tableNumber}
+                </span>
+                <span className="font-medium">Pedido para Mesa {tableNumber}</span>
               </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">Lo usamos para confirmar y coordinar tu entrega.</p>
-            </div>
+            )}
+
+            {/* Nombre opcional */}
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Dirección de entrega</label>
-              <Input placeholder="Calle 10 #43-21, apto 502" defaultValue="Calle 10 #43-21" />
+              <label className="mb-1.5 block text-sm font-medium">Tu nombre (opcional)</label>
+              <Input
+                placeholder="¿A nombre de quién?"
+                value={name}
+                onChange={(e: any) => setName(e.target.value)}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">Para que el mesero sepa a quién entregar.</p>
             </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Método de pago</label>
-              <div className="grid grid-cols-3 gap-2">
-                {WEB_METHODS.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setMethod(m.id)}
-                    className={cn(
-                      "rounded-lg border px-2 py-2 text-center text-xs font-medium transition-colors",
-                      method === m.id ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted"
-                    )}
-                  >
-                    <span className="block text-base">{m.emoji}</span>
-                    {m.label}
-                  </button>
+
+            {/* Resumen con notas por item */}
+            <div className="rounded-xl border border-border p-3">
+              <p className="mb-2 text-sm font-semibold">Tu pedido</p>
+              <div className="space-y-3">
+                {cart.map((l: any) => (
+                  <div key={l.product.id} className="space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{l.quantity}× {l.product.name}</span>
+                      <span>{formatCurrency(l.product.price * l.quantity)}</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Notas (ej. sin cebolla, término medio…)"
+                      value={l.notes ?? ""}
+                      onChange={(e) => setNotes(l.product.id, e.target.value)}
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary"
+                    />
+                  </div>
                 ))}
               </div>
-              {isTransfer && (
-                <div className="mt-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-2.5 text-xs">
-                  <p className="font-medium text-foreground">Transfiere a:</p>
-                  <p className="text-muted-foreground">
-                    {method === "nequi" ? "Nequi" : "Daviplata"} · <span className="font-semibold text-foreground">300 245 1188</span> · {restaurantName}
-                  </p>
-                  <p className="mt-0.5 text-muted-foreground">Sube el comprobante al confirmar el pedido. 📸</p>
-                </div>
-              )}
-            </div>
-            <div className="rounded-xl border border-border p-3">
-              <p className="mb-2 text-sm font-semibold">Resumen</p>
-              {cart.map((l: any) => (
-                <div key={l.product.id} className="flex justify-between py-0.5 text-sm text-muted-foreground">
-                  <span>
-                    {l.quantity}× {l.product.name}
-                  </span>
-                  <span>{formatCurrency(l.product.price * l.quantity)}</span>
-                </div>
-              ))}
-              <div className="mt-2 flex justify-between border-t border-border pt-2 text-sm">
-                <span className="text-muted-foreground">Envío</span>
-                <span className={cn("font-medium", freeShipping ? "text-emerald-500" : "")}>
-                  {freeShipping ? "Gratis" : formatCurrency(5900)}
-                </span>
+              <div className="mt-3 flex justify-between border-t border-border pt-2 text-sm font-semibold">
+                <span>Total</span>
+                <span>{formatCurrency(total)}</span>
               </div>
+            </div>
+
+            <div className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+              <p>El pedido se <strong className="text-foreground">envía directo a cocina</strong>. El pago se realiza al recibir en {restaurantName}.</p>
             </div>
           </div>
         ) : (
           <div className="space-y-3">
-            {!freeShipping && (
-              <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3 text-xs text-muted-foreground">
-                Te faltan <span className="font-semibold text-primary">{formatCurrency(40000 - total)}</span> para
-                obtener <span className="font-semibold text-foreground">envío gratis</span> 🚀
-              </div>
-            )}
             {cart.map((l: any) => (
               <div key={l.product.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
                 <ProductImage emoji={l.product.image} category={l.product.category} size="sm" className="h-12 w-12 shrink-0" />
@@ -663,12 +622,12 @@ function CartSheet({
           </div>
           {checkout ? (
             <Button className="w-full" size="lg" onClick={onPlace} disabled={placing}>
-              {placing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {placing ? "Enviando…" : `Confirmar pedido · ${formatCurrency(total)}`}
+              {placing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {placing ? "Enviando a cocina…" : "Enviar a cocina"}
             </Button>
           ) : (
             <Button className="w-full" size="lg" onClick={onCheckout}>
-              Continuar al pago
+              Confirmar pedido
             </Button>
           )}
         </div>
@@ -678,25 +637,30 @@ function CartSheet({
 }
 
 function OrderConfirmation({ orderId, onClose }: { orderId: string; onClose: () => void }) {
-  const order = useWebStore((s) => s.liveOrders.find((o) => o.id === orderId));
-  const uploadReceipt = useWebStore((s) => s.uploadReceipt);
-  const [uploading, setUploading] = useState(false);
+  // Estado en vivo del pedido consultando el endpoint público.
+  const [status, setStatus] = useState<{ code: string; status: string; table: number | null; estimatedWait: number; items: { name: string; quantity: number }[] } | null>(null);
 
-  if (!order) return null;
-  const needsReceipt = order.status === "awaiting_receipt";
-
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      uploadReceipt(orderId, String(reader.result));
-      setUploading(false);
-      toast.success("Comprobante recibido", { description: "El restaurante verificará tu pago." });
+  useEffect(() => {
+    let alive = true;
+    const poll = async () => {
+      try {
+        const s = await publicService.getStatus(orderId);
+        if (alive) setStatus({ code: s.code, status: s.status, table: s.table, estimatedWait: s.estimatedWait, items: s.items });
+      } catch { /* id mock local o error de red: se queda sin estado */ }
     };
-    reader.readAsDataURL(file);
+    poll();
+    const t = setInterval(poll, 8000);
+    return () => { alive = false; clearInterval(t); };
+  }, [orderId]);
+
+  const STATUS_INFO: Record<string, { label: string; color: string; emoji: string }> = {
+    pending: { label: "En cola", color: "bg-amber-500", emoji: "⏳" },
+    preparing: { label: "Preparando", color: "bg-sky-500", emoji: "👨‍🍳" },
+    ready: { label: "Listo para servir", color: "bg-emerald-500", emoji: "✅" },
+    served: { label: "Servido", color: "bg-emerald-600", emoji: "🍽️" },
+    paid: { label: "Completado", color: "bg-zinc-500", emoji: "🎉" },
   };
+  const info = (status && STATUS_INFO[status.status]) || { label: status?.status || "Pendiente", color: "bg-muted", emoji: "⏳" };
 
   return (
     <motion.div
@@ -721,67 +685,42 @@ function OrderConfirmation({ orderId, onClose }: { orderId: string; onClose: () 
         >
           <Check className="h-9 w-9" />
         </motion.div>
-        <h3 className="text-lg font-bold">¡Pedido recibido!</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Tu orden <span className="font-semibold text-foreground">{order.code}</span> fue registrada para{" "}
-          <span className="font-semibold text-foreground">{order.phone}</span>.
-        </p>
-
-        {needsReceipt ? (
-          <div className="mt-5 text-left">
-            <div className="mb-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">
-              <p className="text-center text-sm font-bold text-destructive">
-                SIN COMPROBANTE TU PEDIDO NO SERA PROCESADO
-              </p>
-              <p className="mt-0.5 text-center text-xs text-destructive/80">
-                El restaurante requiere evidencia del pago para despachar tu orden.
-              </p>
-            </div>
-            <p className="mb-2 text-sm font-semibold">Sube tu comprobante de pago</p>
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary bg-primary/5 p-6 text-center transition-colors hover:border-primary hover:bg-primary/10">
-              {uploading ? (
-                <Loader2 className="h-7 w-7 animate-spin text-primary" />
-              ) : (
-                <Upload className="h-7 w-7 text-muted-foreground" />
-              )}
-              <span className="text-sm font-medium">{uploading ? "Subiendo…" : "Tomar foto o elegir imagen"}</span>
-              <span className="text-xs text-muted-foreground">JPG o PNG · transferencia o recibo</span>
-              <input type="file" accept="image/*" className="hidden" onChange={onFile} disabled={uploading} />
-            </label>
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              El administrador verificará el pago antes de despachar.
-            </p>
-          </div>
-        ) : (
+        <h3 className="text-lg font-bold">¡Pedido enviado a cocina!</h3>
+        {status ? (
           <>
-            {order.receipt && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={order.receipt}
-                alt="Comprobante"
-                className="mx-auto mt-4 max-h-40 rounded-xl border border-border object-contain"
-              />
-            )}
-            <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-600 dark:text-amber-400">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
-              Comprobante en revisión por el restaurante
+            <p className="mt-1 text-sm text-muted-foreground">
+              Orden <span className="font-mono font-semibold text-foreground">{status.code}</span>
+              {status.table ? <> · Mesa {status.table}</> : null}
+            </p>
+
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-muted/60 px-3 py-2.5">
+              <span className="text-xl">{info.emoji}</span>
+              <span className="text-sm font-semibold">{info.label}</span>
+              <span className={cn("ml-1 h-2 w-2 animate-pulse rounded-full", info.color)} />
             </div>
+
+            <p className="mt-3 text-xs text-muted-foreground">
+              Tiempo de espera estimado: <strong className="text-foreground">~{status.estimatedWait} min</strong>
+            </p>
+
+            {status.items.length > 0 && (
+              <div className="mt-4 rounded-xl border border-border p-3 text-left">
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tu pedido</p>
+                {status.items.map((it, i) => (
+                  <div key={i} className="flex justify-between py-0.5 text-sm">
+                    <span className="text-muted-foreground">{it.name}</span>
+                    <span>{it.quantity}×</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">Tu pedido fue registrado. Cocina lo preparará en breve.</p>
         )}
 
-        {needsReceipt && (
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            Si cierras sin subir el comprobante, deberás contactar directamente al restaurante
-            para que procesen tu pedido manualmente.
-          </p>
-        )}
-        <Button
-          className="mt-2 w-full"
-          variant={needsReceipt ? "ghost" : "default"}
-          size={needsReceipt ? "sm" : "default"}
-          onClick={onClose}
-        >
-          {needsReceipt ? "Cerrar de todas formas (pedido en riesgo)" : "Seguir explorando"}
+        <Button className="mt-5 w-full" onClick={onClose}>
+          Hacer otro pedido
         </Button>
       </motion.div>
     </motion.div>
