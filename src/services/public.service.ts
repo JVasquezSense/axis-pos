@@ -17,6 +17,8 @@ export interface PublicOrderResult {
   table: number | null;
   status: string;
   estimatedWait: number;
+  /** true = se sumó a un pedido que la mesa ya tenía abierto. */
+  merged?: boolean;
 }
 
 export interface PublicOrderStatus {

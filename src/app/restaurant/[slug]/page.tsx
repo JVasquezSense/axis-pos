@@ -114,6 +114,11 @@ function RestaurantSiteInner({
         })),
         customer: name.trim() || "Cliente web",
       });
+      const espera = `~${result.estimatedWait} min de espera`;
+      toast.success(
+        result.merged ? `Agregado a tu pedido ${result.code}` : `Pedido ${result.code} enviado a cocina`,
+        { description: result.table ? `Mesa ${result.table} · ${espera}` : espera }
+      );
       setDoneId(result.orderId);
       setCheckout(false);
       setCartOpen(false);
@@ -122,9 +127,17 @@ function RestaurantSiteInner({
       // Limpia el carrito tras enviar al backend real.
       useWebStore.getState().clear();
     } catch (err) {
-      toast.error("No se pudo enviar el pedido", {
-        description: err instanceof Error ? err.message.slice(0, 100) : "Intenta de nuevo",
-      });
+      // El backend responde 409 cuando el mesero ya abrió la cuenta de la mesa.
+      // El cuerpo viene como JSON: mostrar el motivo, no el JSON crudo.
+      let description = "Intenta de nuevo";
+      if (err instanceof Error && err.message) {
+        try {
+          description = (JSON.parse(err.message) as { error?: string }).error ?? err.message.slice(0, 120);
+        } catch {
+          description = err.message.slice(0, 120);
+        }
+      }
+      toast.error("No se pudo enviar el pedido", { description });
     } finally {
       setPlacing(false);
     }
