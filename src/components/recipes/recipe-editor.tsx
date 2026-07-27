@@ -231,11 +231,19 @@ export function RecipeEditor({
       toast.error("La receta necesita un nombre");
       return;
     }
-    if (!draft.category) {
+    // Garantiza una categoría válida del tenant antes de guardar. El draft puede
+    // arrancar con un valor inválido (p.ej. "hamburguesas" por defecto en
+    // emptyRecipe, o "" si las categorías no habían cargado). Si no coincide con
+    // ningún id real, caemos a la primera categoría del restaurante.
+    const storeCategories = useMenuStore.getState().categories;
+    const validCategory = storeCategories.find((c) => String(c.id) === String(draft.category))
+      ? draft.category
+      : (storeCategories[0]?.id ?? "");
+    if (!validCategory) {
       toast.error("Selecciona una categoría primero");
       return;
     }
-    let finalDraft = { ...draft };
+    let finalDraft = { ...draft, category: validCategory };
     if (isNew && !finalDraft.productId) {
       const newProduct: Product = {
         id: uid("p"),
