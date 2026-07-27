@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useMemo, useState, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Clock, ShoppingBag, Plus, Minus, Star, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,9 @@ export default function ProductDetailPage(props: { params: Promise<{ slug: strin
 function ProductDetailInner({ params }: { params: Promise<{ slug: string; id: string }> }) {
   const { slug, id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tableFromQR = searchParams.get("table");
+  const tableNumber = tableFromQR ? Number(tableFromQR) : null;
   const { cart, add, increment, decrement } = useWebStore();
   const [product, setProduct] = useState<Product | null>(null);
   const [categoryName, setCategoryName] = useState<string>("");
@@ -67,6 +70,12 @@ function ProductDetailInner({ params }: { params: Promise<{ slug: string; id: st
   const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
 
   const back = () => router.push(`/restaurant/${slug}`);
+  // "Ver carrito" vuelve a la carta y abre el Sheet del carrito (?cart=1),
+  // conservando la mesa del QR si la hay.
+  const viewCart = () => {
+    const params = tableFromQR ? `?table=${tableNumber}&cart=1` : "?cart=1";
+    router.push(`/restaurant/${slug}${params}`);
+  };
 
   if (loading) {
     return (
@@ -190,11 +199,13 @@ function ProductDetailInner({ params }: { params: Promise<{ slug: string; id: st
       {/* CTA sticky — fondo sólido */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background px-4 py-4">
         <div className="mx-auto flex max-w-lg items-center gap-3">
-          {qty > 0 && (
+          {/* Stepper de cantidad (visible si ya hay unidades de este producto) */}
+          {qty > 0 && product.available && (
             <div className="flex items-center gap-1 rounded-xl border border-border bg-muted p-1">
               <button
                 onClick={() => decrement(product.id)}
                 className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-background"
+                aria-label="Quitar uno"
               >
                 <Minus className="h-4 w-4" />
               </button>
@@ -202,6 +213,7 @@ function ProductDetailInner({ params }: { params: Promise<{ slug: string; id: st
               <button
                 onClick={() => increment(product.id)}
                 className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-background"
+                aria-label="Agregar uno"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -209,16 +221,29 @@ function ProductDetailInner({ params }: { params: Promise<{ slug: string; id: st
           )}
 
           {product.available ? (
-            <Button
-              className="h-12 flex-1 rounded-xl text-base font-semibold"
-              onClick={() => { if (qty === 0) add(product); else increment(product.id); }}
-            >
-              {qty === 0 ? (
-                <><Plus className="mr-2 h-5 w-5" /> Agregar · {formatCurrency(product.price)}</>
-              ) : (
-                <><ShoppingBag className="mr-2 h-5 w-5" /> Ver carrito · {qty} {qty === 1 ? "ítem" : "ítems"}</>
+            <>
+              {/* Agregar / Agregar más */}
+              <Button
+                className="h-12 flex-1 rounded-xl text-base font-semibold"
+                onClick={() => { if (qty === 0) add(product); else increment(product.id); }}
+              >
+                {qty === 0 ? (
+                  <><Plus className="mr-2 h-5 w-5" /> Agregar · {formatCurrency(product.price)}</>
+                ) : (
+                  <><Plus className="mr-2 h-5 w-5" /> Agregar otro</>
+                )}
+              </Button>
+              {/* Ver carrito: vuelve a la carta donde está el Sheet del carrito */}
+              {qty > 0 && (
+                <Button
+                  variant="outline"
+                  className="h-12 rounded-xl text-base font-semibold"
+                  onClick={viewCart}
+                >
+                  <ShoppingBag className="mr-2 h-5 w-5" /> Ver carrito ({cartCount})
+                </Button>
               )}
-            </Button>
+            </>
           ) : (
             <Button disabled className="h-12 flex-1 rounded-xl text-base">
               No disponible

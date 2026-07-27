@@ -51,6 +51,8 @@ function RestaurantSiteInner({
   // Backlog #8: QR por mesa — el parámetro ?table=N indica la mesa escaneada.
   const tableFromQR = searchParams.get("table");
   const tableNumber = tableFromQR ? Number(tableFromQR) : null;
+  // "Ver carrito" desde el detalle del producto vuelve con ?cart=1 para abrir el Sheet.
+  const openCartOnLoad = searchParams.get("cart") === "1";
 
   // Carta pública: SIEMPRE por el endpoint sin autenticación. El cliente que
   // escanea el QR no tiene sesión, así que no puede usar /admin/tenants/ ni
@@ -71,7 +73,7 @@ function RestaurantSiteInner({
   );
   const [activeCat, setActiveCat] = useState("popular");
   const [query, setQuery] = useState("");
-  const [cartOpen, setCartOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(openCartOnLoad);
   const [checkout, setCheckout] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -454,41 +456,53 @@ function MenuCard({
         !p.available && "opacity-60"
       )}
     >
-      {/* Imagen — clickeable abre detalle */}
+      {/* Imagen + info — clickeable abre el detalle del producto */}
       <Link href={`/restaurant/${slug}/product/${p.id}`} className="block">
-      <div className="relative h-36 w-full overflow-hidden sm:h-40">
-        <ProductImage emoji={p.image} category={p.category} size="lg" className="h-full w-full rounded-none" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
-        {p.popular && (
-          <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-amber-950">
-            <Star className="h-3 w-3 fill-current" /> Popular
-          </span>
-        )}
-        {!p.available && (
-          <span className="absolute right-2.5 top-2.5 rounded-md bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-            Agotado
-          </span>
-        )}
-        <div className="absolute inset-x-0 bottom-0 p-3">
-          <p className="line-clamp-1 font-semibold text-white drop-shadow-sm">{p.name}</p>
-          <p className="text-sm font-bold text-white/90">{formatCurrency(p.price)}</p>
+        <div className="relative h-36 w-full overflow-hidden sm:h-40">
+          <ProductImage emoji={p.image} category={p.category} size="lg" className="h-full w-full rounded-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+          {p.popular && (
+            <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-amber-950">
+              <Star className="h-3 w-3 fill-current" /> Popular
+            </span>
+          )}
+          {!p.available && (
+            <span className="absolute right-2.5 top-2.5 rounded-md bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              Agotado
+            </span>
+          )}
+          <div className="absolute inset-x-0 bottom-0 p-3 pr-14">
+            <p className="line-clamp-1 font-semibold text-white drop-shadow-sm">{p.name}</p>
+            <p className="text-sm font-bold text-white/90">{formatCurrency(p.price)}</p>
+          </div>
         </div>
+      </Link>
 
-        {/* Acción */}
+      {/* Acción: botón independiente (fuera del Link) para no navegar al detalle.
+          stopPropagation evita que el clic burbulee al Link si se solapan. */}
+      {p.available && (
         <div className="absolute bottom-3 right-3">
-          {!p.available ? null : qty > 0 ? (
+          {qty > 0 ? (
             <div className="flex items-center gap-1 rounded-full bg-background/95 p-0.5 shadow-lg backdrop-blur">
-              <button onClick={onDec} className="flex h-7 w-7 items-center justify-center rounded-full text-primary hover:bg-primary/10">
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDec(); }}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-primary hover:bg-primary/10"
+                aria-label="Quitar uno"
+              >
                 {qty === 1 ? <Trash2 className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
               </button>
               <span className="w-5 text-center text-sm font-bold">{qty}</span>
-              <button onClick={onInc} className="flex h-7 w-7 items-center justify-center rounded-full text-primary hover:bg-primary/10">
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInc(); }}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-primary hover:bg-primary/10"
+                aria-label="Agregar uno"
+              >
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : (
             <button
-              onClick={onAdd}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAdd(); }}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-110 active:scale-95"
               aria-label={`Añadir ${p.name}`}
             >
@@ -496,8 +510,7 @@ function MenuCard({
             </button>
           )}
         </div>
-      </div>
-      </Link>
+      )}
     </motion.div>
   );
 }
