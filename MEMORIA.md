@@ -10,7 +10,24 @@
 **Producción (deploy)**
 - Backend: `https://axis-pos-production.up.railway.app` (Railway, Postgres, Redis)
 - Frontend: Vercel (`axis-pos-nine.vercel.app`)
-- Fecha de la memoria: **2026-07-22**
+- Fecha de la memoria: **2026-07-27** (última actualización)
+
+---
+
+## ⚙️ Acceso a infraestructura (CLIs)
+
+| Entorno | CLI | Sesión |
+|---|---|---|
+| **Backend** (Railway) | `railway 5.27.2` | `jvasquezsense@gmail.com`, proyecto `resourceful-flexibility`, servicio `axis-pos` |
+| **Frontend** (Vercel) | `vercel 56.5.0` | `jvasquezsense`, proyecto `axis-pos` (team `jvasquezsenses-projects`) |
+
+**URLs / IDs clave**
+- Backend service ID: `4edda2c2-4f88-4054-9bf5-23f5341be5ee`
+- BD pública (accesible desde local para `backfill`/scripts): `postgresql://postgres:gtYIZojkZDeGNtqPlIcQiCmosYnVTKkz@thomas.proxy.rlwy.net:53673/railway`
+- Repo backend: `github.com/JVasquezSense/axis-pos-backend`
+- Auto-deploy: push a `main` → Railway (preDeploy: migrate + collectstatic) y Vercel.
+
+**Tenants reales en producción** (5): Rest Prueba, Teriyaki Sur, Bendito Pecado, Hamburgeseria Juan, El Gallineral. El superadmin `admin@axispos.co` / `Axis2026!` **no tiene tenant** (gestiona todos desde `/admin`). Usuarios con tenant: `Yei@axispos.co` (El Gallineral), `teriyaki@axispos.co` (Teriyaki Sur).
 
 ---
 
@@ -442,4 +459,76 @@ npm run dev                                        # http://localhost:3000
 
 ---
 
-*Memoria generada el 2026-07-22 a partir del análisis completo de ambos repositorios.*
+## 18. Historial de cambios (changelog de sesiones)
+
+### Sesión 2026-07-27 — Backlog POS completo + fixes de producción
+
+**8 funcionalidades del backlog implementadas y desplegadas** (commits `9d8b560` backend, `75e5c31` frontend):
+
+| # | Funcionalidad | Implementación clave |
+|---|---|---|
+| 3 | Kardex saldo inicial | `InventoryItemSerializer.create` genera movimiento "inicial"; comando `backfill_kardex` reparó 147 insumos en prod. |
+| 5 | KDS + descuento inventario | `consume_order_inventory` en `OrderViewSet.perform_update`. **Cambio posterior**: el descuento ahora ocurre al marcar **"ready" (completado)**, NO en "preparing" (commit `33d1451`). Idempotente vía `Order.stock_consumed`. |
+| 2 | Salida por Plato | endpoint `/reports/dish-consumption/` con cruce BOM filtrado por tenant (commit `e631c93` corrige conteo). |
+| 4 | Edición de órdenes | `OrderChangeLog` para auditoría; `OrderSerializer.update` reemplaza líneas; modo edición en `/orders`. |
+| 1 | Factura | campos fiscales en `Tenant` (NIT, razón social, resolución) + `Sale.invoice_number` correlativo `FV-000001`. |
+| 6 | Devoluciones | `CreditNote`/`CreditNoteLine` + `Product.restockable`; módulo `/returns`; reintegro de inventario. |
+| 8 | Pedidos Web + QR | endpoints públicos `/public/<slug>/menu|order|order/<id>/`; QR por mesa en Salón. |
+| 7 | Multi-tenant reportes | auditoría: dashboard y reports ya filtraban correctamente. |
+
+**Fixes de producción** (bugs detectados tras deploy):
+- `a952eac` — `POST /sales/` 500: `select_for_update` fuera de transacción → envuelto en `transaction.atomic()`. Dashboard `KeyError: 'm'` en YoY mensual.
+- `de3e16d` — Historial de ventas vacío: `history.store` era solo localStorage; añadido `load()` que trae `salesService.getAll()`.
+- `4ae9d5e` — ruta `/public/order/<id>/` rechazaba IDs numéricos (`Order.id` es BigAutoField, no UUID) → cambié conversor a `str:`.
+
+### Sesión 2026-07-27 (tarde) — Fixes de recetas y storefront web
+
+**Fix recetas** (commit `00b2df7` backend, `794d94e` frontend):
+- `ProductSerializer.category` no filtraba por tenant → causaba 400 "Clave primaria inválida" al guardar recetas (creaba producto con `category` de otro tenant). Ahora el queryset se filtra por el tenant del usuario en `__init__` (cierra además una fuga multi-tenant).
+- Frontend: el `save()` del editor valida `category` contra las categorías reales del tenant.
+
+**Rediseño del storefront web (sin pago)** (commit `17a2ece` frontend, `8ef2743` backend):
+- **Bug**: detalle de producto (`/restaurant/[slug]/product/[id]`) leía `useMenuStore` (vacío en contexto público) → siempre "no encontrado". Ahora carga desde `publicService.getMenu(slug)`.
+- **Flujo web rediseñado**: eliminado el pago (método, transferencia, comprobante, teléfono obligatorio). Ahora: carrito con **notas por item** + nombre opcional + mesa del QR → botón **"Enviar a cocina"** → crea `Order` canal web y dispara `ticket.new` al KDS → **pantalla de confirmación** con código, mesa, espera y estado en vivo (polling `publicService.getStatus`).
+- `web.store`: `WebCartLine` ahora soporta `notes` + acción `setNotes`.
+- Backend: `/public/order/<id>/` ahora expone `notes` por item.
+
+### Cambios del usuario entre sesiones (commits propios)
+Estos cambios los hizo el usuario y los asimilé al releer el proyecto:
+- `27a5b65` — `/auth/me/` expone `tenantSlug`, `tenantLogo`, `tenantPlan`.
+- `00b8705` — productos se marcan "Agotado" automáticamente al acabarse el stock.
+- `2832daf` — broadcast de disponibilidad de producto por WebSocket.
+- `217b435` — `OrderViewSet` filtra por canal (`?channel=web`).
+- `a003ed4` — pedidos web por-tenant con código y espera realista.
+- `1de4968`, `b7ae750`, `35dd55b` — storefront web funcional sin sesión, QR al slug real, web-orders reales por tenant.
+
+---
+
+## 19. Estado de los stores (auditoría de conexión al backend)
+
+| Store | ¿Carga del backend? | ¿persist? | Estado |
+|---|---|---|---|
+| app | Sí (datos del restaurante, rol) | Sí (`axis-app-store`) | OK |
+| auth | Sí (login JWT) | Sí | OK |
+| order | Sí (`ordersService`) | No | OK |
+| menu | Sí (`menuService`) | Sí (`axis-menu`) | OK |
+| recipes | Sí (`recipesService`) | No | OK |
+| inventory | Sí (`inventoryService`) | Sí (cache) | OK |
+| suppliers | Sí (`suppliersService`) | No | OK |
+| sales | Sí (`salesService`) | No | OK |
+| reservations | Sí (`reservationsService`) | No | OK |
+| employees | Sí (`employeesService`) | No | OK |
+| kitchen | Sí (`kitchenService` + WS) | No | OK |
+| onboarding | Local (tour) | No | OK (por diseño) |
+| audit | **Solo memoria** (cap 500) | No | Local por diseño |
+| history | Sí (`salesService.getAll()` en `load()`) | Sí (`axis-history`) | **Arreglado** esta sesión |
+| tables | Sí (mesas), **zonas mock** | No | Parcial (zones = DEFAULT_ZONES) |
+| delivery | **No** (solo localStorage) | Sí (`axis-deliveries`) | Necesita fix |
+| web | Local + `publicService` en storefront | Sí (`axis-web`) | OK para storefront |
+| whatsapp | **No** (lógica en `whatsapp-simulator.tsx`) | Sí (`axis-whatsapp`) | Necesita fix |
+
+**Pendientes**: `delivery.store` y `whatsapp.store` aún no cargan del backend; `tables.store` tiene zones siempre mock.
+
+---
+
+*Memoria generada el 2026-07-22. Última actualización: 2026-07-27 (backlog POS completo, fixes de producción, rediseño del storefront web).*
