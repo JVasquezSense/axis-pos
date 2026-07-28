@@ -220,6 +220,18 @@ function CartaTab() {
               </div>
               <p className="line-clamp-1 text-xs text-muted-foreground">{p.description}</p>
               {(() => {
+                // Un combo no lleva ficha técnica: su costo sale de los
+                // componentes. Se muestra su composición en lugar del food cost.
+                if (p.isCombo) {
+                  const items = p.comboItems ?? [];
+                  return (
+                    <p className="mt-1.5 line-clamp-1 text-[10px] text-muted-foreground">
+                      {items.length > 0
+                        ? items.map((ci) => `${ci.quantity}× ${ci.name ?? ""}`).join(" · ")
+                        : "Sin productos"}
+                    </p>
+                  );
+                }
                 const rc = recipeFor(p.id);
                 if (rc && rc.price > 0) {
                   const c = computeRecipeCost(rc, invItems);
@@ -237,7 +249,14 @@ function CartaTab() {
               })()}
               <div className="mt-auto flex items-center justify-between pt-2">
                 <span className="text-sm font-bold">{formatCurrency(p.price)}</span>
-                <Button size="icon-sm" variant="ghost" onClick={() => { setEditing(p); setFormOpen(true); }}>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => {
+                    if (p.isCombo) { setComboEditing(p); setComboOpen(true); }
+                    else { setEditing(p); setFormOpen(true); }
+                  }}
+                >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
               </div>
