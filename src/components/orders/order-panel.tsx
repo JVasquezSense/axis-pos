@@ -24,7 +24,7 @@ import { formatCurrency } from "@/lib/utils";
 
 export function OrderPanel() {
   const router = useRouter();
-  const { lines, tableNumber, increment, decrement, remove, clear, setTable, sendToKitchen, setNotes, activeOrderIds, saveOrderChanges } = useOrderStore();
+  const { lines, tableNumber, increment, decrement, remove, clear, setTable, sendToKitchen, setNotes, activeOrderIds, saveOrderChanges, loadTableOrder } = useOrderStore();
   const allTables = useTablesStore((s) => s.tables);
   const occupyTable = useTablesStore((s) => s.occupy);
   const subtotal = orderSelectors.subtotal(lines);
@@ -78,8 +78,16 @@ export function OrderPanel() {
               {allTables.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setTable(t.number)}
-                  title={t.status === "occupied" ? `Mesa ${t.number} - Ocupada` : `Mesa ${t.number} - ${t.zone}`}
+                  onClick={() => {
+                    // Mesa ocupada: cargar su orden real para EDITARLA (no crear otra).
+                    // Mesa libre: simplemente asignar el carrito actual.
+                    if (t.status === "occupied" || t.status === "billing") {
+                      loadTableOrder(t.number);
+                    } else {
+                      setTable(t.number);
+                    }
+                  }}
+                  title={t.status === "occupied" ? `Mesa ${t.number} - Editar pedido` : `Mesa ${t.number} - ${t.zone}`}
                   className={`relative flex h-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent ${
                     tableNumber === t.number ? "bg-primary text-primary-foreground" : t.status === "occupied" ? "bg-amber-500/20 text-amber-700 dark:text-amber-400" : "bg-muted"
                   }`}
