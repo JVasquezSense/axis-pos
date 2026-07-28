@@ -16,14 +16,14 @@ import {
   Send,
   Loader2,
 } from "lucide-react";
-import type { Product } from "@/types";
+import type { Product, ProductVariation } from "@/types";
 import { Icon } from "@/components/shared/icon";
 import { ProductImage } from "@/components/shared/product-image";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { useWebStore } from "@/store/web.store";
+import { useWebStore, cartLineKey, cartLinePrice } from "@/store/web.store";
 import { useAppStore } from "@/store/app.store";
 import { MyOrdersSheet } from "@/components/website/my-orders-sheet";
 import { useAsync } from "@/hooks/use-async";
@@ -76,12 +76,20 @@ function RestaurantSiteInner({
   const [cartOpen, setCartOpen] = useState(openCartOnLoad);
   const [checkout, setCheckout] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
+  const [variationProduct, setVariationProduct] = useState<Product | null>(null);
   const [name, setName] = useState("");
   const [placing, setPlacing] = useState(false);
 
   const count = cart.reduce((s, l) => s + l.quantity, 0);
-  const total = cart.reduce((s, l) => s + l.product.price * l.quantity, 0);
-  const qtyOf = (id: string) => cart.find((l) => l.product.id === id)?.quantity ?? 0;
+  const total = cart.reduce((s, l) => s + cartLinePrice(l) * l.quantity, 0);
+  // Un producto puede estar en el carrito en varias variaciones: la tarjeta
+  // muestra el total y sus +/- actúan sobre la primera línea de ese producto.
+  const qtyOf = (id: string) =>
+    cart.filter((l) => String(l.product.id) === String(id)).reduce((s, l) => s + l.quantity, 0);
+  const firstLineKeyOf = (id: string) => {
+    const line = cart.find((l) => String(l.product.id) === String(id));
+    return line ? cartLineKey(line) : `${id}::`;
+  };
 
   const visible = useMemo(() => {
     if (query.trim()) {
@@ -110,7 +118,8 @@ function RestaurantSiteInner({
         items: cart.map((l) => ({
           productId: Number(l.product.id),
           quantity: l.quantity,
-          notes: l.notes?.trim() || undefined,
+          // La variación viaja en las notas para que cocina la vea en el ticket.
+          notes: [l.variation?.name, l.notes?.trim()].filter(Boolean).join(" · ") || undefined,
         })),
         customer: name.trim() || "Cliente web",
       });
@@ -343,11 +352,16 @@ function RestaurantSiteInner({
                   index={i}
                   slug={slug}
                   onAdd={() => {
+                    // Con variaciones el cliente debe elegir cuál antes de añadir.
+                    if ((p.variations?.length ?? 0) > 0) {
+                      setVariationProduct(p);
+                      return;
+                    }
                     add(p);
                     toast.success(`${p.name} añadido`);
                   }}
-                  onInc={() => increment(p.id)}
-                  onDec={() => decrement(p.id)}
+                  onInc={() => increment(firstLineKeyOf(p.id))}
+                  onDec={() => decrement(firstLineKeyOf(p.id))}
                 />
               ))}
             </div>
@@ -386,6 +400,16 @@ function RestaurantSiteInner({
       {/* Backlog #8: estado del pedido web en vivo (cuando viene del backend) */}
       <AnimatePresence>
         {doneId && <LiveOrderStatus orderId={doneId} />}
+
+        <VariationPicker
+          product={variationProduct}
+          onClose={() => setVariationProduct(null)}
+          onPick={(prod, variation) => {
+            add(prod, variation ?? undefined);
+            toast.success(`${prod.name}${variation ? ` · ${variation.name}` : ""} añadido`);
+            setVariationProduct(null);
+          }}
+        />
       </AnimatePresence>
     </div>
   );
@@ -593,16 +617,19 @@ function CartSheet({
               <p className="mb-2 text-sm font-semibold">Tu pedido</p>
               <div className="space-y-3">
                 {cart.map((l: any) => (
-                  <div key={l.product.id} className="space-y-1.5">
+                  <div key={cartLineKey(l)} className="space-y-1.5">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{l.quantity}× {l.product.name}</span>
-                      <span>{formatCurrency(l.product.price * l.quantity)}</span>
+                      <span className="text-muted-foreground">
+                        {l.quantity}× {l.product.name}
+                        {l.variation && <span className="text-primary"> · {l.variation.name}</span>}
+                      </span>
+                      <span>{formatCurrency(cartLinePrice(l) * l.quantity)}</span>
                     </div>
                     <input
                       type="text"
                       placeholder="Notas (ej. sin cebolla, término medio…)"
                       value={l.notes ?? ""}
-                      onChange={(e) => setNotes(l.product.id, e.target.value)}
+                      onChange={(e) => setNotes(cartLineKey(l), e.target.value)}
                       className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary"
                     />
                   </div>
@@ -621,18 +648,19 @@ function CartSheet({
         ) : (
           <div className="space-y-3">
             {cart.map((l: any) => (
-              <div key={l.product.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <div key={cartLineKey(l)} className="flex items-center gap-3 rounded-xl border border-border p-3">
                 <ProductImage emoji={l.product.image} category={l.product.category} size="sm" className="h-12 w-12 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{l.product.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatCurrency(l.product.price)}</p>
+                  {l.variation && <p className="truncate text-[11px] font-medium text-primary">{l.variation.name}</p>}
+                  <p className="text-xs text-muted-foreground">{formatCurrency(cartLinePrice(l))}</p>
                 </div>
                 <div className="flex items-center gap-1 rounded-lg border border-border">
-                  <button onClick={() => decrement(l.product.id)} className="flex h-7 w-7 items-center justify-center hover:bg-muted">
+                  <button onClick={() => decrement(cartLineKey(l))} className="flex h-7 w-7 items-center justify-center hover:bg-muted">
                     {l.quantity === 1 ? <Trash2 className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
                   </button>
                   <span className="w-5 text-center text-sm font-semibold">{l.quantity}</span>
-                  <button onClick={() => increment(l.product.id)} className="flex h-7 w-7 items-center justify-center hover:bg-muted">
+                  <button onClick={() => increment(cartLineKey(l))} className="flex h-7 w-7 items-center justify-center hover:bg-muted">
                     <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -752,5 +780,58 @@ function OrderConfirmation({ orderId, onClose }: { orderId: string; onClose: () 
         </Button>
       </motion.div>
     </motion.div>
+  );
+}
+
+/** Elección de variación antes de añadir al carrito (carta pública / QR). */
+function VariationPicker({
+  product,
+  onClose,
+  onPick,
+}: {
+  product: Product | null;
+  onClose: () => void;
+  onPick: (product: Product, variation: ProductVariation | null) => void;
+}) {
+  if (!product) return null;
+  const variations = product.variations ?? [];
+  const base = Number(product.price);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-t-2xl border border-border bg-card p-4 shadow-xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-base font-bold">{product.name}</p>
+        <p className="mb-3 text-sm text-muted-foreground">Elige una opción</p>
+        <div className="space-y-2">
+          <button
+            onClick={() => onPick(product, null)}
+            className="flex w-full items-center justify-between rounded-xl border border-border px-3 py-3 text-left text-sm transition-colors hover:border-primary hover:bg-primary/5"
+          >
+            <span className="font-medium">Estándar</span>
+            <span className="font-semibold">{formatCurrency(base)}</span>
+          </button>
+          {variations.map((v) => (
+            <button
+              key={v.id}
+              onClick={() => onPick(product, v)}
+              className="flex w-full items-center justify-between rounded-xl border border-border px-3 py-3 text-left text-sm transition-colors hover:border-primary hover:bg-primary/5"
+            >
+              <span className="font-medium">
+                {v.name}
+                {v.priceDelta !== 0 && (
+                  <span className="ml-1.5 text-xs text-muted-foreground">
+                    {v.priceDelta > 0 ? "+" : "−"}{formatCurrency(Math.abs(v.priceDelta))}
+                  </span>
+                )}
+              </span>
+              <span className="font-semibold">{formatCurrency(base + v.priceDelta)}</span>
+            </button>
+          ))}
+        </div>
+        <Button variant="outline" className="mt-3 w-full" onClick={onClose}>Cancelar</Button>
+      </div>
+    </div>
   );
 }

@@ -132,6 +132,15 @@ export interface Product {
   comboItems?: ComboItem[];
   /** Suma del precio de los componentes (para mostrar el ahorro). */
   componentsTotal?: number | null;
+  /** Variaciones de la ficha técnica, elegibles al pedir (POS y web). */
+  variations?: ProductVariation[];
+}
+
+export interface ProductVariation {
+  id: string;
+  name: string;
+  /** +/- sobre el precio base del producto. */
+  priceDelta: number;
 }
 
 export interface ComboItem {

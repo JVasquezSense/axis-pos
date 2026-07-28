@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import type { Product, ModifierOption } from "@/types";
+import type { Product, ModifierOption, ProductVariation } from "@/types";
 import {
   Dialog,
   DialogContent,
@@ -29,12 +29,19 @@ export function ModifierDialog({
 }) {
   const addProduct = useOrderStore((s) => s.addProduct);
   const [selected, setSelected] = useState<Record<string, ModifierOption[]>>({});
+  const [variation, setVariation] = useState<ProductVariation | null>(null);
   const [notes, setNotes] = useState("");
 
   if (!product) return null;
 
   const groups = product.modifiers ?? [];
-  const chosen = Object.values(selected).flat();
+  const variations = product.variations ?? [];
+  // La variación viaja como un modificador más: así ajusta el precio unitario y
+  // llega a cocina en las notas, sin duplicar la maquinaria del pedido.
+  const variationOption: ModifierOption | null = variation
+    ? { id: `var-${variation.id}`, name: variation.name, price: variation.priceDelta }
+    : null;
+  const chosen = [...Object.values(selected).flat(), ...(variationOption ? [variationOption] : [])];
   const extra = chosen.reduce((s, m) => s + m.price, 0);
 
   const toggle = (groupId: string, opt: ModifierOption, multiple: boolean) => {
@@ -50,9 +57,10 @@ export function ModifierDialog({
 
   const confirm = () => {
     addProduct(product, chosen, notes || undefined);
-    toast.success(`${product.name} agregado al pedido`);
+    toast.success(`${product.name}${variation ? ` · ${variation.name}` : ""} agregado al pedido`);
     onOpenChange(false);
     setSelected({});
+    setVariation(null);
     setNotes("");
   };
 
@@ -71,6 +79,47 @@ export function ModifierDialog({
         </div>
 
         <div className="scrollbar-thin max-h-[50vh] space-y-5 overflow-y-auto p-5">
+          {variations.length > 0 && (
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold">Variación</p>
+                <Badge variant="secondary">Elige una</Badge>
+              </div>
+              <div className="space-y-1.5">
+                {[null, ...variations].map((v) => {
+                  const active = (v?.id ?? null) === (variation?.id ?? null);
+                  return (
+                    <button
+                      key={v?.id ?? "estandar"}
+                      onClick={() => setVariation(v)}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-colors",
+                        active ? "border-primary bg-primary/5 text-foreground" : "border-border hover:bg-muted"
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "flex h-4 w-4 items-center justify-center rounded-full border",
+                            active ? "border-primary bg-primary" : "border-muted-foreground/40"
+                          )}
+                        >
+                          {active && <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />}
+                        </span>
+                        {v ? v.name : "Estándar"}
+                      </span>
+                      {v && v.priceDelta !== 0 && (
+                        <span className={cn(v.priceDelta > 0 ? "text-muted-foreground" : "text-emerald-600")}>
+                          {v.priceDelta > 0 ? "+" : "−"}{formatCurrency(Math.abs(v.priceDelta))}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {groups.map((g) => (
             <div key={g.id}>
               <div className="mb-2 flex items-center justify-between">

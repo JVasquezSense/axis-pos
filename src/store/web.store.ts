@@ -1,12 +1,24 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Product, PaymentMethod } from "@/types";
+import type { Product, PaymentMethod, ProductVariation } from "@/types";
 
 export interface WebCartLine {
   product: Product;
   quantity: number;
   /** Notas por item del pedido web (ej. "sin cebolla"). */
   notes?: string;
+  /** Variación elegida de la ficha técnica (ej. "Doble carne"). */
+  variation?: ProductVariation;
+}
+
+/** Clave de línea: el mismo producto con distinta variación son líneas aparte. */
+export function cartLineKey(l: Pick<WebCartLine, "product" | "variation">): string {
+  return `${l.product.id}::${l.variation?.id ?? ""}`;
+}
+
+/** Precio unitario ya con el ajuste de la variación. */
+export function cartLinePrice(l: Pick<WebCartLine, "product" | "variation">): number {
+  return Number(l.product.price) + Number(l.variation?.priceDelta ?? 0);
 }
 
 /**
@@ -39,11 +51,12 @@ interface WebState {
   liveOrders: LiveWebOrder[];
   /** IDs de pedidos web enviados desde este dispositivo (persistido). */
   myOrderIds: string[];
-  add: (product: Product) => void;
-  increment: (id: string) => void;
-  decrement: (id: string) => void;
+  add: (product: Product, variation?: ProductVariation) => void;
+  /** Reciben la clave de línea (producto+variación), no el id del producto. */
+  increment: (key: string) => void;
+  decrement: (key: string) => void;
   /** Notas por item del carrito web (ej. "sin cebolla"). */
-  setNotes: (id: string, notes: string) => void;
+  setNotes: (key: string, notes: string) => void;
   clear: () => void;
   /** Registra un pedido enviado para poder seguirlo en 'Mis pedidos'. */
   addMyOrder: (orderId: string) => void;
@@ -62,31 +75,30 @@ export const useWebStore = create<WebState>()(
   cart: [],
   liveOrders: [],
   myOrderIds: [],
-  add: (product) =>
+  add: (product, variation) =>
     set((s) => {
-      const existing = s.cart.find((l) => l.product.id === product.id);
+      const key = cartLineKey({ product, variation });
+      const existing = s.cart.find((l) => cartLineKey(l) === key);
       if (existing) {
         return {
-          cart: s.cart.map((l) =>
-            l.product.id === product.id ? { ...l, quantity: l.quantity + 1 } : l
-          ),
+          cart: s.cart.map((l) => (cartLineKey(l) === key ? { ...l, quantity: l.quantity + 1 } : l)),
         };
       }
-      return { cart: [...s.cart, { product, quantity: 1 }] };
+      return { cart: [...s.cart, { product, quantity: 1, variation }] };
     }),
-  increment: (id) =>
+  increment: (key) =>
     set((s) => ({
-      cart: s.cart.map((l) => (l.product.id === id ? { ...l, quantity: l.quantity + 1 } : l)),
+      cart: s.cart.map((l) => (cartLineKey(l) === key ? { ...l, quantity: l.quantity + 1 } : l)),
     })),
-  decrement: (id) =>
+  decrement: (key) =>
     set((s) => ({
       cart: s.cart
-        .map((l) => (l.product.id === id ? { ...l, quantity: l.quantity - 1 } : l))
+        .map((l) => (cartLineKey(l) === key ? { ...l, quantity: l.quantity - 1 } : l))
         .filter((l) => l.quantity > 0),
     })),
-  setNotes: (id, notes) =>
+  setNotes: (key, notes) =>
     set((s) => ({
-      cart: s.cart.map((l) => (l.product.id === id ? { ...l, notes } : l)),
+      cart: s.cart.map((l) => (cartLineKey(l) === key ? { ...l, notes } : l)),
     })),
   clear: () => set({ cart: [] }),
   addMyOrder: (orderId) =>
@@ -96,7 +108,7 @@ export const useWebStore = create<WebState>()(
 
   submitOrder: (customer, phone, method) => {
     const { cart } = get();
-    const total = cart.reduce((s, l) => s + l.product.price * l.quantity, 0);
+    const total = cart.reduce((s, l) => s + cartLinePrice(l) * l.quantity, 0);
     const items = cart.reduce((s, l) => s + l.quantity, 0);
     const order: LiveWebOrder = {
       id: `web-${Date.now()}`,
@@ -106,7 +118,7 @@ export const useWebStore = create<WebState>()(
       method,
       total,
       items,
-      lines: cart.map((l) => ({ name: l.product.name, quantity: l.quantity })),
+      lines: cart.map((l) => ({ name: l.variation ? `${l.product.name} (${l.variation.name})` : l.product.name, quantity: l.quantity })),
       createdAt: Date.now(),
       status: "awaiting_receipt",
     };
