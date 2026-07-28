@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { USE_API } from "@/services/http";
+import { deliveryService } from "@/services/delivery.service";
 import { persist } from "zustand/middleware";
 
 export type DeliveryStatus = "pending" | "assigned" | "picked_up" | "on_the_way" | "arrived" | "delivered" | "cancelled";
@@ -48,6 +50,8 @@ export interface DeliveryOrder {
 
 interface DeliveryState {
   orders: DeliveryOrder[];
+  /** Trae los domicilios del backend (filtrados por tenant). */
+  load: () => Promise<void>;
   addOrder: (order: Omit<DeliveryOrder, "id" | "createdAt" | "assignedAt" | "pickedUpAt" | "deliveredAt">) => void;
   assignDriver: (orderId: string, driverId: string, driverName: string) => void;
   updateStatus: (orderId: string, status: DeliveryStatus) => void;
@@ -103,6 +107,13 @@ export const useDeliveryStore = create<DeliveryState>()(
     (set) => ({
       orders: [],
 
+      load: async () => {
+        if (!USE_API) return;
+        try {
+          set({ orders: await deliveryService.list() });
+        } catch { /* sin conexión: se conserva lo local */ }
+      },
+
       addOrder: (order) => {
         const entry: DeliveryOrder = {
           ...order,
@@ -113,18 +124,26 @@ export const useDeliveryStore = create<DeliveryState>()(
           deliveredAt: null,
         };
         set((s) => ({ orders: [entry, ...s.orders].slice(0, 500) }));
+        if (!USE_API) return;
+        deliveryService.create(order)
+          .then((saved) => set((s) => ({ orders: s.orders.map((o) => (o.id === entry.id ? saved : o)) })))
+          .catch(() => { /* queda local */ });
       },
 
-      assignDriver: (orderId, driverId, driverName) =>
+      assignDriver: (orderId, driverId, driverName) => {
         set((s) => ({
           orders: s.orders.map((o) =>
             o.id === orderId
               ? { ...o, driverId, driverName, status: "assigned" as DeliveryStatus, assignedAt: Date.now() }
               : o
           ),
-        })),
+        }));
+        if (USE_API) {
+          deliveryService.update(orderId, { driverId, driverName, status: "assigned" }).catch(() => {});
+        }
+      },
 
-      updateStatus: (orderId, status) =>
+      updateStatus: (orderId, status) => {
         set((s) => ({
           orders: s.orders.map((o) => {
             if (o.id !== orderId) return o;
@@ -133,10 +152,15 @@ export const useDeliveryStore = create<DeliveryState>()(
             if (status === "delivered") updates.deliveredAt = Date.now();
             return { ...o, ...updates };
           }),
-        })),
+        }));
+        // El backend sella assigned_at/picked_up_at/delivered_at al cambiar estado.
+        if (USE_API) deliveryService.setStatus(orderId, status).catch(() => {});
+      },
 
-      removeOrder: (orderId) =>
-        set((s) => ({ orders: s.orders.filter((o) => o.id !== orderId) })),
+      removeOrder: (orderId) => {
+        set((s) => ({ orders: s.orders.filter((o) => o.id !== orderId) }));
+        if (USE_API) deliveryService.remove(orderId).catch(() => {});
+      },
 
       seedDemo: () =>
         set((s) => {

@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import type { PaymentMethod } from "@/types";
 import { USE_API } from "@/services/http";
 import { salesService } from "@/services/sales.service";
+import { shiftsService } from "@/services/shifts.service";
 
 export interface ArchivedSale {
   id: string;
@@ -52,6 +53,11 @@ export const useHistoryStore = create<HistoryState>()(
       load: async () => {
         if (!USE_API || get().loading) return;
         set({ loading: true });
+        // Los cierres de turno ahora viven en el backend (antes solo localStorage,
+        // así que no cruzaban de dispositivo).
+        shiftsService.list()
+          .then((shifts) => { if (shifts.length) set({ shifts }); })
+          .catch(() => { /* sin conexión: se conserva lo local */ });
         try {
           const remote = await salesService.getAll();
           // Fusiona: las ventas del backend son la fuente de verdad; conserva las
@@ -75,6 +81,11 @@ export const useHistoryStore = create<HistoryState>()(
           ts: Date.now(),
         };
         set((s) => ({ shifts: [entry, ...s.shifts].slice(0, 100) }));
+        if (!USE_API) return;
+        // Persiste el cierre para que sobreviva al navegador y cruce dispositivos.
+        shiftsService.create(shift)
+          .then((saved) => set((s) => ({ shifts: s.shifts.map((x) => (x.id === entry.id ? saved : x)) })))
+          .catch(() => { /* queda local */ });
       },
     }),
     { name: "axis-history", partialize: (s) => ({ sales: s.sales, shifts: s.shifts }) }

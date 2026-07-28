@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { USE_API } from "@/services/http";
+import { auditService } from "@/services/audit.service";
 
 export type AuditModule =
   | "ventas"
@@ -21,6 +23,9 @@ export interface AuditEntry {
 
 interface AuditState {
   entries: AuditEntry[];
+  loaded: boolean;
+  /** Trae la bitácora del backend (filtrada por tenant). */
+  load: () => Promise<void>;
   log: (entry: Omit<AuditEntry, "id" | "ts">) => void;
   clear: () => void;
 }
@@ -49,12 +54,31 @@ export const MODULE_COLORS: Record<AuditModule, string> = {
 
 export const useAuditStore = create<AuditState>()((set) => ({
   entries: [],
-  log: (entry) =>
-    set((s) => ({
-      entries: [
-        { ...entry, id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, ts: Date.now() },
-        ...s.entries,
-      ].slice(0, 500),
-    })),
+  loaded: false,
+
+  load: async () => {
+    if (!USE_API) return;
+    try {
+      const entries = await auditService.list();
+      set({ entries, loaded: true });
+    } catch {
+      set({ loaded: true }); // sin conexión: se conserva lo que haya en memoria
+    }
+  },
+
+  log: (entry) => {
+    // Optimista: se pinta ya y se persiste en segundo plano.
+    const local: AuditEntry = {
+      ...entry,
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      ts: Date.now(),
+    };
+    set((s) => ({ entries: [local, ...s.entries].slice(0, 500) }));
+    if (!USE_API) return;
+    auditService.log(entry)
+      .then((saved) => set((s) => ({ entries: s.entries.map((e) => (e.id === local.id ? saved : e)) })))
+      .catch(() => { /* queda solo en memoria */ });
+  },
+
   clear: () => set({ entries: [] }),
 }));

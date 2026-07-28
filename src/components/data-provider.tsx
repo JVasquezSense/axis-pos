@@ -11,6 +11,8 @@ import { useSalesStore } from "@/store/sales.store";
 import { useReservationsStore } from "@/store/reservations.store";
 import { useEmployeesStore } from "@/store/employees.store";
 import { useAuthStore } from "@/store/auth.store";
+import { useAuditStore } from "@/store/audit.store";
+import { useDeliveryStore } from "@/store/delivery.store";
 import { useAppStore } from "@/store/app.store";
 import { meService } from "@/services/me.service";
 
@@ -25,6 +27,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadSales = useSalesStore((s) => s.load);
   const loadReservations = useReservationsStore((s) => s.load);
   const loadEmployees = useEmployeesStore((s) => s.load);
+  const loadAudit = useAuditStore((s) => s.load);
+  const loadDeliveries = useDeliveryStore((s) => s.load);
   const connectRealtime = useMenuStore((s) => s.connectRealtime);
   const tenantId = useAuthStore((s) => s.tenantId);
   const updateRestaurant = useAppStore((s) => s.updateRestaurant);
@@ -42,6 +46,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loadSales(),
       loadReservations(),
       loadEmployees(),
+      loadAudit(),
+      loadDeliveries(),
     ]).catch(console.error);
 
     // Hidrata el restaurante real del usuario. Sin esto, `restaurant.slug`
