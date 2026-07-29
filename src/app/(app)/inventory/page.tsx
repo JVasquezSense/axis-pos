@@ -42,7 +42,7 @@ import { PhysicalCountView } from "@/components/inventory/physical-count-view";
 import { ConsumptionView } from "@/components/inventory/consumption-view";
 import { STOCK_STATUS } from "@/lib/status";
 import { exportCsv } from "@/lib/export";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, formatDateTime } from "@/lib/utils";
 
 type SortKey = "name" | "category" | "stock" | "cost" | "value" | "status";
 const STATUS_RANK: Record<StockStatus, number> = { critical: 0, low: 1, normal: 2 };
@@ -311,7 +311,7 @@ function InventoryRow({
     <TableRow>
       <TableCell>
         <p className="font-medium">{item.name}</p>
-        <p className="text-xs text-muted-foreground">Actualizado {item.updatedAt}</p>
+        <p className="text-xs text-muted-foreground">Actualizado {formatDateTime(item.updatedAt)}</p>
       </TableCell>
       <TableCell className="text-muted-foreground">{item.category}</TableCell>
       <TableCell>

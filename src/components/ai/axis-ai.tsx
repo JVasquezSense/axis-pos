@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useSalesStore } from "@/store/sales.store";
 import { useRecipesStore } from "@/store/recipes.store";
-import { useInventoryStore } from "@/store/inventory.store";
+import { useInventoryStore, statusFor } from "@/store/inventory.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useReservationsStore } from "@/store/reservations.store";
@@ -30,7 +30,10 @@ import {
   type Insight,
 } from "@/lib/ai-context";
 import { computeRecipeCost } from "@/lib/recipes";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
+import type { InventoryItem } from "@/types";
+import type { AiAction } from "@/app/api/ai/action/route";
+import { uid } from "@/store/menu.store";
 
 function MdText({ text, onNavigate }: { text: string; onNavigate: (path: string) => void }) {
   const lines = text.split("\n");
@@ -278,6 +281,7 @@ export function AxisAI() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const invItems = useInventoryStore((s) => s.items);
+  const createInventoryItem = useInventoryStore((s) => s.createItem);
   const recipeList = useRecipesStore((s) => s.recipes);
   const alerts = useMemo(() => computeAlerts(), [invItems, recipeList]);
   const navigate = (path: string) => { setOpen(false); router.push(path); };
@@ -287,11 +291,82 @@ export function AxisAI() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
+  /**
+   * Si el mensaje pide crear un insumo, lo crea de verdad contra el backend y
+   * responde con el dato guardado. Antes el modelo solo decía haberlo creado.
+   */
+  const runAction = async (userText: string): Promise<boolean> => {
+    let plan: AiAction;
+    try {
+      const res = await fetch("/api/ai/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userText }),
+      });
+      plan = await res.json();
+    } catch {
+      return false;
+    }
+    if (plan.action !== "create_inventory_item" || !plan.item) return false;
+
+    const it = plan.item;
+    const item: InventoryItem = {
+      id: uid("inv"),
+      name: it.name,
+      category: it.category ?? "General",
+      stock: it.stock ?? 0,
+      unit: it.unit ?? "Und",
+      minStock: it.minStock ?? 0,
+      cost: it.cost ?? 0,
+      supplier: it.supplier ?? "",
+      status: statusFor(it.stock ?? 0, it.minStock ?? 0),
+      updatedAt: new Date().toISOString(),
+    };
+    const saved = await createInventoryItem(item);
+    if (!saved) {
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: `No pude crear **${item.name}**. Créalo manualmente en [Ver en /inventory].` },
+      ]);
+      return true;
+    }
+    setMessages((m) => [
+      ...m,
+      {
+        role: "assistant",
+        content:
+          `✅ Insumo **${saved.name}** creado.
+
+` +
+          `- **Stock inicial:** ${saved.stock} ${saved.unit}
+` +
+          `- **Stock mínimo:** ${saved.minStock} ${saved.unit}
+` +
+          `- **Costo unitario:** ${formatCurrency(Number(saved.cost))}
+` +
+          `- **Categoría:** ${saved.category}
+
+` +
+          `👉 Revísalo o ajústalo en [Ver en /inventory].`,
+      },
+    ]);
+    return true;
+  };
+
   const send = async (mode: AiMode, userText: string) => {
     if (busy) return;
     setBusy(true);
     const prev = messages.filter((m) => m.content).slice(-6);
-    setMessages((m) => [...m, { role: "user", content: userText }, { role: "assistant", content: "" }]);
+    setMessages((m) => [...m, { role: "user", content: userText }]);
+    if (mode === "chat") {
+      try {
+        if (await runAction(userText)) {
+          setBusy(false);
+          return;
+        }
+      } catch { /* si la acción falla, sigue el chat normal */ }
+    }
+    setMessages((m) => [...m, { role: "assistant", content: "" }]);
     try {
       const res = await fetch("/api/ai", {
         method: "POST",

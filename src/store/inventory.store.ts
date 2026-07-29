@@ -49,9 +49,12 @@ interface InventoryState {
   movements: InventoryMovement[];
   load: () => Promise<void>;
   addItem: (item: InventoryItem) => void;
+  /** Alta esperando confirmación del backend; devuelve el insumo guardado. */
+  createItem: (item: InventoryItem) => Promise<InventoryItem | null>;
   updateItem: (item: InventoryItem) => void;
   deleteItem: (id: string) => void;
-  applySale: (reference: string, lines: SaleLine[]) => { affected: number; depletedItemIds: string[] };
+  applySale: (reference: string, lines: SaleLine[]) => Promise<{ affected: number; depletedItemIds: string[] }>;
+  connectRealtime: (tenantId: string) => () => void;
   addPurchase: (reference: string, lines: { inventoryId: string; quantity: number; unitCost: number }[]) => void;
   applyPhysicalCount: (adjustments: { inventoryId: string; physical: number }[]) => number;
   reset: () => void;
@@ -88,6 +91,23 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     }).catch(apiErrorHandler("inventario"));
   },
 
+  createItem: async (item) => {
+    if (!USE_API) {
+      get().addItem(item);
+      return item;
+    }
+    try {
+      const saved = await inventoryService.createItem(item);
+      set((s) => ({ items: [saved, ...s.items] }));
+      useAuditStore.getState().log({ action: "Insumo creado", details: `${saved.name} · ${saved.stock} ${saved.unit}`, user: "Sistema", module: "inventario" });
+      saveCache(get);
+      return saved;
+    } catch (err) {
+      apiErrorHandler("crear insumo")(err);
+      return null;
+    }
+  },
+
   updateItem: (item) => {
     set((s) => ({ items: s.items.map((x) => (x.id === item.id ? item : x)) }));
     useAuditStore.getState().log({ action: "Insumo actualizado", details: item.name, user: "Sistema", module: "inventario" });
@@ -106,7 +126,29 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     if (USE_API) inventoryService.deleteItem(id).catch(apiErrorHandler("eliminar insumo"));
   },
 
-  applySale: (reference, lines) => {
+  applySale: async (reference, lines) => {
+    // Con backend, el descuento y el kardex los escribe el servidor (una sola
+    // fuente de verdad); el WS devuelve los insumos y movimientos ya aplicados.
+    if (USE_API) {
+      try {
+        const { items, movements } = await inventoryService.consumeSale(reference, lines);
+        if (items.length === 0) return { affected: 0, depletedItemIds: [] };
+        const byId = new Map(items.map((i) => [String(i.id), i]));
+        set((s) => ({
+          items: s.items.map((i) => byId.get(String(i.id)) ?? i),
+          movements: [...s.movements, ...movements],
+        }));
+        saveCache(get);
+        return {
+          affected: items.length,
+          depletedItemIds: items.filter((i) => Number(i.stock) === 0).map((i) => i.id),
+        };
+      } catch (err) {
+        apiErrorHandler("descontar inventario")(err);
+        return { affected: 0, depletedItemIds: [] };
+      }
+    }
+
     const recipes = useRecipesStore.getState().recipes;
     const items = [...get().items];
     const moves: InventoryMovement[] = [];
@@ -137,9 +179,6 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           reason: `Venta ${reference}`,
         });
         affected++;
-        if (USE_API) {
-          inventoryService.adjustStock(it.id, newStock, `Venta ${reference}`).catch(apiErrorHandler("ajuste stock"));
-        }
       });
     });
 
@@ -209,6 +248,62 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       saveCache(get);
     }
     return applied;
+  },
+
+  /**
+   * Kardex en vivo: el backend emite `inventory.update` cada vez que el stock
+   * se mueve (venta, compra, ajuste, alta de insumo), así la tabla y el kardex
+   * se refrescan sin recargar la página.
+   */
+  connectRealtime: (tenantId) => {
+    const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
+    if (!USE_API || !WS_BASE || !tenantId || typeof window === "undefined") return () => {};
+    let ws: WebSocket | null = null;
+    let closed = false;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+
+    const open = () => {
+      if (closed) return;
+      ws = new WebSocket(`${WS_BASE}/ws/kitchen/${tenantId}/`);
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.event !== "inventory.update") return;
+          const incoming: InventoryItem[] = (data.items ?? []).map((i: InventoryItem) => ({
+            ...i,
+            stock: Number(i.stock),
+            minStock: Number(i.minStock),
+            cost: Number(i.cost),
+          }));
+          const moves: InventoryMovement[] = data.movements ?? [];
+          const byId = new Map(incoming.map((i) => [String(i.id), i]));
+          set((s) => {
+            const known = new Set(s.items.map((i) => String(i.id)));
+            const seen = new Set(s.movements.map((m) => String(m.id)));
+            return {
+              // Un insumo recién creado en otro dispositivo también debe aparecer.
+              items: [
+                ...s.items.map((i) => byId.get(String(i.id)) ?? i),
+                ...incoming.filter((i) => !known.has(String(i.id))),
+              ],
+              movements: [...s.movements, ...moves.filter((m) => !seen.has(String(m.id)))],
+            };
+          });
+          saveCache(get);
+        } catch { /* fragmento inválido */ }
+      };
+      ws.onclose = () => {
+        if (closed) return;
+        retry = setTimeout(open, 3000);
+      };
+    };
+    open();
+
+    return () => {
+      closed = true;
+      if (retry) clearTimeout(retry);
+      ws?.close();
+    };
   },
 
   reset: () => set({ items: structuredClone(INVENTORY), movements: structuredClone(MOVEMENTS) }),

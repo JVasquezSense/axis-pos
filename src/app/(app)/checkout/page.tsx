@@ -21,6 +21,7 @@ import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useSalesStore } from "@/store/sales.store";
+import { useInventoryStore } from "@/store/inventory.store";
 import { useAuditStore } from "@/store/audit.store";
 import { useAppStore } from "@/store/app.store";
 import { USE_API } from "@/services/http";
@@ -39,6 +40,7 @@ export default function CheckoutPage() {
   const freeTable = useTablesStore((s) => s.free);
   const occupyTable = useTablesStore((s) => s.occupy);
   const recordSale = useSalesStore((s) => s.record);
+  const consumeStock = useInventoryStore((s) => s.applySale);
   const auditLog = useAuditStore((s) => s.log);
   const allEmployees = useEmployeesStore((s) => s.employees);
   const role = useAppStore((s) => s.role);
@@ -105,6 +107,21 @@ export default function CheckoutPage() {
     const ref = table ? `mesa ${table}` : "mostrador";
     // BACKLOG #5: el inventario se descuenta cuando la cocina prepara el pedido
     // (backend consume_order_inventory), NUNCA al cobrar.
+
+    // Venta directa (sin mesa y sin pasar por cocina): aquí no hay orden en el
+    // KDS que dispare el descuento, así que el kardex se mueve al cobrar.
+    const directSale = !table && saleType !== "takeaway" && lines.length > 0;
+    if (directSale) {
+      const { affected } = await consumeStock(
+        ref,
+        lines.map((l) => ({ productId: String(l.product.id), quantity: l.quantity }))
+      );
+      if (affected === 0) {
+        toast.info("Sin descuento de inventario", {
+          description: "Ningún producto de la venta tiene receta con insumos vinculados.",
+        });
+      }
+    }
 
     if (saleType === "takeaway" && !table && lines.length > 0) {
       try {

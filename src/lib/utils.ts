@@ -35,6 +35,32 @@ export function delay(ms = 600): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/**
+ * Fecha corta y legible para tablas: "Hoy 08:42", "Ayer 19:15", "12 jul 08:42".
+ * Las marcas ISO del backend son ilegibles de un vistazo; los valores locales
+ * ya humanizados ("Justo ahora", "Hoy") se devuelven tal cual.
+ */
+export function formatDateTime(value?: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+
+  const now = new Date();
+  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  if (sameDay(d, now)) return `Hoy ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(d, yesterday)) return `Ayer ${time}`;
+
+  const day = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return d.getFullYear() === now.getFullYear() ? `${day} ${time}` : `${day} ${d.getFullYear()}`;
+}
+
 export function minutesAgo(date: Date): number {
   return Math.floor((Date.now() - date.getTime()) / 60000);
 }

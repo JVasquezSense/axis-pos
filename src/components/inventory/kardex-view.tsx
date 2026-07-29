@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportCsv } from "@/lib/export";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, formatDateTime } from "@/lib/utils";
 
 const TYPE_BADGE: Record<InventoryMovement["type"], { label: string; variant: "success" | "warning" | "secondary" | "destructive" }> = {
   inicial: { label: "Inicial", variant: "secondary" },
@@ -70,7 +70,7 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
     exportCsv(
       `kardex-${detailItem.name.toLowerCase().replace(/\s+/g, "-")}`,
       ["Fecha", "Tipo", "Entrada", "Salida", "Saldo", "Costo unit.", "Motivo"],
-      detail.map((m) => [m.date, TYPE_BADGE[m.type].label, m.quantity > 0 ? m.quantity : "", m.quantity < 0 ? Math.abs(m.quantity) : "", m.balance, m.unitCost, m.reason])
+      detail.map((m) => [formatDateTime(m.date), TYPE_BADGE[m.type].label, m.quantity > 0 ? m.quantity : "", m.quantity < 0 ? Math.abs(m.quantity) : "", m.balance, m.unitCost, m.reason])
     );
   };
 
@@ -146,7 +146,7 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
             <TableBody>
               {detail.map((m) => (
                 <TableRow key={m.id}>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">{m.date}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(m.date)}</TableCell>
                   <TableCell><Badge variant={TYPE_BADGE[m.type].variant}>{TYPE_BADGE[m.type].label}</Badge></TableCell>
                   <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">
                     {m.quantity > 0 ? <span className="inline-flex items-center gap-1"><ArrowDownToLine className="h-3 w-3" />{m.quantity}</span> : "—"}

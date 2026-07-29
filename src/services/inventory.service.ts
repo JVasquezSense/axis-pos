@@ -73,6 +73,21 @@ export const inventoryService = {
     if (USE_API) await request<void>(`/inventory/${id}/`, { method: "DELETE" });
   },
   /** Ajuste de stock post-venta: envía el nuevo nivel al backend para sync. */
+  /**
+   * Descuenta insumos por una venta que no pasa por cocina (venta directa de
+   * caja). El backend cruza cada producto con su receta y escribe el kardex.
+   */
+  async consumeSale(
+    reference: string,
+    lines: { productId: string; quantity: number }[]
+  ): Promise<{ items: InventoryItem[]; movements: InventoryMovement[] }> {
+    if (!USE_API) return mockRequest({ items: [], movements: [] }, 100);
+    const res = await request<{ items: InventoryItem[]; movements: InventoryMovement[] }>(
+      "/inventory/consume/",
+      { method: "POST", body: JSON.stringify({ reference, lines }) }
+    );
+    return { items: (res.items ?? []).map(normalizeItem), movements: res.movements ?? [] };
+  },
   async adjustStock(id: string, newStock: number, reason: string): Promise<InventoryItem> {
     return USE_API
       ? request<InventoryItem>(`/inventory/${id}/adjust/`, {
