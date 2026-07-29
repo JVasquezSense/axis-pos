@@ -39,6 +39,7 @@ export const CAPABILITY_FEATURES: FeatureDef[] = [
   { id: "qr", label: "QR por mesa", desc: "Pedidos desde la mesa escaneando" },
   { id: "whatsapp", label: "Chatbot WhatsApp", desc: "Pedidos y atención por WhatsApp" },
   { id: "ai", label: "Axis IA", desc: "Copiloto e importar carta con IA" },
+  { id: "voice", label: "Pedidos por voz", desc: "El mesero dicta el pedido" },
 ];
 
 export const ALL_FEATURES = [...SECTION_FEATURES, ...CAPABILITY_FEATURES];

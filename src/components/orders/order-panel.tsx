@@ -19,6 +19,7 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { useTablesStore } from "@/store/tables.store";
+import { VoiceOrder } from "@/components/orders/voice-order";
 import { useAuditStore } from "@/store/audit.store";
 import { formatCurrency } from "@/lib/utils";
 
@@ -101,6 +102,11 @@ export function OrderPanel() {
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+
+      {/* Dictado: tercera vía para armar el pedido, junto al clic y el QR. */}
+      <div className="border-b border-border px-3 py-2.5">
+        <VoiceOrder />
       </div>
 
       <div className="scrollbar-thin flex-1 overflow-y-auto p-3">
