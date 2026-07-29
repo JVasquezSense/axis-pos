@@ -1,3 +1,4 @@
+import { NAV_ITEMS } from "@/lib/nav";
 import { useAppStore } from "@/store/app.store";
 
 /**
@@ -23,13 +24,26 @@ export function isFeatureEnabled(
   return features[key] === true;
 }
 
-/** Hook: `const { has, features, maxUsers } = useFeatures()`. */
+/** Sección del menú a la que pertenece una ruta (la coincidencia más específica). */
+export function navItemForPath(path: string) {
+  return NAV_ITEMS
+    .filter((i) => path === i.href || path.startsWith(`${i.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+}
+
+/** Hook: `const { has, hasPath, features, maxUsers } = useFeatures()`. */
 export function useFeatures() {
   const features = useAppStore((s) => s.features);
   const maxUsers = useAppStore((s) => s.maxUsers);
+  const has = (key: string) => isFeatureEnabled(features, key);
   return {
     features,
     maxUsers,
-    has: (key: string) => isFeatureEnabled(features, key),
+    has,
+    /** Igual que `has` pero para un href: útil en accesos rápidos y atajos. */
+    hasPath: (path: string) => {
+      const item = navItemForPath(path);
+      return !item || has(item.key);
+    },
   };
 }

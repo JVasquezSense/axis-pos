@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Icon } from "@/components/shared/icon";
+import { useFeatures } from "@/lib/features";
 import { cn } from "@/lib/utils";
 
 export interface QuickAction {
@@ -25,9 +26,14 @@ const TONES = {
 };
 
 export function QuickActions({ actions }: { actions: QuickAction[] }) {
+  // Un acceso rápido a un módulo fuera del plan solo llevaría a la pantalla de
+  // bloqueo; mejor no mostrarlo.
+  const { hasPath } = useFeatures();
+  const visible = actions.filter((a) => hasPath(a.href));
+
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {actions.map((a, i) => (
+      {visible.map((a, i) => (
         <motion.div
           key={a.label}
           initial={{ opacity: 0, y: 10 }}

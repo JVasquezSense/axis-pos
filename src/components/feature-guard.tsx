@@ -3,8 +3,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Lock } from "lucide-react";
-import { NAV_ITEMS } from "@/lib/nav";
-import { useFeatures } from "@/lib/features";
+import { navItemForPath, useFeatures } from "@/lib/features";
 import { useAppStore } from "@/store/app.store";
 import { Button } from "@/components/ui/button";
 
@@ -19,9 +18,7 @@ export function FeatureGuard({ children }: { children: React.ReactNode }) {
   const plan = useAppStore((s) => s.restaurant.plan);
 
   // Ruta -> sección del menú (la más específica que haga prefijo).
-  const item = NAV_ITEMS
-    .filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`))
-    .sort((a, b) => b.href.length - a.href.length)[0];
+  const item = navItemForPath(pathname);
 
   if (!item || item.key === "admin" || has(item.key)) return <>{children}</>;
 

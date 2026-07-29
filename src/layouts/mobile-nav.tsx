@@ -6,7 +6,9 @@ import { useState } from "react";
 import { Menu } from "lucide-react";
 import { NAV_ITEMS, NAV_GROUPS } from "@/lib/nav";
 import { ROLE_NAV } from "@/lib/roles";
+import { useFeatures } from "@/lib/features";
 import { useAppStore } from "@/store/app.store";
+import { useAuthStore } from "@/store/auth.store";
 import { Icon } from "@/components/shared/icon";
 import { LogoMark } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
@@ -17,7 +19,14 @@ export function MobileNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const role = useAppStore((s) => s.role);
-  const items = NAV_ITEMS.filter((i) => ROLE_NAV[role].includes(i.key));
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
+  const { has } = useFeatures();
+  const items = NAV_ITEMS.filter(
+    (i) =>
+      ROLE_NAV[role].includes(i.key) &&
+      (i.key !== "admin" || isSuperAdmin) &&
+      (i.key === "admin" || has(i.key))
+  );
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

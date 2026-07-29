@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { NAV_ITEMS } from "@/lib/nav";
+import { useFeatures } from "@/lib/features";
 import { ROLE_NAV } from "@/lib/roles";
 import { buildOnboardingSteps } from "@/lib/onboarding";
 import { useAppStore } from "@/store/app.store";
@@ -62,10 +63,15 @@ export function OnboardingTour() {
     useOnboardingStore.getState().maybeStart();
   }, []);
 
+  const { has, features } = useFeatures();
+
   const navKeys = useMemo(() => {
     const allowed = ROLE_NAV[role] ?? ROLE_NAV.admin;
-    return NAV_ITEMS.filter((i) => allowed.includes(i.key) && (i.key !== "admin" || isSuperAdmin)).map((i) => i.key);
-  }, [role, isSuperAdmin]);
+    return NAV_ITEMS.filter(
+      (i) => allowed.includes(i.key) && (i.key !== "admin" || isSuperAdmin) && (i.key === "admin" || has(i.key))
+    ).map((i) => i.key);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `has` deriva de features
+  }, [role, isSuperAdmin, features]);
 
   const steps = useMemo(() => buildOnboardingSteps(navKeys), [navKeys]);
   const current = steps[step];
