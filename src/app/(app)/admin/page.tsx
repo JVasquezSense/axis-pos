@@ -6,13 +6,12 @@ import { useAuthStore } from "@/store/auth.store";
 import { toast } from "sonner";
 import {
   ShieldCheck, Building2, Globe, Plus, MoreHorizontal,
-  Pencil, Trash2, ToggleLeft, TrendingUp, TrendingDown,
-  CheckCircle, ShoppingBag, ChefHat, Boxes, BookOpen,
-  LayoutDashboard, CalendarDays, Users, Truck, UserCheck,
-  BarChart3, Smartphone, Loader2, UserPlus, Eye, EyeOff,
+  Pencil, Trash2, ToggleLeft, Layers, Loader2, UserPlus, Eye, EyeOff,
 } from "lucide-react";
 import type { Tenant, TenantFeatures, TenantPlan, TenantStatus, TenantUser } from "@/types";
 import { saasService } from "@/services/saas.service";
+import { SECTION_FEATURES, CAPABILITY_FEATURES, ALL_FEATURES } from "@/lib/plan-features";
+import { PlansDialog } from "@/components/admin/plans-dialog";
 import { useAsync } from "@/hooks/use-async";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -21,7 +20,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,26 +37,8 @@ const PLAN_STYLE: Record<string, string> = {
   enterprise: "bg-violet-500/12 text-violet-600 dark:text-violet-400",
 };
 
-const FEATURE_LIST: { id: keyof TenantFeatures; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: "pos", label: "POS / Caja", icon: ShoppingBag, desc: "Punto de venta y checkout" },
-  { id: "kitchen", label: "Pantalla Cocina", icon: ChefHat, desc: "KDS y gestión de tickets" },
-  { id: "inventory", label: "Inventario", icon: Boxes, desc: "Control de insumos y kardex" },
-  { id: "recipes", label: "Recetas", icon: BookOpen, desc: "Fichas técnicas y costos" },
-  { id: "salon", label: "Salón / Mesas", icon: LayoutDashboard, desc: "Mapa de mesas y estados" },
-  { id: "reservations", label: "Reservaciones", icon: CalendarDays, desc: "Agenda y confirmaciones" },
-  { id: "crm", label: "CRM Clientes", icon: Users, desc: "Base de clientes y fidelización" },
-  { id: "suppliers", label: "Proveedores", icon: Truck, desc: "Órdenes de compra y pagos" },
-  { id: "employees", label: "Empleados", icon: UserCheck, desc: "Equipo y roles" },
-  { id: "reports", label: "Reportes", icon: BarChart3, desc: "Análisis ejecutivo" },
-  { id: "website", label: "Carta Online", icon: Globe, desc: "Menú público del restaurante" },
-  { id: "web_orders", label: "Pedidos Web", icon: Smartphone, desc: "Órdenes desde la carta" },
-];
-
-const DEFAULT_FEATURES: TenantFeatures = {
-  pos: true, kitchen: true, inventory: true, recipes: true,
-  salon: true, reservations: true, crm: true, suppliers: true,
-  employees: true, reports: true, website: true, web_orders: true,
-};
+/** Nº de features conmutables (las de núcleo siempre están activas). */
+const TOGGLEABLE = ALL_FEATURES.filter((f) => !f.core);
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -70,6 +50,7 @@ export default function AdminPage() {
 
   const [tenants, setTenants] = useState<Tenant[] | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [plansOpen, setPlansOpen] = useState(false);
   const [editTenant, setEditTenant] = useState<Tenant | null>(null);
   const [featuresTenant, setFeaturesTenant] = useState<Tenant | null>(null);
   const [usersTenant, setUsersTenant] = useState<Tenant | null>(null);
@@ -122,9 +103,14 @@ export default function AdminPage() {
         description="Gestión global de la plataforma multi-tenant"
         icon={<ShieldCheck className="h-5 w-5" />}
         actions={
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4" /> Nuevo restaurante
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setPlansOpen(true)}>
+              <Layers className="h-4 w-4" /> Planes
+            </Button>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" /> Nuevo restaurante
+            </Button>
+          </div>
         }
       />
 
@@ -229,6 +215,7 @@ export default function AdminPage() {
         tenant={usersTenant}
         onClose={() => setUsersTenant(null)}
       />
+      <PlansDialog open={plansOpen} onOpenChange={setPlansOpen} />
 
       {/* Delete confirm */}
       <Dialog open={!!deleteTarget} onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}>
@@ -265,9 +252,8 @@ function TenantRow({
   onDelete: () => void;
 }) {
   const status = TENANT_STATUS[tenant.status];
-  const enabledCount = tenant.features
-    ? Object.values(tenant.features).filter(Boolean).length
-    : 12;
+  const eff = tenant.effectiveFeatures ?? {};
+  const enabledCount = TOGGLEABLE.filter((f) => eff[f.id] === true).length;
 
   return (
     <TableRow>
@@ -296,7 +282,7 @@ function TenantRow({
           onClick={onFeatures}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          {enabledCount}/12 activas
+          {enabledCount}/{TOGGLEABLE.length} activas
         </button>
       </TableCell>
       <TableCell>
@@ -366,7 +352,7 @@ function TenantFormDialog({
     if (!valid) return;
     setSaving(true);
     try {
-      const payload = { name: name.trim(), logo, city, plan, status, locations, features: initialData?.features ?? DEFAULT_FEATURES };
+      const payload = { name: name.trim(), logo, city, plan, status, locations, features: initialData?.features ?? {} };
       let saved: Tenant;
       if (isEdit && initialData) {
         saved = await saasService.updateTenant(initialData.id, payload);
@@ -462,25 +448,40 @@ function FeaturesDialog({
   onClose: () => void;
   onUpdate: (t: Tenant) => void;
 }) {
-  const [features, setFeatures] = useState<TenantFeatures>(DEFAULT_FEATURES);
+  const [features, setFeatures] = useState<TenantFeatures>({});
   const [saving, setSaving] = useState(false);
   const prevId = useState<string | null>(null);
 
   // Sync features when tenant changes
   if (tenant && tenant.id !== prevId[0]) {
     prevId[1](tenant.id);
-    setFeatures(tenant.features ?? DEFAULT_FEATURES);
+    setFeatures(tenant.features ?? {});
   }
 
-  const toggle = (id: keyof TenantFeatures) =>
-    setFeatures((f) => ({ ...f, [id]: !f[id] }));
+  const eff = tenant?.effectiveFeatures ?? {};
+
+  /** Cicla heredado → forzado ON → forzado OFF → heredado. */
+  const cycle = (id: string) =>
+    setFeatures((f) => {
+      const next = { ...f };
+      if (!(id in next)) next[id] = true;
+      else if (next[id] === true) next[id] = false;
+      else delete next[id];
+      return next;
+    });
 
   const save = async () => {
     if (!tenant) return;
     setSaving(true);
     try {
-      await saasService.updateFeatures(tenant.id, features);
-      onUpdate({ ...tenant, features });
+      // Las claves que el usuario quitó del override viajan como null para que
+      // el backend las borre y el restaurante vuelva a heredar del plan.
+      const payload: TenantFeatures = { ...features };
+      for (const key of Object.keys(tenant.features ?? {})) {
+        if (!(key in payload)) payload[key] = null;
+      }
+      const saved = await saasService.updateFeatures(tenant.id, payload);
+      onUpdate(saved);
       toast.success("Funcionalidades actualizadas");
       onClose();
     } catch {
@@ -490,37 +491,59 @@ function FeaturesDialog({
     }
   };
 
+  const Row = ({ id, label, desc, core }: (typeof ALL_FEATURES)[number]) => {
+    const override = features[id];
+    const inherited = eff[id] === true;
+    const active = core ? true : override === undefined ? inherited : override === true;
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{label}</p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {core ? "Siempre incluido" : override === undefined ? `Del plan: ${inherited ? "sí" : "no"}` : desc}
+          </p>
+        </div>
+        {core ? (
+          <Badge variant="secondary" className="shrink-0">Núcleo</Badge>
+        ) : (
+          <button
+            onClick={() => cycle(id)}
+            className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+              override === undefined
+                ? "bg-muted text-muted-foreground"
+                : active
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                  : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            {override === undefined ? (active ? "Plan · sí" : "Plan · no") : active ? "Forzado sí" : "Forzado no"}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Dialog open={!!tenant} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="text-xl">{tenant?.logo}</span>
             {tenant?.name} · Funcionalidades
           </DialogTitle>
           <DialogDescription>
-            Activa o desactiva módulos para este restaurante.
+            Por defecto hereda del plan <strong>{tenant?.plan}</strong>. Toca una función para
+            forzarla solo en este restaurante.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {FEATURE_LIST.map(({ id, label, icon: Icon, desc }) => (
-            <div
-              key={id}
-              className="flex items-center justify-between rounded-lg border border-border p-3"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-[11px] text-muted-foreground">{desc}</p>
-                </div>
-              </div>
-              <Switch checked={features[id]} onCheckedChange={() => toggle(id)} />
-            </div>
-          ))}
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Secciones</p>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {SECTION_FEATURES.map((f) => <Row key={f.id} {...f} />)}
+        </div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Capacidades</p>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {CAPABILITY_FEATURES.map((f) => <Row key={f.id} {...f} />)}
         </div>
 
         <DialogFooter>

@@ -32,6 +32,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const connectRealtime = useMenuStore((s) => s.connectRealtime);
   const tenantId = useAuthStore((s) => s.tenantId);
   const updateRestaurant = useAppStore((s) => s.updateRestaurant);
+  const setFeatures = useAppStore((s) => s.setFeatures);
 
   useEffect(() => {
     if (loaded.current || !USE_API) return;
@@ -63,6 +64,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         if (me.tenantLogo) patch.logo = me.tenantLogo;
         if (me.tenantPlan) patch.plan = me.tenantPlan;
         updateRestaurant(patch);
+        // Features del plan: restringen la barra lateral y los módulos.
+        setFeatures(me.tenantFeatures ?? null, me.tenantMaxUsers ?? undefined);
       })
       .catch(() => { /* sin sesión válida: se conserva lo que haya */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps

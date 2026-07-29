@@ -13,6 +13,8 @@ export interface Me {
   tenantSlug: string | null;
   tenantLogo: string | null;
   tenantPlan: string | null;
+  tenantFeatures: Record<string, boolean | number> | null;
+  tenantMaxUsers: number | null;
   resolvedTenantId: string | null;
 }
 

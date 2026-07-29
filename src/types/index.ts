@@ -322,20 +322,12 @@ export interface ReportData {
 export type TenantPlan = "starter" | "growth" | "enterprise";
 export type TenantStatus = "active" | "trial" | "past_due" | "churned";
 
-export interface TenantFeatures {
-  pos: boolean;
-  kitchen: boolean;
-  inventory: boolean;
-  recipes: boolean;
-  salon: boolean;
-  reservations: boolean;
-  crm: boolean;
-  suppliers: boolean;
-  employees: boolean;
-  reports: boolean;
-  website: boolean;
-  web_orders: boolean;
-}
+/**
+ * Overrides de features por restaurante. Las claves coinciden con las secciones
+ * del menú (ver src/lib/plan-features.ts); `null` significa "heredar del plan".
+ * `max_users` es numérico, el resto booleano.
+ */
+export type TenantFeatures = Record<string, boolean | number | null>;
 
 export interface Tenant {
   id: string;
@@ -351,6 +343,9 @@ export interface Tenant {
   joinedAt: string;
   city: string;
   features: TenantFeatures;
+  /** Resultado de defaults <- plan <- override; solo lectura. */
+  effectiveFeatures?: Record<string, boolean | number>;
+  maxUsers?: number;
 }
 
 export interface TenantUser {

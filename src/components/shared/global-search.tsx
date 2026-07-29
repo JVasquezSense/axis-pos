@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, CornerDownLeft } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
+import { useFeatures } from "@/lib/features";
 import { ROLE_NAV } from "@/lib/roles";
 import { PRODUCTS } from "@/mock/menu";
 import { useAppStore } from "@/store/app.store";
@@ -28,7 +29,8 @@ export function GlobalSearch() {
 
   const ql = q.trim().toLowerCase();
   const allowed = ROLE_NAV[role];
-  const pages = ql ? NAV_ITEMS.filter((n) => allowed.includes(n.key) && n.label.toLowerCase().includes(ql)) : [];
+  const { has } = useFeatures();
+  const pages = ql ? NAV_ITEMS.filter((n) => allowed.includes(n.key) && has(n.key) && n.label.toLowerCase().includes(ql)) : [];
   const products = ql ? PRODUCTS.filter((p) => p.name.toLowerCase().includes(ql)).slice(0, 5) : [];
   const hasResults = pages.length > 0 || products.length > 0;
 

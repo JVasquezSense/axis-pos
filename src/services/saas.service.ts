@@ -2,9 +2,27 @@ import type { Tenant, TenantFeatures, TenantUser, SaasMetrics } from "@/types";
 import { TENANTS, SAAS_METRICS } from "@/mock/datasets";
 import { USE_API, request, mockRequest } from "./http";
 
+
+export interface PlanConfig {
+  code: string;
+  name: string;
+  price: number;
+  maxUsers: number;
+  features: Record<string, boolean | number>;
+}
+
 export const saasService = {
   async getTenants(): Promise<Tenant[]> {
     return USE_API ? request<Tenant[]>("/admin/tenants/") : mockRequest(TENANTS, 650);
+  },
+  /** Planes SaaS y sus features (solo superadmin). */
+  async getPlans(): Promise<PlanConfig[]> {
+    return USE_API ? request<PlanConfig[]>("/admin/plans/") : mockRequest([], 300);
+  },
+  async savePlan(plan: PlanConfig): Promise<PlanConfig> {
+    return USE_API
+      ? request<PlanConfig>("/admin/plans/", { method: "PATCH", body: JSON.stringify(plan) })
+      : mockRequest(plan, 200);
   },
   async getMetrics(): Promise<SaasMetrics> {
     return USE_API ? request<SaasMetrics>("/admin/metrics/") : mockRequest(SAAS_METRICS, 700);

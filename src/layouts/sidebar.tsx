@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { NAV_ITEMS, NAV_GROUPS } from "@/lib/nav";
+import { useFeatures } from "@/lib/features";
 import { ROLE_NAV } from "@/lib/roles";
 import { useAppStore } from "@/store/app.store";
 import { useAuthStore } from "@/store/auth.store";
@@ -17,7 +18,11 @@ export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar, role } = useAppStore();
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
   const allowed = ROLE_NAV[role] ?? ROLE_NAV["admin"];
-  const items = NAV_ITEMS.filter((i) => allowed.includes(i.key) && (i.key !== "admin" || isSuperAdmin));
+  const { has } = useFeatures();
+  // Visible si el rol lo permite Y el plan del restaurante incluye la sección.
+  const items = NAV_ITEMS.filter(
+    (i) => allowed.includes(i.key) && (i.key !== "admin" || isSuperAdmin) && (i.key === "admin" || has(i.key))
+  );
 
   return (
     <aside
