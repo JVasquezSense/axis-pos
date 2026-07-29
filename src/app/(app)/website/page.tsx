@@ -10,12 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StoreQR } from "@/components/shared/store-qr";
+import { useFeatures } from "@/lib/features";
 import { WebOrdersFeed } from "@/components/website/web-orders-feed";
 import { WhatsAppBotSection } from "@/components/website/whatsapp-config";
 import { useAppStore } from "@/store/app.store";
 
 export default function WebsitePage() {
   const restaurant = useAppStore((s) => s.restaurant);
+  const hasWhatsapp = useFeatures().has("whatsapp");
   const updateRestaurant = useAppStore((s) => s.updateRestaurant);
   const [origin, setOrigin] = useState("https://axispos.co");
   useEffect(() => setOrigin(window.location.origin), []);
@@ -166,7 +168,7 @@ export default function WebsitePage() {
         </Card>
       </div>
 
-      <WhatsAppBotSection />
+      {hasWhatsapp && <WhatsAppBotSection />}
 
       <Card>
         <CardHeader>

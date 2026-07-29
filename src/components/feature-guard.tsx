@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Lock } from "lucide-react";
 import { navItemForPath, useFeatures } from "@/lib/features";
 import { useAppStore } from "@/store/app.store";
+import { PLAN_LABEL } from "@/lib/status";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -29,7 +30,7 @@ export function FeatureGuard({ children }: { children: React.ReactNode }) {
       </div>
       <p className="text-lg font-bold">{item.label} no está en tu plan</p>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-        Tu restaurante tiene el plan <strong className="text-foreground">{plan}</strong>. Pide al
+        Tu restaurante tiene el plan <strong className="text-foreground">{PLAN_LABEL[plan] ?? plan}</strong>. Pide al
         administrador de la plataforma que lo habilite o cambie de plan.
       </p>
       <Button asChild className="mt-5">

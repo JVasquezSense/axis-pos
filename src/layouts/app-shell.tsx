@@ -5,9 +5,11 @@ import { Header } from "./header";
 import { AxisAI } from "@/components/ai/axis-ai";
 import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { useAppInit } from "@/hooks/use-app-init";
+import { useFeatures } from "@/lib/features";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   useAppInit();
+  const { has } = useFeatures();
 
   return (
     <div className="flex min-h-screen bg-muted/30">
@@ -16,7 +18,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Header />
         <main className="flex-1 px-4 py-6 lg:px-6">{children}</main>
       </div>
-      <AxisAI />
+      {has("ai") && <AxisAI />}
       <OnboardingTour />
     </div>
   );

@@ -19,6 +19,7 @@ import { TableDrawer } from "@/components/salon/table-drawer";
 import { AddTableDialog, type NewTableData } from "@/components/salon/add-table-dialog";
 import { ZonesDialog } from "@/components/salon/zones-dialog";
 import { TABLE_STATUS } from "@/lib/status";
+import { useFeatures } from "@/lib/features";
 import { cn } from "@/lib/utils";
 
 const SHAPES: { id: RestaurantTable["shape"]; label: string }[] = [
@@ -72,6 +73,7 @@ export default function SalonPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [zonesOpen, setZonesOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const hasQr = useFeatures().has("qr");
   const [layoutMode, setLayoutMode] = useState(false);
   const [layoutSelectedId, setLayoutSelectedId] = useState<string | null>(null);
   const layoutSelected = tables.find((t) => t.id === layoutSelectedId) ?? null;
@@ -197,9 +199,11 @@ export default function SalonPage() {
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4" /> Nueva mesa
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setQrOpen(true)}>
-              <QrCode className="h-4 w-4" /> QR por mesa
-            </Button>
+            {hasQr && (
+              <Button size="sm" variant="outline" onClick={() => setQrOpen(true)}>
+                <QrCode className="h-4 w-4" /> QR por mesa
+              </Button>
+            )}
           </div>
         }
       />
