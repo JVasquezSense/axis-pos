@@ -88,6 +88,14 @@ export const inventoryService = {
     );
     return { items: (res.items ?? []).map(normalizeItem), movements: res.movements ?? [] };
   },
+  /**
+   * Descuenta un pedido para llevar que se paga por adelantado. Idempotente: si
+   * luego la cocina lo marca como listo, no vuelve a descontar.
+   */
+  async consumeOrder(orderCode: string): Promise<void> {
+    if (!USE_API) return;
+    await request("/inventory/consume/", { method: "POST", body: JSON.stringify({ orderCode }) });
+  },
   async adjustStock(id: string, newStock: number, reason: string): Promise<InventoryItem> {
     return USE_API
       ? request<InventoryItem>(`/inventory/${id}/adjust/`, {

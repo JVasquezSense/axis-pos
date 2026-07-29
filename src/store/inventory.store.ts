@@ -86,7 +86,9 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     useAuditStore.getState().log({ action: "Insumo creado", details: `${item.name} · ${item.stock} ${item.unit}`, user: "Sistema", module: "inventario" });
     saveCache(get);
     if (USE_API) inventoryService.createItem(item).then((saved) => {
-      set((s) => ({ items: s.items.map((x) => (x.id === item.id ? saved : x)) }));
+      set((s) => ({
+        items: [saved, ...s.items.filter((x) => x.id !== item.id && String(x.id) !== String(saved.id))],
+      }));
       saveCache(get);
     }).catch(apiErrorHandler("inventario"));
   },
@@ -98,7 +100,9 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     }
     try {
       const saved = await inventoryService.createItem(item);
-      set((s) => ({ items: [saved, ...s.items] }));
+      // El evento WS del alta puede llegar antes que esta respuesta: filtrar por
+      // id evita que el insumo aparezca dos veces en la lista.
+      set((s) => ({ items: [saved, ...s.items.filter((x) => String(x.id) !== String(saved.id))] }));
       useAuditStore.getState().log({ action: "Insumo creado", details: `${saved.name} · ${saved.stock} ${saved.unit}`, user: "Sistema", module: "inventario" });
       saveCache(get);
       return saved;

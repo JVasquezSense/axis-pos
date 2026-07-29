@@ -22,6 +22,7 @@ import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useSalesStore } from "@/store/sales.store";
 import { useInventoryStore } from "@/store/inventory.store";
+import { inventoryService } from "@/services/inventory.service";
 import { useAuditStore } from "@/store/audit.store";
 import { useAppStore } from "@/store/app.store";
 import { USE_API } from "@/services/http";
@@ -126,6 +127,9 @@ export default function CheckoutPage() {
     if (saleType === "takeaway" && !table && lines.length > 0) {
       try {
         const ticket = await sendToKitchen("takeaway");
+        // Ya está pagado: el inventario no puede quedar esperando a que alguien
+        // marque el ticket como listo en el KDS (bebidas que nunca pasan por ahí).
+        await inventoryService.consumeOrder(ticket.code).catch(() => {});
         auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} · Para llevar · Pagado`, user: waiter.trim() || "Sistema", module: "ventas" });
         toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: "Para llevar · ya pagado" });
       } catch { /* error silencioso — la venta ya se registró */ }
