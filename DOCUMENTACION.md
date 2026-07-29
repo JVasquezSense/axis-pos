@@ -511,6 +511,32 @@ Base: **`/api/v1/`**. Generada por `DefaultRouter` de DRF (CRUD completo salvo e
 
 ---
 
+### Pedidos por voz
+
+El mesero dicta y el pedido se arma solo, sin sustituir el toque: es una tercera
+entrada al mismo carrito, junto al clic y al QR.
+
+1. **Dictado** — `src/hooks/use-speech-recognition.ts` usa la Web Speech API del
+   navegador (`es-CO`, gratis, transcribe mientras se habla). Es *mantener
+   pulsado para hablar*: nunca queda escuchando el salón. Chrome, Edge y Android
+   la traen; donde no existe, el panel lo dice en vez de fallar en silencio.
+2. **Interpretación** — `POST /api/ai/voice-order` (server-side, la `GLM_API_KEY`
+   nunca sale del servidor) recibe el texto y los nombres de la carta, y devuelve
+   líneas con cantidad, notas, variación, mesa e intención de quitar. Devuelve
+   **nombres, nunca ids**: quien los resuelve contra el catálogo real es
+   `src/lib/voice-order.ts` (normaliza, singulariza y compara por bigramas), así
+   el modelo no puede colar un producto inexistente. Sin clave configurada, ese
+   mismo archivo interpreta la frase con reglas locales.
+3. **Confirmación** — nada llega a cocina automáticamente. Lo dictado aparece
+   como borrador editable: cantidad, notas, aviso cuando la coincidencia es
+   dudosa y marca de *Agotado* en lo que no se puede vender. Un error de
+   transcripción cuesta un plato; confirmar cuesta un toque.
+
+Al confirmar, la mesa se fija **antes** de volcar las líneas: cambiar de mesa
+reemplaza el contenido del panel por la cuenta de esa mesa.
+
+Se activa con la capacidad `voice` del plan (hoy solo Enterprise).
+
 ### Descuento de inventario y kardex
 
 El stock se mueve en el backend, nunca solo en el cliente:
