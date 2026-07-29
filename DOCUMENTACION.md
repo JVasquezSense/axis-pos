@@ -544,6 +544,35 @@ class TenantQuerySet:  # mixin aplicado a TODOS los ViewSets de negocio
 
 Excepción: si sólo existe **un** Tenant en la BD (modo single-tenant/webhooks), asume ese.
 
+### Planes SaaS y features por restaurante
+
+Tres planes (`starter` → **Básico**, `growth` → **Pro**, `enterprise`) definen qué
+módulos incluye cada restaurante y cuántos usuarios puede crear.
+
+**Precedencia**: `defaults` ← `Plan.features` ← `Tenant.features` (solo overrides).
+`Tenant.features` guarda **únicamente** las claves que el superadmin forzó para ese
+restaurante; el resto se hereda del plan (`Tenant.effective_features()`). Un valor
+`null` en `PATCH /admin/tenants/<id>/features/` borra el override.
+
+Las claves de sección coinciden 1:1 con `NAV_ITEMS` del frontend
+(`src/lib/plan-features.ts` ↔ `NAV_FEATURES` en `api/models.py`), más las
+capacidades `qr`, `whatsapp`, `ai` y el numérico `max_users`. Las de núcleo
+(`dashboard`, `salon`, `orders`, `kitchen`, `checkout`) no se pueden apagar.
+
+Aplicación de la restricción:
+- **Backend** — `required_feature` en los ViewSets (queryset vacío y 403 al crear),
+  límite de usuarios al crear cuentas, y los endpoints públicos exigen `website`
+  (carta) y `weborders` / `qr` (pedido web con mesa).
+- **Frontend** — `/auth/me/` devuelve `tenantFeatures` y `tenantMaxUsers`; con eso
+  `src/lib/features.ts` filtra la barra lateral, el menú móvil, la búsqueda global,
+  los accesos rápidos y el tour; `FeatureGuard` bloquea el acceso por URL directa.
+
+Administración: **Super Admin → Planes** edita los tres planes (secciones,
+capacidades, usuarios y precio) vía `GET/PATCH /admin/plans/`; el diálogo de
+funcionalidades de cada restaurante es tri-estado (heredar / forzar sí / forzar no).
+
+Al eliminar un restaurante se borran también las cuentas de usuario asociadas.
+
 ### Autorización por roles
 - Roles en `UserProfile.ROLE` (admin/cashier/waiter/kitchen/warehouse) van dentro del JWT.
 - ⚠️ **No se aplican como `permission_classes`**: cualquier usuario autenticado hace CRUD en su tenant. Sólo `IsAdminUser` (superuser) restringe `/admin/*`.

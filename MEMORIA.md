@@ -531,4 +531,4 @@ Estos cambios los hizo el usuario y los asimilé al releer el proyecto:
 
 ---
 
-*Memoria generada el 2026-07-22. Última actualización: 2026-07-27 (backlog POS completo, fixes de producción, rediseño del storefront web).*
+*Memoria generada el 2026-07-22. Última actualización: 2026-07-28 (planes SaaS con features por restaurante y borrado de cuentas al eliminar un tenant).*
