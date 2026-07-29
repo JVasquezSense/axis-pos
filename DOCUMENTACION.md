@@ -511,6 +511,26 @@ Base: **`/api/v1/`**. Generada por `DefaultRouter` de DRF (CRUD completo salvo e
 
 ---
 
+### Descuento de inventario y kardex
+
+El stock se mueve en el backend, nunca solo en el cliente:
+
+| Flujo | Cuándo descuenta |
+|---|---|
+| Pedido en mesa | La cocina lo marca listo (`ready`), o al cobrarlo (`paid`) |
+| Para llevar prepago | Al cobrarlo — `POST /inventory/consume/ {orderCode}` |
+| Venta directa de caja (domicilio, interno, cortesía…) | Al cobrarlo — `POST /inventory/consume/ {lines}` |
+| Compra a proveedor / devolución | Al registrarla (entrada) |
+
+`consume_order_inventory` toma candado de fila y marca `Order.stock_consumed`,
+así que un pedido nunca descuenta dos veces aunque pase por varios estados o por
+dos pantallas a la vez. Todo movimiento emite el evento WS `inventory.update`
+(insumos + movimientos), que el store de inventario aplica en vivo: stock, kardex
+y saldo inicial de un insumo nuevo se ven sin recargar.
+
+Solo descuentan los productos con receta e insumos vinculados: si nada de la
+venta tiene ficha técnica, la caja avisa que no hubo descuento.
+
 ## 10. Autenticación, autorización y multi-tenancy
 
 ### Autenticación (JWT)
