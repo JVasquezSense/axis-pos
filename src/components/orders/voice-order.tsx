@@ -38,7 +38,8 @@ export function VoiceOrder() {
   const lines = useOrderStore((s) => s.lines);
   const removeLine = useOrderStore((s) => s.remove);
   const decrement = useOrderStore((s) => s.decrement);
-  const setTable = useOrderStore((s) => s.setTable);
+  const loadTableOrder = useOrderStore((s) => s.loadTableOrder);
+  const tableNumber = useOrderStore((s) => s.tableNumber);
   const tables = useTablesStore((s) => s.tables);
 
   const { supported, listening, transcript, error, getTranscript, start, stop, reset } = useSpeechRecognition();
@@ -140,15 +141,23 @@ export function VoiceOrder() {
     reset();
   };
 
-  const confirm = () => {
+  const confirm = async () => {
     if (!drafts) return;
     let added = 0;
     let removed = 0;
 
+    // La mesa PRIMERO: cambiarla reemplaza las líneas del panel por la cuenta de
+    // esa mesa, así que hacerlo después borraría lo que acabamos de agregar.
+    if (table !== null && tables.some((t) => t.number === table) && table !== tableNumber) {
+      await loadTableOrder(table);
+    }
+
     for (const d of drafts) {
       if (d.agotado) continue;
       if (d.remove) {
-        const line = lines.find((l) => String(l.product.id) === String(d.product.id));
+        const line = useOrderStore
+          .getState()
+          .lines.find((l) => String(l.product.id) === String(d.product.id));
         if (!line) continue;
         if (d.quantity >= line.quantity) removeLine(line.id);
         else for (let i = 0; i < d.quantity; i++) decrement(line.id);
@@ -162,8 +171,6 @@ export function VoiceOrder() {
       for (let i = 0; i < d.quantity; i++) addProduct(d.product, modifiers, d.notes);
       added += d.quantity;
     }
-
-    if (table !== null && tables.some((t) => t.number === table)) setTable(table);
 
     const parts = [added > 0 ? `${added} ítem${added > 1 ? "s" : ""} agregado${added > 1 ? "s" : ""}` : "",
       removed > 0 ? `${removed} quitado${removed > 1 ? "s" : ""}` : ""].filter(Boolean);
