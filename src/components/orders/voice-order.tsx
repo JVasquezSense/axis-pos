@@ -25,6 +25,8 @@ interface Draft {
   remove?: boolean;
   /** Por debajo de este umbral la coincidencia se marca como dudosa. */
   sure: boolean;
+  /** Está en la carta pero sin stock: se muestra y no se agrega. */
+  agotado?: boolean;
 }
 
 const SURE_THRESHOLD = 0.72;
@@ -47,7 +49,6 @@ export function VoiceOrder() {
 
   if (!has("voice")) return null;
 
-  const available = products.filter((p) => p.available);
 
   /** Resuelve nombres dictados contra la carta real. */
   const toDrafts = (
@@ -57,7 +58,7 @@ export function VoiceOrder() {
     const misses: string[] = [];
     spoken.forEach((item, i) => {
       const match =
-        matchProduct(item.spoken, available) ?? matchProduct(singularize(item.spoken), available);
+        matchProduct(item.spoken, products) ?? matchProduct(singularize(item.spoken), products);
       if (!match) {
         misses.push(item.spoken);
         return;
@@ -70,6 +71,7 @@ export function VoiceOrder() {
         variation: matchVariation(item.variation, match.product),
         remove: item.remove,
         sure: match.score >= SURE_THRESHOLD,
+        agotado: !match.product.available && !item.remove,
       });
     });
     return { drafts: out, misses };
@@ -85,7 +87,7 @@ export function VoiceOrder() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             transcript: text,
-            menu: available.map((p) => p.name),
+            menu: products.map((p) => p.name),
             current: lines.map((l) => `${l.quantity}× ${l.product.name}`),
           }),
         });
@@ -144,6 +146,7 @@ export function VoiceOrder() {
     let removed = 0;
 
     for (const d of drafts) {
+      if (d.agotado) continue;
       if (d.remove) {
         const line = lines.find((l) => String(l.product.id) === String(d.product.id));
         if (!line) continue;
@@ -243,8 +246,12 @@ export function VoiceOrder() {
                   {d.variation && <span className="text-muted-foreground"> · {d.variation.name}</span>}
                 </p>
                 {d.notes && <p className="truncate text-[11px] text-muted-foreground">{d.notes}</p>}
-                {!d.sure && (
-                  <p className="text-[11px] text-warning">¿Es este? Lo entendí parecido, no idéntico.</p>
+                {d.agotado ? (
+                  <p className="text-[11px] text-destructive">Agotado: no se puede agregar.</p>
+                ) : (
+                  !d.sure && (
+                    <p className="text-[11px] text-warning">¿Es este? Lo entendí parecido, no idéntico.</p>
+                  )
                 )}
               </div>
               <div className="flex items-center gap-1">
@@ -269,7 +276,12 @@ export function VoiceOrder() {
             <Button size="sm" variant="outline" className="flex-1" onClick={discard}>
               <X className="h-4 w-4" /> Descartar
             </Button>
-            <Button size="sm" className={cn("flex-1")} onClick={confirm} disabled={drafts.length === 0}>
+            <Button
+              size="sm"
+              className={cn("flex-1")}
+              onClick={confirm}
+              disabled={drafts.every((d) => d.agotado)}
+            >
               <Check className="h-4 w-4" /> Agregar al pedido
             </Button>
           </div>
