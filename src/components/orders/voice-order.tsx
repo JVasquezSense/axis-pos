@@ -74,7 +74,9 @@ export function VoiceOrder() {
   /** Resuelve nombres dictados contra la carta real. */
   const toDrafts = (
     spoken: { spoken: string; quantity: number; notes?: string; variation?: string; remove?: boolean }[],
-    transcript: string
+    transcript: string,
+    /** true = los nombres los eligió el modelo, no las reglas locales. */
+    fromAi: boolean
   ): { drafts: Draft[]; misses: Miss[] } => {
     const out: Draft[] = [];
     const misses: Miss[] = [];
@@ -98,7 +100,9 @@ export function VoiceOrder() {
       // lo que se oyó tal cual.
       const heard = bestPhraseFor(match.product.name, transcript);
       const spokenFor = heard.phrase || item.spoken;
-      const confidence = Math.max(match.score, heard.score);
+      // Con IA la confianza es SOLO la del audio: el nombre ya viene de la carta,
+      // así que compararlo con la carta siempre daría 1 y nunca dudaríamos.
+      const confidence = fromAi ? heard.score : Math.max(match.score, heard.score);
       out.push({
         key: `${match.product.id}-${i}`,
         spoken: spokenFor,
@@ -191,7 +195,7 @@ export function VoiceOrder() {
         : parseTranscriptLocally(text).lines;
       const spokenTable = useAi ? plan!.table : parseTranscriptLocally(text).table;
 
-      const { drafts: resolved, misses } = toDrafts(spoken, text);
+      const { drafts: resolved, misses } = toDrafts(spoken, text, useAi);
       // Lo que el modelo no reconoció también merece sugerencias.
       const aiMisses: Miss[] = (useAi ? plan!.unknown : []).map((text, i) => ({
         key: `ai-miss-${i}`,
