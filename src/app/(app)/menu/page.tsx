@@ -350,7 +350,8 @@ function RecetasTab() {
       avgMargin: costs.reduce((s, c) => s + c.margin, 0) / costs.length,
       lowStock: costs.filter((c) => c.maxPortions <= 10).length,
     };
-  }, [recipes]);
+    // invItems entra en el cálculo: el stock cambia en vivo y el food cost con él.
+  }, [recipes, invItems]);
 
   const openNew = () => { setEditing(emptyRecipe()); setEditingIsNew(true); setEditorOpen(true); };
 
