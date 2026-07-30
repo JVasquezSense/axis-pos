@@ -527,10 +527,25 @@ entrada al mismo carrito, junto al clic y al QR.
    `src/lib/voice-order.ts` (normaliza, singulariza y compara por bigramas), así
    el modelo no puede colar un producto inexistente. Sin clave configurada, ese
    mismo archivo interpreta la frase con reglas locales.
-3. **Confirmación** — nada llega a cocina automáticamente. Lo dictado aparece
-   como borrador editable: cantidad, notas, aviso cuando la coincidencia es
-   dudosa y marca de *Agotado* en lo que no se puede vender. Un error de
-   transcripción cuesta un plato; confirmar cuesta un toque.
+3. **Confirmación y sugerencias** — nada llega a cocina automáticamente. Lo
+   dictado aparece como borrador editable, y cuando algo no cuadra el panel
+   propone en vez de solo avisar:
+   - Nada parecido en la carta → «¿Quisiste decir…?» con los tres nombres más
+     cercanos; un toque lo convierte en línea con la cantidad dictada.
+   - Coincidencia dudosa → «¿O era…?» con los otros candidatos, para corregir sin
+     repetir el dictado.
+   - Producto agotado → «En su lugar:» con alternativas vendibles de su categoría.
+
+   La confianza no se mide contra la carta sino contra el audio: el modelo
+   responde nombres exactos del menú, así que un error suyo ("sacuro" → *Shochu
+   Mule*) parecería perfecto. `bestPhraseFor` busca el trozo del dictado más
+   parecido al nombre elegido; si no se parece, la línea se marca dudosa y los
+   candidatos se buscan contra todo el dictado (así aparece *Sakura*).
+
+**Tiempos**: interpretar con el modelo tardó entre 2 y 97 segundos en pruebas de
+producción, así que el cliente corta a los 7 s y el servidor a los 9. Al cortar
+se usan las reglas locales y el borrador se marca «Sin IA»: vale más un borrador
+imperfecto al instante que un mesero esperando.
 
 Al confirmar, la mesa se fija **antes** de volcar las líneas: cambiar de mesa
 reemplaza el contenido del panel por la cuenta de esa mesa.
