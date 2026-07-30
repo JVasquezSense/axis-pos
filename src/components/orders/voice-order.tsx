@@ -290,6 +290,12 @@ export function VoiceOrder() {
   const drop = (key: string) =>
     setDrafts((prev) => (prev ? prev.filter((d) => d.key !== key) : prev));
 
+  /** Sugerencias de una línea, sin proponer lo que ya está en otra línea. */
+  const alternativesFor = (d: Draft) =>
+    d.options.filter(
+      (o) => !(drafts ?? []).some((x) => x.key !== d.key && String(x.product.id) === String(o.id))
+    );
+
   if (!supported) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
@@ -373,12 +379,12 @@ export function VoiceOrder() {
              </div>
 
               {/* Corregir con un toque en lugar de repetir todo el dictado. */}
-              {!d.remove && (d.agotado || !d.sure) && d.options.length > 0 && (
+              {!d.remove && (d.agotado || !d.sure) && alternativesFor(d).length > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-border pt-1.5">
                   <span className="text-[11px] text-muted-foreground">
                     {d.agotado ? "En su lugar:" : "¿O era…?"}
                   </span>
-                  {d.options.map((o) => (
+                  {alternativesFor(d).map((o) => (
                     <button
                       key={o.id}
                       onClick={() => swap(d.key, o)}
