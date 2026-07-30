@@ -89,8 +89,8 @@ export function matchProduct(spoken: string, products: Product[]): ProductMatch 
 /**
  * Candidatos ordenados de mejor a peor para lo dictado, para ofrecerlos como
  * «¿quisiste decir…?» cuando la transcripción no cuadra con ningún producto.
- * Sin umbral de descarte: es mejor proponer tres nombres que dejar al mesero
- * sin salida, y la decisión siempre la toma él.
+ * Descarta lo que no se parece nada: proponer disparates gasta la confianza del
+ * mesero. La decisión final siempre es suya.
  */
 export function suggestProducts(spoken: string, products: Product[], limit = 3): Product[] {
   const q = normalize(spoken);
@@ -104,10 +104,32 @@ export function suggestProducts(spoken: string, products: Product[], limit = 3):
       const partial = name.includes(q) || q.includes(name) ? 0.75 : 0;
       return { product, score: Math.max(score, partial) };
     })
-    .filter((c) => c.score >= 0.2)
+    .filter((c) => c.score >= 0.32)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((c) => c.product);
+}
+
+/**
+ * Trozo del dictado que más se parece al nombre elegido, y cuánto.
+ *
+ * El modelo devuelve nombres exactos de la carta, así que por sí solo nunca
+ * parece dudoso: si oyó "sacuro" y respondió "Shochu Mule", hay que volver al
+ * audio para notar que no se parecen. Recorre ventanas de 1 a 3 palabras del
+ * dictado y devuelve la mejor, que sirve además para sugerir alternativas.
+ */
+export function bestPhraseFor(name: string, transcript: string): { phrase: string; score: number } {
+  const target = normalize(name);
+  const words = normalize(transcript).split(" ").filter(Boolean);
+  let best = { phrase: "", score: 0 };
+  for (let size = 1; size <= 3; size++) {
+    for (let i = 0; i + size <= words.length; i++) {
+      const phrase = words.slice(i, i + size).join(" ");
+      const score = Math.max(similarity(target, phrase), similarity(target, singularize(phrase)));
+      if (score > best.score) best = { phrase, score };
+    }
+  }
+  return best;
 }
 
 /** Reemplazos vendibles para un producto agotado: lo más cercano de su categoría. */

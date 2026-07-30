@@ -11,6 +11,7 @@ import { useOrderStore } from "@/store/order.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useFeatures } from "@/lib/features";
 import {
+  bestPhraseFor,
   matchProduct,
   matchVariation,
   parseTranscriptLocally,
@@ -72,7 +73,8 @@ export function VoiceOrder() {
 
   /** Resuelve nombres dictados contra la carta real. */
   const toDrafts = (
-    spoken: { spoken: string; quantity: number; notes?: string; variation?: string; remove?: boolean }[]
+    spoken: { spoken: string; quantity: number; notes?: string; variation?: string; remove?: boolean }[],
+    transcript: string
   ): { drafts: Draft[]; misses: Miss[] } => {
     const out: Draft[] = [];
     const misses: Miss[] = [];
@@ -91,20 +93,26 @@ export function VoiceOrder() {
         return;
       }
       const agotado = !match.product.available && !item.remove;
+      // Contra qué se compara la confianza: si el nombre vino del modelo, contra
+      // el trozo del dictado que más se le parece; si vino de las reglas, contra
+      // lo que se oyó tal cual.
+      const heard = bestPhraseFor(match.product.name, transcript);
+      const spokenFor = heard.phrase || item.spoken;
+      const confidence = Math.max(match.score, heard.score);
       out.push({
         key: `${match.product.id}-${i}`,
-        spoken: item.spoken,
+        spoken: spokenFor,
         product: match.product,
         quantity,
         notes: item.notes,
         variation: matchVariation(item.variation, match.product),
         remove: item.remove,
-        sure: match.score >= SURE_THRESHOLD,
+        sure: confidence >= SURE_THRESHOLD,
         agotado,
         // Agotado → qué vender en su lugar. Dudoso → los otros candidatos.
         options: agotado
           ? suggestReplacements(match.product, products)
-          : suggestProducts(item.spoken, products.filter((p) => p.available && p.id !== match.product.id)),
+          : suggestProducts(spokenFor, products.filter((p) => p.available && p.id !== match.product.id)),
       });
     });
     return { drafts: out, misses };
@@ -183,7 +191,7 @@ export function VoiceOrder() {
         : parseTranscriptLocally(text).lines;
       const spokenTable = useAi ? plan!.table : parseTranscriptLocally(text).table;
 
-      const { drafts: resolved, misses } = toDrafts(spoken);
+      const { drafts: resolved, misses } = toDrafts(spoken, text);
       // Lo que el modelo no reconoció también merece sugerencias.
       const aiMisses: Miss[] = (useAi ? plan!.unknown : []).map((text, i) => ({
         key: `ai-miss-${i}`,
