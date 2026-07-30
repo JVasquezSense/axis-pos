@@ -4,13 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Sparkles, X, Send, Receipt, Tag, Boxes, Loader2,
+  Sparkles, X, Send, Receipt, Tag, Boxes, Loader2, Mic,
   Users, ChefHat, CalendarClock, ChevronDown, ChevronUp,
   AlertTriangle,
 } from "lucide-react";
 import { useSalesStore } from "@/store/sales.store";
 import { useRecipesStore } from "@/store/recipes.store";
-import { useInventoryStore, statusFor } from "@/store/inventory.store";
+import { useInventoryStore } from "@/store/inventory.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useReservationsStore } from "@/store/reservations.store";
@@ -30,10 +30,10 @@ import {
   type Insight,
 } from "@/lib/ai-context";
 import { computeRecipeCost } from "@/lib/recipes";
-import { cn, formatCurrency } from "@/lib/utils";
-import type { InventoryItem } from "@/types";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { actionContext, planFor, type ActionPlan } from "@/lib/ai-actions";
+import { cn } from "@/lib/utils";
 import type { AiAction } from "@/app/api/ai/action/route";
-import { uid } from "@/store/menu.store";
 
 function MdText({ text, onNavigate }: { text: string; onNavigate: (path: string) => void }) {
   const lines = text.split("\n");
@@ -275,13 +275,16 @@ export function AxisAI() {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const speech = useSpeechRecognition();
+  // Acción propuesta por la IA, esperando el visto bueno del usuario.
+  const [pending, setPending] = useState<ActionPlan | null>(null);
+  const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [showAllQuick, setShowAllQuick] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const invItems = useInventoryStore((s) => s.items);
-  const createInventoryItem = useInventoryStore((s) => s.createItem);
   const recipeList = useRecipesStore((s) => s.recipes);
   const alerts = useMemo(() => computeAlerts(), [invItems, recipeList]);
   const navigate = (path: string) => { setOpen(false); router.push(path); };
@@ -292,65 +295,51 @@ export function AxisAI() {
   }, [messages, open]);
 
   /**
-   * Si el mensaje pide crear un insumo, lo crea de verdad contra el backend y
-   * responde con el dato guardado. Antes el modelo solo decía haberlo creado.
+   * Traduce el mensaje a una acción ejecutable (crear insumo, registrar compra,
+   * crear producto, tomar pedido…). No ejecuta nada: deja la propuesta a la
+   * espera de que el usuario confirme, porque estas acciones escriben datos.
    */
-  const runAction = async (userText: string): Promise<boolean> => {
-    let plan: AiAction;
+  const proposeAction = async (userText: string): Promise<boolean> => {
+    let action: AiAction;
     try {
       const res = await fetch("/api/ai/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify({ message: userText, context: actionContext() }),
       });
-      plan = await res.json();
+      action = await res.json();
     } catch {
       return false;
     }
-    if (plan.action !== "create_inventory_item" || !plan.item) return false;
+    if (action.action === "none") return false;
 
-    const it = plan.item;
-    const item: InventoryItem = {
-      id: uid("inv"),
-      name: it.name,
-      category: it.category ?? "General",
-      stock: it.stock ?? 0,
-      unit: it.unit ?? "Und",
-      minStock: it.minStock ?? 0,
-      cost: it.cost ?? 0,
-      supplier: it.supplier ?? "",
-      status: statusFor(it.stock ?? 0, it.minStock ?? 0),
-      updatedAt: new Date().toISOString(),
-    };
-    const saved = await createInventoryItem(item);
-    if (!saved) {
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: `No pude crear **${item.name}**. Créalo manualmente en [Ver en /inventory].` },
-      ]);
+    const plan = planFor(action);
+    if (!plan) return false;
+
+    if (plan.blocked) {
+      setMessages((m) => [...m, { role: "assistant", content: `⚠️ ${plan.blocked}` }]);
       return true;
     }
-    setMessages((m) => [
-      ...m,
-      {
-        role: "assistant",
-        content:
-          `✅ Insumo **${saved.name}** creado.
-
-` +
-          `- **Stock inicial:** ${saved.stock} ${saved.unit}
-` +
-          `- **Stock mínimo:** ${saved.minStock} ${saved.unit}
-` +
-          `- **Costo unitario:** ${formatCurrency(Number(saved.cost))}
-` +
-          `- **Categoría:** ${saved.category}
-
-` +
-          `👉 Revísalo o ajústalo en [Ver en /inventory].`,
-      },
-    ]);
+    setPending(plan);
     return true;
+  };
+
+  /** Ejecuta la acción confirmada y responde con lo que quedó guardado. */
+  const confirmAction = async () => {
+    if (!pending) return;
+    setRunning(true);
+    try {
+      const result = await pending.run();
+      setMessages((m) => [...m, { role: "assistant", content: `✅ ${result}` }]);
+      setPending(null);
+    } catch (err) {
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: `No pude completarlo: ${err instanceof Error ? err.message : "error inesperado"}.` },
+      ]);
+    } finally {
+      setRunning(false);
+    }
   };
 
   const send = async (mode: AiMode, userText: string) => {
@@ -360,7 +349,7 @@ export function AxisAI() {
     setMessages((m) => [...m, { role: "user", content: userText }]);
     if (mode === "chat") {
       try {
-        if (await runAction(userText)) {
+        if (await proposeAction(userText)) {
           setBusy(false);
           return;
         }
@@ -401,6 +390,16 @@ export function AxisAI() {
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Al soltar el micrófono, el dictado se vuelca en el campo de texto. */
+  const stopDictation = () => {
+    speech.stop();
+    setTimeout(() => {
+      const text = speech.getTranscript();
+      if (text) setInput((prev) => (prev ? `${prev} ${text}` : text));
+      speech.reset();
+    }, 350);
   };
 
   const onSubmit = (e: React.FormEvent) => {
@@ -512,6 +511,38 @@ export function AxisAI() {
                   </div>
                 </div>
               ))}
+
+              {/* Acción propuesta: nada se guarda hasta que el usuario dice que sí. */}
+              {pending && (
+                <div className="rounded-xl border border-primary/40 bg-primary/5 p-3">
+                  <p className="text-sm font-semibold">{pending.title}</p>
+                  <ul className="mt-1.5 space-y-0.5">
+                    {pending.details.map((d) => (
+                      <li key={d} className="text-xs text-muted-foreground">· {d}</li>
+                    ))}
+                  </ul>
+                  {pending.warnings.map((w) => (
+                    <p key={w} className="mt-1.5 flex items-start gap-1.5 text-[11px] text-warning">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {w}
+                    </p>
+                  ))}
+                  <div className="mt-2.5 flex gap-2">
+                    <button
+                      onClick={() => setPending(null)}
+                      className="flex-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={confirmAction}
+                      disabled={running}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                    >
+                      {running && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Confirmar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Acciones rápidas */}
@@ -568,10 +599,28 @@ export function AxisAI() {
 
             {/* Input */}
             <form onSubmit={onSubmit} className="flex items-center gap-2 border-t border-border p-3">
+              {/* Dictar en vez de escribir: el texto queda en el campo para revisarlo. */}
+              {speech.supported && (
+                <button
+                  type="button"
+                  onPointerDown={() => { speech.reset(); speech.start(); }}
+                  onPointerUp={stopDictation}
+                  onPointerLeave={() => { if (speech.listening) stopDictation(); }}
+                  aria-label="Mantén pulsado para dictar"
+                  className={cn(
+                    "flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-lg border transition-colors",
+                    speech.listening
+                      ? "border-destructive bg-destructive text-white"
+                      : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                  )}
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
+              )}
               <input
-                value={input}
+                value={speech.listening ? `${input}${input ? " " : ""}${speech.transcript}` : input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Pregunta sobre tu negocio…"
+                placeholder={speech.listening ? "Escuchando…" : "Pregunta o dicta…"}
                 className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
               />
               <button
