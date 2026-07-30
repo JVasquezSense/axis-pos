@@ -29,6 +29,19 @@ function readCache(): { items: InventoryItem[]; movements: InventoryMovement[] }
   } catch { return null; }
 }
 
+/**
+ * Insumos a mostrar en selectores y costeo.
+ *
+ * Con backend NUNCA se rellena con el catálogo de ejemplo: un restaurante con el
+ * inventario vacío veía insumos de la demo ("Pan de hamburguesa", "Tocineta") y
+ * parecía que se le habían colado los de otro. Sin backend (modo demo) sí, que
+ * es para lo que existe ese dataset.
+ */
+export function inventoryOrDemo(items: InventoryItem[]): InventoryItem[] {
+  if (USE_API) return items;
+  return items.length > 0 ? items : INVENTORY;
+}
+
 export function statusFor(stock: number, min: number): StockStatus {
   // Los decimales llegan como string desde DRF ("12.000"); comparar dos strings
   // con `<` es lexicografico ("12.000" < "3.000" === true). Coercionar siempre.

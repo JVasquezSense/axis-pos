@@ -5,8 +5,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, Sparkles, GripVertical, Wand2, Loader2, X } from "lucide-react";
 import type { Recipe, Product, Allergen, RecipeStation, RecipeStatus, RecipeDifficulty, RecipeIngredient, InventoryItem } from "@/types";
 import { useMenuStore } from "@/store/menu.store";
-import { useInventoryStore } from "@/store/inventory.store";
-import { INVENTORY } from "@/mock/datasets";
+import { useInventoryStore, inventoryOrDemo } from "@/store/inventory.store";
 import { USE_API } from "@/services/http";
 import { menuService } from "@/services/menu.service";
 import { inventoryService } from "@/services/inventory.service";
@@ -50,7 +49,7 @@ export function RecipeEditor({
   const addProductLocal = useMenuStore((s) => s.addProductLocal);
   const updateProduct = useMenuStore((s) => s.updateProduct);
   const liveInventory = useInventoryStore((s) => s.items);
-  const items = liveInventory.length > 0 ? liveInventory : INVENTORY;
+  const items = inventoryOrDemo(liveInventory);
   const [draft, setDraft] = useState<Recipe | null>(recipe);
   const [tagInput, setTagInput] = useState("");
   const [describingAI, setDescribingAI] = useState(false);
@@ -109,7 +108,7 @@ export function RecipeEditor({
     setGeneratingAI(true);
     try {
       const storeItems = useInventoryStore.getState().items;
-      const allItems = storeItems.length > 0 ? storeItems : INVENTORY;
+      const allItems = inventoryOrDemo(storeItems);
 
       const res = await fetch("/api/ai/generate-recipe", {
         method: "POST",

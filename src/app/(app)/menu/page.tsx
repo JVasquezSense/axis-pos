@@ -9,8 +9,7 @@ import {
 import type { Category, Product, Recipe } from "@/types";
 import { useMenuStore, emptyProduct, uid } from "@/store/menu.store";
 import { useRecipesStore, emptyRecipe } from "@/store/recipes.store";
-import { useInventoryStore } from "@/store/inventory.store";
-import { INVENTORY } from "@/mock/datasets";
+import { useInventoryStore, inventoryOrDemo } from "@/store/inventory.store";
 import { computeRecipeCost, foodCostTone, STATION } from "@/lib/recipes";
 import { RecipeEditor } from "@/components/recipes/recipe-editor";
 import { RecipeCard } from "@/components/recipes/recipe-card";
@@ -76,7 +75,7 @@ function CartaTab() {
   const { categories, products, addCategory, removeCategory, addProduct, updateProduct, removeProduct, syncRecipePrice } = useMenuStore();
   const recipes = useRecipesStore((s) => s.recipes);
   const invRaw = useInventoryStore((s) => s.items);
-  const invItems = invRaw.length > 0 ? invRaw : INVENTORY;
+  const invItems = inventoryOrDemo(invRaw);
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("all");
   const [editing, setEditing] = useState<Product | null>(null);
@@ -319,7 +318,7 @@ function RecetasTab() {
   const { recipes, duplicate, remove } = useRecipesStore();
   const categories = useMenuStore((s) => s.categories);
   const invRaw = useInventoryStore((s) => s.items);
-  const invItems = invRaw.length > 0 ? invRaw : INVENTORY;
+  const invItems = inventoryOrDemo(invRaw);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [station, setStation] = useState("all");

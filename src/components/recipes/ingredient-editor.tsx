@@ -2,12 +2,11 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import type { RecipeIngredient } from "@/types";
-import { INVENTORY } from "@/mock/datasets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { emptyIngredient } from "@/store/recipes.store";
-import { useInventoryStore } from "@/store/inventory.store";
+import { useInventoryStore, inventoryOrDemo } from "@/store/inventory.store";
 import { ingredientCost } from "@/lib/recipes";
 import { formatCurrency } from "@/lib/utils";
 
@@ -34,7 +33,7 @@ export function IngredientEditor({
   compact?: boolean;
 }) {
   const storeItems = useInventoryStore((s) => s.items);
-  const items = storeItems.length > 0 ? storeItems : INVENTORY;
+  const items = inventoryOrDemo(storeItems);
 
   const update = (id: string, patch: Partial<RecipeIngredient>) =>
     onChange(value.map((ing) => (ing.id === id ? { ...ing, ...patch } : ing)));

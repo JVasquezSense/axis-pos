@@ -9,6 +9,7 @@ import type {
   InventoryItem,
 } from "@/types";
 import { INVENTORY } from "@/mock/datasets";
+import { USE_API } from "@/services/http";
 
 /** Food cost objetivo para sugerir precio de venta (30%). */
 export const TARGET_FOOD_COST = 0.3;
@@ -17,6 +18,17 @@ const INV_MAP = new Map(INVENTORY.map((i) => [i.id, i]));
 
 export function getInventoryItem(id: string): InventoryItem | undefined {
   return INV_MAP.get(id);
+}
+
+/**
+ * Resuelve el insumo de un ingrediente. Con backend solo cuentan los insumos
+ * reales del restaurante: costear con los del catálogo de ejemplo daba un food
+ * cost inventado a partir de insumos que el restaurante no tiene.
+ */
+function itemLookup(liveItems?: InventoryItem[]): (id: string) => InventoryItem | undefined {
+  const live = (id: string) => liveItems?.find((i) => String(i.id) === String(id));
+  if (USE_API) return live;
+  return (id) => live(id) ?? INV_MAP.get(id);
 }
 
 /**
@@ -55,13 +67,9 @@ export function ingredientCost(ing: RecipeIngredient, item: InventoryItem): numb
 /**
  * Motor de costeo: costo, food cost %, margen, precio sugerido y disponibilidad.
  * @param liveItems  Insumos del store en tiempo real (incluye items creados dinámicamente).
- *                   Se fusionan con los mock; el store tiene prioridad.
  */
 export function computeRecipeCost(recipe: Recipe, liveItems?: InventoryItem[]): RecipeCost {
-  // Mapa fusionado: mock base + items vivos (store tiene prioridad)
-  const lookup: (id: string) => InventoryItem | undefined = liveItems?.length
-    ? (id) => liveItems.find((i) => String(i.id) === String(id)) ?? INV_MAP.get(id)
-    : (id) => INV_MAP.get(id);
+  const lookup = itemLookup(liveItems);
 
   const portions = Math.max(recipe.portions, 1);
   const totalCost = recipe.ingredients.reduce((s, ing) => {
@@ -93,9 +101,7 @@ export function computeRecipeCost(recipe: Recipe, liveItems?: InventoryItem[]): 
 
 /** Costo total de una variación = base + insumos extra. */
 export function variationCost(recipe: Recipe, variationId: string, liveItems?: InventoryItem[]): number {
-  const lookup: (id: string) => InventoryItem | undefined = liveItems?.length
-    ? (id) => liveItems.find((i) => String(i.id) === String(id)) ?? INV_MAP.get(id)
-    : (id) => INV_MAP.get(id);
+  const lookup = itemLookup(liveItems);
   const base = computeRecipeCost(recipe, liveItems).costPerPortion;
   const variation = recipe.variations.find((v) => v.id === variationId);
   if (!variation) return base;
