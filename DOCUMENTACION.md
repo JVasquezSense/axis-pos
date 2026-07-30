@@ -552,6 +552,26 @@ reemplaza el contenido del panel por la cuenta de esa mesa.
 
 Se activa con la capacidad `voice` del plan (hoy solo Enterprise).
 
+### De dónde salen los insumos
+
+Un restaurante solo debe ver en su inventario lo que él registró. Dos reglas que
+costaron incidentes:
+
+- **El catálogo de ejemplo (`src/mock/datasets.ts`) no se mezcla con datos reales.**
+  Los selectores de ingredientes y el costeo rellenaban con él cuando el
+  inventario estaba vacío, y el restaurante veía insumos ajenos ("Pan de
+  hamburguesa", "Queso cheddar"). `inventoryOrDemo()` solo lo devuelve sin
+  backend (`USE_API === false`), que es para lo que existe.
+- **Generar una receta con IA nunca da de alta insumos por su cuenta.** Enlaza
+  los que ya existen (comparando por nombre normalizado, lo que además evita
+  duplicados) y lista aparte los que faltan: el usuario decide cuáles crear, uno
+  por uno si quiere, y se crean con **stock 0** porque el sistema no puede
+  inventar existencias que nadie contó.
+
+El aislamiento entre restaurantes es del backend (`TenantQuerySet`, fail-closed)
+y está verificado usuario por usuario: cada cuenta ve exactamente las filas de su
+tenant y ninguna ajena.
+
 ### Descuento de inventario y kardex
 
 El stock se mueve en el backend, nunca solo en el cliente:
