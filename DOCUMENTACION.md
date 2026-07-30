@@ -511,6 +511,31 @@ Base: **`/api/v1/`**. Generada por `DefaultRouter` de DRF (CRUD completo salvo e
 
 ---
 
+### Acciones del asistente
+
+Axis IA no solo responde: ejecuta trabajo sobre el negocio. `POST /api/ai/action`
+traduce el mensaje a una acción estructurada y `src/lib/ai-actions.ts` la resuelve
+contra los datos reales y la ejecuta.
+
+| Acción | Qué hace |
+|---|---|
+| `create/update/delete_inventory_item` | CRUD de insumos |
+| `register_purchase` | Compra a un proveedor (entra al inventario y al kardex) |
+| `create_recipe` | Producto de la carta con su ficha técnica |
+| `add_order_lines` | Agrega productos al pedido de una mesa |
+
+Dos reglas que sostienen todo esto:
+
+- **Nada se guarda sin confirmar.** La acción llega como una tarjeta con lo que va
+  a pasar y sus avisos (insumo duplicado, receta que quedará sin costo, producto
+  agotado, stock que no genera kardex). Solo al pulsar *Confirmar* se escribe.
+- **El modelo trabaja con nombres, nunca con ids.** Se resuelven contra el
+  inventario, la carta, los proveedores y las mesas del restaurante; lo que no
+  existe se reporta en vez de crearse por su cuenta.
+
+El campo del chat también acepta **dictado** (mismo micrófono que los pedidos por
+voz): se mantiene pulsado, se habla y el texto queda en el campo para revisarlo.
+
 ### Pedidos por voz
 
 El mesero dicta y el pedido se arma solo, sin sustituir el toque: es una tercera
