@@ -10,7 +10,14 @@ import { useMenuStore } from "@/store/menu.store";
 import { useOrderStore } from "@/store/order.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useFeatures } from "@/lib/features";
-import { matchProduct, matchVariation, parseTranscriptLocally, singularize } from "@/lib/voice-order";
+import {
+  matchProduct,
+  matchVariation,
+  parseTranscriptLocally,
+  singularize,
+  suggestProducts,
+  suggestReplacements,
+} from "@/lib/voice-order";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -18,6 +25,8 @@ import { cn } from "@/lib/utils";
 /** Línea dictada ya resuelta contra la carta, pendiente de que el mesero confirme. */
 interface Draft {
   key: string;
+  /** Lo que se oyó, para recalcular sugerencias si el mesero corrige. */
+  spoken: string;
   product: Product;
   quantity: number;
   notes?: string;
@@ -27,6 +36,16 @@ interface Draft {
   sure: boolean;
   /** Está en la carta pero sin stock: se muestra y no se agrega. */
   agotado?: boolean;
+  /** Otros productos que pudo ser: se ofrecen para corregir con un toque. */
+  options: Product[];
+}
+
+/** Algo dictado que no corresponde a ningún producto, con lo más parecido. */
+interface Miss {
+  key: string;
+  spoken: string;
+  quantity: number;
+  options: Product[];
 }
 
 const SURE_THRESHOLD = 0.72;
@@ -46,7 +65,7 @@ export function VoiceOrder() {
   const [thinking, setThinking] = useState(false);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [table, setDraftTable] = useState<number | null>(null);
-  const [unknown, setUnknown] = useState<string[]>([]);
+  const [unknown, setUnknown] = useState<Miss[]>([]);
 
   if (!has("voice")) return null;
 
@@ -54,28 +73,82 @@ export function VoiceOrder() {
   /** Resuelve nombres dictados contra la carta real. */
   const toDrafts = (
     spoken: { spoken: string; quantity: number; notes?: string; variation?: string; remove?: boolean }[]
-  ): { drafts: Draft[]; misses: string[] } => {
+  ): { drafts: Draft[]; misses: Miss[] } => {
     const out: Draft[] = [];
-    const misses: string[] = [];
+    const misses: Miss[] = [];
     spoken.forEach((item, i) => {
+      const quantity = Math.max(1, Math.round(item.quantity));
       const match =
         matchProduct(item.spoken, products) ?? matchProduct(singularize(item.spoken), products);
       if (!match) {
-        misses.push(item.spoken);
+        // No cuadra con nada: se ofrecen los nombres más cercanos de la carta.
+        misses.push({
+          key: `miss-${i}`,
+          spoken: item.spoken,
+          quantity,
+          options: suggestProducts(item.spoken, products.filter((p) => p.available)),
+        });
         return;
       }
+      const agotado = !match.product.available && !item.remove;
       out.push({
         key: `${match.product.id}-${i}`,
+        spoken: item.spoken,
         product: match.product,
-        quantity: Math.max(1, Math.round(item.quantity)),
+        quantity,
         notes: item.notes,
         variation: matchVariation(item.variation, match.product),
         remove: item.remove,
         sure: match.score >= SURE_THRESHOLD,
-        agotado: !match.product.available && !item.remove,
+        agotado,
+        // Agotado → qué vender en su lugar. Dudoso → los otros candidatos.
+        options: agotado
+          ? suggestReplacements(match.product, products)
+          : suggestProducts(item.spoken, products.filter((p) => p.available && p.id !== match.product.id)),
       });
     });
     return { drafts: out, misses };
+  };
+
+  /** Cambia el producto de una línea por el que el mesero eligió de las sugerencias. */
+  const swap = (key: string, product: Product) =>
+    setDrafts((prev) =>
+      prev
+        ? prev.map((d) =>
+            d.key === key
+              ? {
+                  ...d,
+                  product,
+                  sure: true,
+                  agotado: false,
+                  variation: null,
+                  options: suggestProducts(
+                    d.spoken,
+                    products.filter((p) => p.available && p.id !== product.id)
+                  ),
+                }
+              : d
+          )
+        : prev
+    );
+
+  /** Convierte algo no reconocido en una línea, con el producto que se eligió. */
+  const resolveMiss = (miss: Miss, product: Product) => {
+    setDrafts((prev) => [
+      ...(prev ?? []),
+      {
+        key: `${product.id}-${miss.key}`,
+        spoken: miss.spoken,
+        product,
+        quantity: miss.quantity,
+        sure: true,
+        options: suggestProducts(
+          miss.spoken,
+          products.filter((p) => p.available && p.id !== product.id)
+        ),
+      },
+    ]);
+    setUnknown((prev) => prev.filter((m) => m.key !== miss.key));
   };
 
   const interpret = async (text: string) => {
@@ -111,11 +184,18 @@ export function VoiceOrder() {
       const spokenTable = useAi ? plan!.table : parseTranscriptLocally(text).table;
 
       const { drafts: resolved, misses } = toDrafts(spoken);
+      // Lo que el modelo no reconoció también merece sugerencias.
+      const aiMisses: Miss[] = (useAi ? plan!.unknown : []).map((text, i) => ({
+        key: `ai-miss-${i}`,
+        spoken: text,
+        quantity: 1,
+        options: suggestProducts(text, products.filter((p) => p.available)),
+      }));
       setDrafts(resolved);
-      setUnknown([...(useAi ? plan!.unknown : []), ...misses]);
+      setUnknown([...aiMisses, ...misses]);
       setDraftTable(spokenTable ?? null);
 
-      if (resolved.length === 0) {
+      if (resolved.length === 0 && aiMisses.length === 0 && misses.length === 0) {
         toast.error("No reconocí productos de la carta", {
           description: "Repite el nombre como aparece en el menú.",
         });
@@ -235,7 +315,7 @@ export function VoiceOrder() {
         </p>
       )}
 
-      {drafts && (
+      {(drafts || unknown.length > 0) && (
         <div className="space-y-2 rounded-xl border border-primary/40 bg-primary/5 p-2.5">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -244,8 +324,9 @@ export function VoiceOrder() {
             {table !== null && <Badge variant="secondary">Mesa {table}</Badge>}
           </div>
 
-          {drafts.map((d) => (
-            <div key={d.key} className="flex items-center gap-2 rounded-lg bg-background px-2.5 py-2">
+          {(drafts ?? []).map((d) => (
+            <div key={d.key} className="rounded-lg bg-background px-2.5 py-2">
+             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">
                   {d.remove && <span className="text-destructive">Quitar · </span>}
@@ -269,15 +350,57 @@ export function VoiceOrder() {
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
+             </div>
+
+              {/* Corregir con un toque en lugar de repetir todo el dictado. */}
+              {!d.remove && (d.agotado || !d.sure) && d.options.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-border pt-1.5">
+                  <span className="text-[11px] text-muted-foreground">
+                    {d.agotado ? "En su lugar:" : "¿O era…?"}
+                  </span>
+                  {d.options.map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => swap(d.key, o)}
+                      className="rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:border-primary hover:text-primary"
+                    >
+                      {o.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
 
-          {unknown.length > 0 && (
-            <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
-              No está en la carta: {unknown.join(", ")}
-            </p>
-          )}
+          {unknown.map((m) => (
+            <div key={m.key} className="rounded-lg border border-dashed border-warning/50 bg-background px-2.5 py-2">
+              <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+                <span>
+                  No reconocí <strong className="text-foreground">«{m.spoken}»</strong>
+                  {m.quantity > 1 && ` (×${m.quantity})`}
+                </span>
+              </p>
+              {m.options.length > 0 ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-muted-foreground">¿Quisiste decir…?</span>
+                  {m.options.map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => resolveMiss(m, o)}
+                      className="rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:border-primary hover:text-primary"
+                    >
+                      {o.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  No hay nada parecido en la carta. Búscalo en el menú o vuelve a dictarlo.
+                </p>
+              )}
+            </div>
+          ))}
 
           <div className="flex gap-2 pt-0.5">
             <Button size="sm" variant="outline" className="flex-1" onClick={discard}>
@@ -287,7 +410,7 @@ export function VoiceOrder() {
               size="sm"
               className={cn("flex-1")}
               onClick={confirm}
-              disabled={drafts.every((d) => d.agotado)}
+              disabled={(drafts ?? []).every((d) => d.agotado)}
             >
               <Check className="h-4 w-4" /> Agregar al pedido
             </Button>

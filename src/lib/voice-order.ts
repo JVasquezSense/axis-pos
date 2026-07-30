@@ -86,6 +86,43 @@ export function matchProduct(spoken: string, products: Product[]): ProductMatch 
   return best && best.score >= 0.5 ? best : null;
 }
 
+/**
+ * Candidatos ordenados de mejor a peor para lo dictado, para ofrecerlos como
+ * «¿quisiste decir…?» cuando la transcripción no cuadra con ningún producto.
+ * Sin umbral de descarte: es mejor proponer tres nombres que dejar al mesero
+ * sin salida, y la decisión siempre la toma él.
+ */
+export function suggestProducts(spoken: string, products: Product[], limit = 3): Product[] {
+  const q = normalize(spoken);
+  if (!q) return [];
+  const singular = singularize(spoken);
+  return products
+    .map((product) => {
+      const name = normalize(product.name);
+      const score = Math.max(similarity(name, q), similarity(name, singular));
+      // Un pedazo del nombre dicho suelto ("martini") vale más que el parecido crudo.
+      const partial = name.includes(q) || q.includes(name) ? 0.75 : 0;
+      return { product, score: Math.max(score, partial) };
+    })
+    .filter((c) => c.score >= 0.2)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((c) => c.product);
+}
+
+/** Reemplazos vendibles para un producto agotado: lo más cercano de su categoría. */
+export function suggestReplacements(product: Product, products: Product[], limit = 3): Product[] {
+  const sameCategory = products.filter(
+    (p) => p.available && p.id !== product.id && String(p.category) === String(product.category)
+  );
+  const pool = sameCategory.length > 0 ? sameCategory : products.filter((p) => p.available && p.id !== product.id);
+  return pool
+    .map((p) => ({ p, score: similarity(normalize(p.name), normalize(product.name)) + (p.popular ? 0.2 : 0) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((c) => c.p);
+}
+
 /** Variación del producto que mejor corresponde a lo dictado ("grande", "sin azúcar"). */
 export function matchVariation(spoken: string | undefined, product: Product) {
   if (!spoken) return null;
