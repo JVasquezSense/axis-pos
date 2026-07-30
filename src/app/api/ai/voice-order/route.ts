@@ -117,11 +117,14 @@ export async function POST(req: Request) {
   try {
     const upstream = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
+      // El modelo se ha tomado hasta 90 s con cartas largas. Un mesero no espera:
+      // se corta y el cliente resuelve la frase con sus reglas locales.
+      signal: AbortSignal.timeout(9000),
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model,
         temperature: 0,
-        max_tokens: 700,
+        max_tokens: 400,
         thinking: { type: "disabled" },
         messages: [
           { role: "system", content: SYSTEM },

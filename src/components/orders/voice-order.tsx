@@ -68,6 +68,7 @@ export function VoiceOrder() {
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [table, setDraftTable] = useState<number | null>(null);
   const [unknown, setUnknown] = useState<Miss[]>([]);
+  const [localOnly, setLocalOnly] = useState(false);
 
   if (!has("voice")) return null;
 
@@ -178,6 +179,9 @@ export function VoiceOrder() {
       try {
         const res = await fetch("/api/ai/voice-order", {
           method: "POST",
+          // Tope duro: si la IA no contesta pronto, se sigue con reglas locales.
+          // Vale más un borrador imperfecto al instante que un mesero esperando.
+          signal: AbortSignal.timeout(7000),
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             transcript: text,
@@ -213,6 +217,7 @@ export function VoiceOrder() {
       }));
       setDrafts(resolved);
       setUnknown([...aiMisses, ...misses]);
+      setLocalOnly(!useAi);
       setDraftTable(spokenTable ?? null);
 
       if (resolved.length === 0 && aiMisses.length === 0 && misses.length === 0) {
@@ -347,7 +352,10 @@ export function VoiceOrder() {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Confirma lo dictado
             </p>
-            {table !== null && <Badge variant="secondary">Mesa {table}</Badge>}
+            <div className="flex items-center gap-1.5">
+              {localOnly && <Badge variant="secondary">Sin IA</Badge>}
+              {table !== null && <Badge variant="secondary">Mesa {table}</Badge>}
+            </div>
           </div>
 
           {(drafts ?? []).map((d) => (
