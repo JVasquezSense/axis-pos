@@ -9,6 +9,9 @@ export interface CreatePurchasePayload {
   total: number;
   lines: PurchaseLine[];
   invoicePhoto?: string;
+  invoiceNumber?: string;
+  receivedAt?: string;
+  dueDate?: string;
 }
 
 export const suppliersService = {

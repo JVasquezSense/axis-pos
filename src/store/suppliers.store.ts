@@ -6,6 +6,13 @@ import { USE_API, apiErrorHandler } from "@/services/http";
 import { suppliersService } from "@/services/suppliers.service";
 import { useAuditStore } from "./audit.store";
 
+/** Datos de la factura del proveedor que acompañan a la compra. */
+export interface InvoiceData {
+  invoiceNumber?: string;
+  receivedAt?: string | null;
+  dueDate?: string | null;
+}
+
 interface SuppliersState {
   suppliers: Supplier[];
   purchases: Purchase[];
@@ -14,7 +21,7 @@ interface SuppliersState {
   addSupplier: (s: Supplier) => void;
   updateSupplier: (s: Supplier) => void;
   removeSupplier: (id: string) => void;
-  registerPurchase: (supplier: Supplier, lines: PurchaseLine[], invoicePhoto?: string) => void;
+  registerPurchase: (supplier: Supplier, lines: PurchaseLine[], invoicePhoto?: string, invoice?: InvoiceData) => void;
 }
 
 export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
@@ -52,7 +59,7 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
     if (USE_API) suppliersService.deleteSupplier(id).catch(apiErrorHandler("eliminar proveedor"));
   },
 
-  registerPurchase: (supplier, lines, invoicePhoto) => {
+  registerPurchase: (supplier, lines, invoicePhoto, invoice) => {
     const code = `OC-${get().seq}`;
     const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
     const taxTotal = lines.reduce((s, l) => s + l.quantity * l.unitCost * ((l.taxRate ?? 0) / 100), 0);
@@ -68,6 +75,9 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
       taxTotal,
       total,
       ...(invoicePhoto ? { invoicePhoto } : {}),
+      invoiceNumber: invoice?.invoiceNumber ?? "",
+      receivedAt: invoice?.receivedAt ?? null,
+      dueDate: invoice?.dueDate ?? null,
     };
     set((st) => ({ purchases: [purchase, ...st.purchases].slice(0, 50), seq: st.seq + 1 }));
     useAuditStore.getState().log({ action: "Compra registrada", details: `${code} · ${supplier.name} · $${total.toFixed(0)}`, user: "Sistema", module: "proveedores" });
@@ -81,6 +91,9 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
         total,
         lines,
         invoicePhoto,
+        invoiceNumber: invoice?.invoiceNumber || undefined,
+        receivedAt: invoice?.receivedAt || undefined,
+        dueDate: invoice?.dueDate || undefined,
       }).then((saved) =>
         set((st) => ({ purchases: st.purchases.map((p) => (p.id === purchase.id ? { ...saved } : p)) }))
       ).catch(apiErrorHandler("registrar compra"));

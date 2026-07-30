@@ -447,6 +447,11 @@ export interface Purchase {
   taxTotal?: number; // suma del IVA de todas las líneas
   total: number; // subtotal + taxTotal (lo pagado al proveedor)
   invoicePhoto?: string; // base64 o URL de la foto de la factura
+  /** Datos de la factura del proveedor, para conciliar y controlar el pago. */
+  invoiceNumber?: string;
+  receivedAt?: string | null; // fecha de recibo de la mercancía (YYYY-MM-DD)
+  dueDate?: string | null;    // vencimiento de la factura (YYYY-MM-DD)
+  isOverdue?: boolean;        // lo calcula el backend
 }
 
 /** Resultado del motor de costeo de una receta. */

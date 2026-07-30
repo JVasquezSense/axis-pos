@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Truck, Plus, ShoppingCart, Pencil, Trash2, Phone, Mail, Package, Minus, ImagePlus, X, ZoomIn } from "lucide-react";
 import type { Supplier, PurchaseLine } from "@/types";
-import { useSuppliersStore, emptySupplier } from "@/store/suppliers.store";
+import { useSuppliersStore, emptySupplier, type InvoiceData } from "@/store/suppliers.store";
 import { useInventoryStore } from "@/store/inventory.store";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
 const CATEGORIES = ["Carnes", "Lácteos", "Verduras", "Frutas", "Panadería", "Abarrotes", "Bebidas", "Pescados", "Congelados"];
 
@@ -102,7 +102,8 @@ export default function SuppliersPage() {
                   <TableRow>
                     <TableHead>Orden</TableHead>
                     <TableHead>Proveedor</TableHead>
-                    <TableHead>Fecha</TableHead>
+                    <TableHead>Recibido</TableHead>
+                    <TableHead>Vence</TableHead>
                     <TableHead className="text-right">Ítems</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-center">Factura</TableHead>
@@ -124,7 +125,12 @@ export default function SuppliersPage() {
         suppliers={suppliers}
         open={buyOpen}
         onOpenChange={setBuyOpen}
-        onRegister={(supplier, lines, invoicePhoto) => { registerPurchase(supplier, lines, invoicePhoto); toast.success("Compra registrada", { description: `${lines.length} insumos sumados al inventario` }); }}
+        onRegister={(supplier, lines, invoicePhoto, invoice) => {
+          registerPurchase(supplier, lines, invoicePhoto, invoice);
+          toast.success("Compra registrada", {
+            description: `${lines.length} insumos sumados al inventario${invoice?.invoiceNumber ? ` · Factura ${invoice.invoiceNumber}` : ""}`,
+          });
+        }}
       />
     </div>
   );
@@ -182,16 +188,23 @@ function PurchaseDialog({
   suppliers: Supplier[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onRegister: (s: Supplier, lines: PurchaseLine[], invoicePhoto?: string) => void;
+  onRegister: (s: Supplier, lines: PurchaseLine[], invoicePhoto?: string, invoice?: InvoiceData) => void;
 }) {
   const inventory = useInventoryStore((s) => s.items);
   const [supplierId, setSupplierId] = useState("");
   const [lines, setLines] = useState<PurchaseLine[]>([]);
   const [invoicePhoto, setInvoicePhoto] = useState<string | undefined>(undefined);
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  // Por defecto la mercancía se recibe hoy: es lo habitual al registrar la compra.
+  const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (open) { setSupplierId(""); setLines([]); setInvoicePhoto(undefined); }
+    if (open) {
+      setSupplierId(""); setLines([]); setInvoicePhoto(undefined);
+      setInvoiceNumber(""); setReceivedAt(new Date().toISOString().slice(0, 10)); setDueDate("");
+    }
   }, [open]);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -301,6 +314,28 @@ function PurchaseDialog({
             <Button variant="outline" size="sm" onClick={addLine}><Plus className="h-4 w-4" /> Agregar insumo</Button>
           </div>
 
+          {/* Datos de la factura del proveedor */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">N.º de factura</label>
+              <Input
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                placeholder="Ej: FV-10245"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Recibo de mercancía</label>
+              <Input type="date" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">
+                Vence <span className="text-muted-foreground">(opcional)</span>
+              </label>
+              <Input type="date" value={dueDate} min={receivedAt || undefined} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
+          </div>
+
           {/* Foto de factura (opcional) */}
           <div>
             <label className="mb-1.5 block text-sm font-medium">Foto de factura <span className="text-muted-foreground">(opcional)</span></label>
@@ -351,7 +386,11 @@ function PurchaseDialog({
             disabled={!valid}
             onClick={() => {
               if (supplier) {
-                onRegister(supplier, lines, invoicePhoto);
+                onRegister(supplier, lines, invoicePhoto, {
+                  invoiceNumber: invoiceNumber.trim(),
+                  receivedAt: receivedAt || null,
+                  dueDate: dueDate || null,
+                });
                 onOpenChange(false);
               }
             }}
@@ -371,7 +410,22 @@ function PurchaseRow({ purchase }: { purchase: import("@/types").Purchase }) {
       <TableRow>
         <TableCell className="font-medium">{purchase.code}</TableCell>
         <TableCell>{purchase.supplierName}</TableCell>
-        <TableCell className="text-muted-foreground">{purchase.date}</TableCell>
+        <TableCell className="text-muted-foreground">
+          <span>{formatDate(purchase.receivedAt) || purchase.date}</span>
+          {purchase.invoiceNumber && (
+            <span className="block text-[11px]">Factura {purchase.invoiceNumber}</span>
+          )}
+        </TableCell>
+        <TableCell>
+          {purchase.dueDate ? (
+            <span className={cn("text-sm", purchase.isOverdue && "font-semibold text-destructive")}>
+              {formatDate(purchase.dueDate)}
+              {purchase.isOverdue && <span className="block text-[11px]">Vencida</span>}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </TableCell>
         <TableCell className="text-right">{purchase.lines.length}</TableCell>
         <TableCell className="text-right font-semibold">{formatCurrency(purchase.total)}</TableCell>
         <TableCell className="text-center">

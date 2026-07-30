@@ -61,6 +61,18 @@ export function formatDateTime(value?: string | null): string {
   return d.getFullYear() === now.getFullYear() ? `${day} ${time}` : `${day} ${d.getFullYear()}`;
 }
 
+/** Fecha sin hora: "28 jul" del año en curso, "28 jul 2025" si es de otro año. */
+export function formatDate(value?: string | null): string {
+  if (!value) return "";
+  // "2026-07-28" se parsea como UTC y en Colombia retrocedería un día.
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return value;
+  const now = new Date();
+  const base = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return d.getFullYear() === now.getFullYear() ? base : `${base} ${d.getFullYear()}`;
+}
+
 export function minutesAgo(date: Date): number {
   return Math.floor((Date.now() - date.getTime()) / 60000);
 }
