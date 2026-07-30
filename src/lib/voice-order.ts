@@ -132,6 +132,21 @@ export function bestPhraseFor(name: string, transcript: string): { phrase: strin
   return best;
 }
 
+/**
+ * Candidatos sacados de TODO el dictado, comparando cada producto contra cada
+ * ventana de palabras. Es la salida cuando el nombre elegido no se parece a nada
+ * de lo que se oyó: ahí sugerir a partir de ese nombre solo propone sinónimos
+ * del error ("Shochu Mule" → "Shochu Fizz") en vez de lo que se dijo.
+ */
+export function suggestFromTranscript(transcript: string, products: Product[], limit = 3): Product[] {
+  return products
+    .map((product) => ({ product, score: bestPhraseFor(product.name, transcript).score }))
+    .filter((c) => c.score >= 0.32)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((c) => c.product);
+}
+
 /** Reemplazos vendibles para un producto agotado: lo más cercano de su categoría. */
 export function suggestReplacements(product: Product, products: Product[], limit = 3): Product[] {
   const sameCategory = products.filter(

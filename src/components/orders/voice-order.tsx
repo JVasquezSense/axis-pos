@@ -16,6 +16,7 @@ import {
   matchVariation,
   parseTranscriptLocally,
   singularize,
+  suggestFromTranscript,
   suggestProducts,
   suggestReplacements,
 } from "@/lib/voice-order";
@@ -113,10 +114,17 @@ export function VoiceOrder() {
         remove: item.remove,
         sure: confidence >= SURE_THRESHOLD,
         agotado,
-        // Agotado → qué vender en su lugar. Dudoso → los otros candidatos.
+        // Agotado → qué vender en su lugar. Dudoso → los otros candidatos: si el
+        // nombre elegido no se parece a nada del audio, hay que buscarlos en el
+        // dictado completo y no alrededor del propio error.
         options: agotado
           ? suggestReplacements(match.product, products)
-          : suggestProducts(spokenFor, products.filter((p) => p.available && p.id !== match.product.id)),
+          : (() => {
+              const pool = products.filter((p) => p.available && p.id !== match.product.id);
+              return heard.score < 0.35
+                ? suggestFromTranscript(transcript, pool)
+                : suggestProducts(spokenFor, pool);
+            })(),
       });
     });
     return { drafts: out, misses };
