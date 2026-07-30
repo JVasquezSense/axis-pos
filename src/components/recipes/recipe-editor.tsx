@@ -26,6 +26,20 @@ const STATUSES: RecipeStatus[] = ["active", "draft", "archived"];
 const DIFFS: RecipeDifficulty[] = ["easy", "medium", "hard"];
 const ALLERGEN_KEYS = Object.keys(ALLERGENS) as Allergen[];
 
+/** Insumo sugerido por la IA que aún no existe en el inventario. */
+interface ProposedItem {
+  name: string;
+  unit: string;
+  cost: number;
+}
+
+/** Compara nombres de insumo ignorando mayúsculas, tildes y espacios de más. */
+function sameName(a: string, b: string): boolean {
+  const norm = (t: string) =>
+    t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+  return norm(a) === norm(b);
+}
+
 export function RecipeEditor({
   recipe,
   isNew,
@@ -54,10 +68,16 @@ export function RecipeEditor({
   const [tagInput, setTagInput] = useState("");
   const [describingAI, setDescribingAI] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
+  // Insumos que la IA propuso y el restaurante todavía no tiene.
+  const [proposed, setProposed] = useState<ProposedItem[]>([]);
+  const [creatingItems, setCreatingItems] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (open) setDraft(recipe ? structuredClone(recipe) : null);
+    if (open) {
+      setDraft(recipe ? structuredClone(recipe) : null);
+      setProposed([]);
+    }
   }, [open, recipe]);
 
   if (!draft) return null;
@@ -122,57 +142,43 @@ export function RecipeEditor({
       const data = await res.json();
       if (data.error) { toast.error(data.error); return; }
 
-      // Crear insumos nuevos en inventario (await para obtener IDs reales del backend)
-      const addInventoryItem = useInventoryStore.getState().addItem;
-      let newItemsCount = 0;
-
-      const ingredients: RecipeIngredient[] = await Promise.all(
-        ((data.ingredients as { name: string; unit: string; quantity: number; waste?: number; existingId?: string | null; cost?: number }[]) ?? []).map(async (ing) => {
-          let inventoryId: string = String(ing.existingId ?? "");
-          if (inventoryId && !allItems.find((i) => String(i.id) === inventoryId)) inventoryId = "";
-          if (!inventoryId) {
+      // Los insumos que la IA propone y no existen NO se crean aquí: el
+      // restaurante veía aparecer en su inventario cosas que nunca registró
+      // ("Pan de hamburguesa", "Queso cheddar"), a veces duplicadas. Se listan
+      // y se crean solo si el usuario lo pide.
+      const proposals: ProposedItem[] = [];
+      const ingredients: RecipeIngredient[] = (
+        (data.ingredients as { name: string; unit: string; quantity: number; waste?: number; existingId?: string | null; cost?: number }[]) ?? []
+      ).map((ing) => {
+        let inventoryId: string = String(ing.existingId ?? "");
+        if (inventoryId && !allItems.find((i) => String(i.id) === inventoryId)) inventoryId = "";
+        if (!inventoryId) {
+          // Reutiliza el insumo que ya exista con ese nombre antes de proponerlo.
+          const existing = allItems.find((i) => sameName(i.name, ing.name));
+          if (existing) inventoryId = String(existing.id);
+          else if (!proposals.some((p) => sameName(p.name, ing.name))) {
             // La IA cotiza el costo en escala "grande" (por kg/L) aunque la receta
             // use gramos/mililitros. Si guardáramos el insumo nuevo con unidad "g"
             // y ese mismo costo, el precio quedaría inflado ~1000x (bug food cost >7000%).
             const SMALL_TO_BIG: Record<string, string> = { g: "kg", gr: "kg", ml: "L", cl: "L" };
-            const stockUnit = SMALL_TO_BIG[(ing.unit ?? "").toLowerCase()] ?? ing.unit ?? "und";
-            const newItem: InventoryItem = {
-              id: uid("inv"),
+            proposals.push({
               name: ing.name,
-              category: "general",
-              stock: 10,
-              unit: stockUnit,
-              minStock: 2,
+              unit: SMALL_TO_BIG[(ing.unit ?? "").toLowerCase()] ?? ing.unit ?? "und",
               cost: Number(ing.cost) || 0,
-              supplier: "",
-              status: "normal",
-              updatedAt: "Justo ahora",
-            };
-            if (USE_API) {
-              try {
-                const saved = await inventoryService.createItem(newItem);
-                addInventoryItem(saved);
-                inventoryId = String(saved.id);
-              } catch {
-                addInventoryItem(newItem);
-                inventoryId = newItem.id;
-              }
-            } else {
-              addInventoryItem(newItem);
-              inventoryId = newItem.id;
-            }
-            newItemsCount++;
+            });
           }
-          return {
-            id: uid("ing"),
-            inventoryId,
-            name: ing.name,
-            unit: ing.unit ?? "und",
-            quantity: Number(ing.quantity) || 1,
-            waste: Number(ing.waste) || 0,
-          };
-        })
-      );
+        }
+        return {
+          id: uid("ing"),
+          inventoryId,
+          name: ing.name,
+          unit: ing.unit ?? "und",
+          quantity: Number(ing.quantity) || 1,
+          waste: Number(ing.waste) || 0,
+        };
+      });
+      setProposed(proposals);
+      const newItemsCount = proposals.length;
 
       // Mapear categoría: el AI puede devolver id o nombre, buscar coincidencia
       const storeCategories = useMenuStore.getState().categories;
@@ -215,13 +221,59 @@ export function RecipeEditor({
       });
 
       const desc = newItemsCount > 0
-        ? `${newItemsCount} insumo${newItemsCount > 1 ? "s" : ""} nuevo${newItemsCount > 1 ? "s" : ""} creado${newItemsCount > 1 ? "s" : ""} en inventario`
+        ? `${newItemsCount} insumo${newItemsCount > 1 ? "s" : ""} no está${newItemsCount > 1 ? "n" : ""} en tu inventario: revísalo${newItemsCount > 1 ? "s" : ""} en la pestaña Insumos`
         : "Insumos del inventario existente";
       toast.success("Receta generada con IA", { description: desc });
     } catch {
       toast.error("No se pudo conectar con la IA");
     } finally {
       setGeneratingAI(false);
+    }
+  };
+
+  /** Crea en inventario los insumos propuestos por la IA y los vincula. */
+  const createProposed = async () => {
+    if (proposed.length === 0) return;
+    setCreatingItems(true);
+    const created: InventoryItem[] = [];
+    try {
+      for (const it of proposed) {
+        // Stock 0: el sistema no puede inventar existencias que nadie contó.
+        const draftItem: InventoryItem = {
+          id: uid("inv"),
+          name: it.name,
+          category: "General",
+          stock: 0,
+          unit: it.unit,
+          minStock: 0,
+          cost: it.cost,
+          supplier: "",
+          status: "critical",
+          updatedAt: new Date().toISOString(),
+        };
+        const saved = USE_API
+          ? await useInventoryStore.getState().createItem(draftItem)
+          : (useInventoryStore.getState().addItem(draftItem), draftItem);
+        if (saved) created.push(saved);
+      }
+      // Vincula cada ingrediente suelto con el insumo recién creado.
+      setDraft((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ingredients: prev.ingredients.map((ing) => {
+            if (ing.inventoryId) return ing;
+            const match = created.find((c) => sameName(c.name, ing.name));
+            return match ? { ...ing, inventoryId: String(match.id) } : ing;
+          }),
+        };
+      });
+      setProposed([]);
+      toast.success(`${created.length} insumo${created.length > 1 ? "s" : ""} creado${created.length > 1 ? "s" : ""}`, {
+        description: "Quedaron con stock 0: ajústalo en Inventario cuando los recibas.",
+      });
+    } finally {
+      setCreatingItems(false);
     }
   };
 
@@ -551,6 +603,44 @@ export function RecipeEditor({
                 <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                   💡 ¿No encuentras un insumo? Créalo en <strong className="text-foreground">Inventario → + Insumo</strong> y luego selecciónalo aquí.
                 </p>
+                {proposed.length > 0 && (
+                  <div className="rounded-xl border border-warning/50 bg-warning/5 p-3">
+                    <p className="text-sm font-medium">
+                      La IA propone {proposed.length} insumo{proposed.length > 1 ? "s" : ""} que no tienes en inventario
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      No se crean solos. Revisa la lista y decide: los que crees quedarán con stock 0 para que los
+                      ajustes al recibirlos.
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {proposed.map((it) => (
+                        <li key={it.name} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="truncate">{it.name} · {it.unit}</span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span className="text-muted-foreground">{formatCurrency(it.cost)}</span>
+                            {/* Descartar solo este: el resto sigue disponible para crear. */}
+                            <button
+                              onClick={() => setProposed((prev) => prev.filter((p) => p.name !== it.name))}
+                              className="text-muted-foreground transition-colors hover:text-destructive"
+                              aria-label={`Descartar ${it.name}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-2.5 flex gap-2">
+                      <Button size="sm" variant="outline" className="flex-1" onClick={() => setProposed([])}>
+                        Ahora no
+                      </Button>
+                      <Button size="sm" className="flex-1" onClick={createProposed} disabled={creatingItems}>
+                        {creatingItems && <Loader2 className="h-4 w-4 animate-spin" />}
+                        Crear en inventario
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <IngredientEditor value={draft.ingredients} onChange={(ingredients) => set({ ingredients })} />
               </TabsContent>
 
