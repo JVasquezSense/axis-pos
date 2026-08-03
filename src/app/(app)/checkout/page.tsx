@@ -19,6 +19,7 @@ import { SplitBillDialog } from "@/components/checkout/split-bill-dialog";
 import { PAYMENT_METHODS, PAYMENT_LABEL } from "@/lib/payments";
 import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
+import { computeTaxes } from "@/lib/taxes";
 import { useTablesStore } from "@/store/tables.store";
 import { useSalesStore } from "@/store/sales.store";
 import { useInventoryStore } from "@/store/inventory.store";
@@ -77,12 +78,29 @@ export default function CheckoutPage() {
   const autoDiscount = st.full ? subtotal : Math.round(subtotal * (st.discountPct ?? 0));
   const effectiveDiscount = Math.min(discount + autoDiscount, subtotal);
   const taxedBase = Math.max(subtotal - effectiveDiscount, 0);
-  const tax = st.noTax ? 0 : Math.round(taxedBase * TAX_RATE);
+  // Cada producto puede traer sus propios impuestos (IVA % + consumo fijo); los
+  // que no traen ninguno usan el impuesto general del restaurante. El descuento
+  // se reparte proporcionalmente sobre la base gravable.
+  const { totals: taxTotals, total: taxOnFullPrice } = useMemo(
+    () => computeTaxes(lines, TAX_RATE, st.noTax === true),
+    [lines, st.noTax]
+  );
+  const discountFactor = subtotal > 0 ? taxedBase / subtotal : 0;
+  const taxes = taxTotals.map((t) => ({ name: t.name, amount: Math.round(t.amount * discountFactor) }));
+  const tax = taxes.reduce((s, t) => s + t.amount, 0);
   const tip = st.full ? 0 : Math.round(subtotal * tipRate);
   const total = taxedBase + tax + tip;
   const remaining = Math.max(total - splitCollected, 0);
 
-  const breakdown: PaymentBreakdown = { subtotal, tax, taxRate: st.noTax ? 0 : TAX_RATE, discount: effectiveDiscount, tip, total: remaining };
+  const breakdown: PaymentBreakdown = {
+    subtotal,
+    tax,
+    taxRate: st.noTax ? 0 : TAX_RATE,
+    taxes,
+    discount: effectiveDiscount,
+    tip,
+    total: remaining,
+  };
 
   const sendToKitchen = useOrderStore((s) => s.sendToKitchen);
 
@@ -315,7 +333,13 @@ export default function CheckoutPage() {
               {effectiveDiscount > 0 && (
                 <Row label={st.full ? `Descuento (${st.label})` : "Descuento"} value={`- ${formatCurrency(effectiveDiscount)}`} accent />
               )}
-              <Row label={st.noTax ? "IVA (exento)" : `IVA (${Math.round(TAX_RATE * 100)}%)`} value={formatCurrency(tax)} muted />
+              {st.noTax ? (
+                <Row label="Impuestos (exento)" value={formatCurrency(0)} muted />
+              ) : taxes.length > 0 ? (
+                taxes.map((t) => <Row key={t.name} label={t.name} value={formatCurrency(t.amount)} muted />)
+              ) : (
+                <Row label={`IVA (${Math.round(TAX_RATE * 100)}%)`} value={formatCurrency(0)} muted />
+              )}
               <Row label="Propina" value={formatCurrency(tip)} muted />
               <Separator className="my-2" />
               <div className="flex items-center justify-between">

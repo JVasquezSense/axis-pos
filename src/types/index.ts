@@ -136,6 +136,17 @@ export interface Product {
   componentsTotal?: number | null;
   /** Variaciones de la ficha técnica, elegibles al pedir (POS y web). */
   variations?: ProductVariation[];
+  /** Impuestos propios del producto; vacío = usa el impuesto general. */
+  taxes?: ProductTax[];
+}
+
+/** Un impuesto del producto: porcentual (IVA) o fijo por unidad (Ipoconsumo). */
+export interface ProductTax {
+  id: string;
+  name: string;
+  type: "percent" | "fixed";
+  /** % cuando es porcentual, COP por unidad cuando es fijo. */
+  rate: number;
 }
 
 export interface ProductVariation {
@@ -288,6 +299,8 @@ export interface PaymentBreakdown {
   subtotal: number;
   tax: number;
   taxRate: number;
+  /** Desglose por impuesto (IVA, Ipoconsumo…); vacío = un único impuesto general. */
+  taxes?: { name: string; amount: number }[];
   discount: number;
   tip: number;
   total: number;

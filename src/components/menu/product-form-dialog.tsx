@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, X } from "lucide-react";
-import type { Category, Product } from "@/types";
+import { ImagePlus, X, Plus, Trash2 } from "lucide-react";
+import type { Category, Product, ProductTax } from "@/types";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductImage } from "@/components/shared/product-image";
+import { emptyTax } from "@/lib/taxes";
 
 function isImageUrl(src: string) {
   return src.startsWith("data:") || src.startsWith("http") || src.startsWith("/") || src.startsWith("blob:");
@@ -62,6 +63,9 @@ export function ProductFormDialog({
     if (t && !draft.tags.includes(t)) set({ tags: [...draft.tags, t] });
     setTagInput("");
   };
+
+  const updateTax = (index: number, patch: Partial<ProductTax>) =>
+    set({ taxes: (draft.taxes ?? []).map((t, i) => (i === index ? { ...t, ...patch } : t)) });
 
   const save = () => {
     if (!draft.name.trim() || draft.price <= 0) return;
@@ -150,6 +154,78 @@ export function ProductFormDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Impuestos: un campo por defecto y tantos como haga falta. Una cerveza
+              lleva IVA porcentual y un impuesto al consumo fijo por unidad. */}
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-sm font-medium">
+                Impuestos <span className="text-muted-foreground">(opcional)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => set({ taxes: [...(draft.taxes ?? []), emptyTax()] })}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                <Plus className="h-3.5 w-3.5" /> Agregar impuesto
+              </button>
+            </div>
+
+            {(draft.taxes ?? []).length === 0 ? (
+              <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                Sin impuestos propios: se cobra el impuesto general del restaurante.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {(draft.taxes ?? []).map((tax, i) => (
+                  <div key={tax.id} className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="mb-1 block text-[11px] text-muted-foreground">Nombre</label>
+                      <Input
+                        value={tax.name}
+                        onChange={(e) => updateTax(i, { name: e.target.value })}
+                        placeholder="Ej: IVA"
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <label className="mb-1 block text-[11px] text-muted-foreground">Tipo</label>
+                      <Select
+                        value={tax.type}
+                        onValueChange={(v) => updateTax(i, { type: v as ProductTax["type"] })}
+                      >
+                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percent">% Porcentual</SelectItem>
+                          <SelectItem value="fixed">$ Por unidad</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-28">
+                      <label className="mb-1 block text-[11px] text-muted-foreground">
+                        {tax.type === "percent" ? "Porcentaje" : "Valor (COP)"}
+                      </label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={tax.rate}
+                        onChange={(e) => updateTax(i, { rate: Number(e.target.value) })}
+                        className="h-9"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => set({ taxes: (draft.taxes ?? []).filter((_, x) => x !== i) })}
+                      className="mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      title="Quitar impuesto"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

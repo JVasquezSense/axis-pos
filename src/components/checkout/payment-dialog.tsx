@@ -142,7 +142,13 @@ export function PaymentDialog({
 
               <Row label="Subtotal" value={formatCurrency(breakdown.subtotal)} />
               {breakdown.discount > 0 && <Row label="Descuento" value={`- ${formatCurrency(breakdown.discount)}`} />}
-              <Row label={`IVA (${Math.round(breakdown.taxRate * 100)}%)`} value={formatCurrency(breakdown.tax)} />
+              {breakdown.taxes && breakdown.taxes.length > 0 ? (
+                breakdown.taxes.map((t) => (
+                  <Row key={t.name} label={t.name} value={formatCurrency(t.amount)} />
+                ))
+              ) : (
+                <Row label={`IVA (${Math.round(breakdown.taxRate * 100)}%)`} value={formatCurrency(breakdown.tax)} />
+              )}
               {breakdown.tip > 0 && (
                 <Row label={`Propina${waiter && waiter !== "Sin asignar" ? ` → ${waiter}` : ""}`} value={formatCurrency(breakdown.tip)} />
               )}

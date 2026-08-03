@@ -50,6 +50,7 @@ export function TableDrawer({
   const router = useRouter();
   const setTable = useOrderStore((s) => s.setTable);
   const loadTableOrder = useOrderStore((s) => s.loadTableOrder);
+  const freeTable = useTablesStore((s) => s.free);
   const [mode, setMode] = useState<Mode>("idle");
   const [people, setPeople] = useState(2);
 
@@ -61,7 +62,6 @@ export function TableDrawer({
   if (!table) return null;
   const status = TABLE_STATUS[table.status];
   const elapsed = table.seatedAt ? minutesAgo(new Date(table.seatedAt)) : 0;
-  const freeTable = useTablesStore((s) => s.free);
 
   const takeOrder = () => {
     setTable(table.number);
