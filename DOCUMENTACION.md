@@ -577,6 +577,37 @@ reemplaza el contenido del panel por la cuenta de esa mesa.
 
 Se activa con la capacidad `voice` del plan (hoy solo Enterprise).
 
+### Impuestos por producto
+
+`Product.taxes` es una lista: `[{name, type: "percent"|"fixed", rate}]`. Una
+cerveza en Colombia paga IVA porcentual **y** un impuesto al consumo fijo por
+unidad, así que un solo porcentaje sobre la cuenta no alcanza. El formulario del
+producto muestra un impuesto y permite agregar los que hagan falta; el producto
+que no declara ninguno usa el impuesto general del restaurante (`TAX_RATE`),
+que es el comportamiento anterior.
+
+`src/lib/taxes.ts` calcula por línea (los fijos se multiplican por la cantidad,
+los porcentuales por el precio con modificadores) y la caja reparte el descuento
+proporcionalmente sobre la base gravable. Caja y recibo desglosan cada impuesto
+por su nombre.
+
+### Unidades entre receta e inventario
+
+La unidad la manda **el insumo del inventario**. La IA propone lo que le suena
+natural ("200 g de carne") mientras el inventario compra en kilos: si el
+ingrediente conservaba su unidad, la ficha decía kg y el inventario ml, y el
+costeo multiplicaba masa por volumen. `alignToItemUnit` convierte la cantidad
+(200 g → 0,2 kg) y, cuando las magnitudes no son convertibles, se queda con la
+unidad del inventario en vez de inventar una equivalencia.
+
+### Estado de las mesas
+
+`seated_at` lo fija **el servidor** al pasar la mesa a ocupada y lo limpia al
+liberarla. Cuando vivía solo en el navegador, al recargar la mesa seguía ocupada
+pero sin tiempo de espera. El serializer expone además `hasActiveOrder`: una mesa
+ocupada sin ningún pedido en curso queda bloqueada, así que el salón lo avisa y
+ofrece liberarla.
+
 ### De dónde salen los insumos
 
 Un restaurante solo debe ver en su inventario lo que él registró. Dos reglas que
