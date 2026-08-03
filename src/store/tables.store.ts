@@ -21,6 +21,7 @@ interface TablesState {
   addZone: (zone: SalonZone) => void;
   updateZone: (zone: SalonZone) => void;
   removeZone: (id: string) => void;
+  connectRealtime: (tenantId: string) => () => void;
 }
 
 export const useTablesStore = create<TablesState>()((set, get) => ({
@@ -83,6 +84,44 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
   updateTableProps: (id, props) => {
     set((s) => ({ tables: s.tables.map((t) => (t.id === id ? { ...t, ...props } : t)) }));
     if (USE_API) salonService.updateTable({ id, ...props }).catch(apiErrorHandler("actualizar mesa"));
+  },
+
+  /**
+   * Estado de las mesas en vivo: un pedido por QR ocupa la mesa desde el
+   * servidor, y el salón debe enterarse sin que nadie recargue.
+   */
+  connectRealtime: (tenantId) => {
+    const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "";
+    if (!USE_API || !WS_BASE || !tenantId || typeof window === "undefined") return () => {};
+    let ws: WebSocket | null = null;
+    let closed = false;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+
+    const open = () => {
+      if (closed) return;
+      ws = new WebSocket(`${WS_BASE}/ws/kitchen/${tenantId}/`);
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.event !== "table.update" || !data.table) return;
+          const incoming: RestaurantTable = data.table;
+          set((s) => ({
+            tables: s.tables.map((t) => (String(t.id) === String(incoming.id) ? { ...t, ...incoming } : t)),
+          }));
+        } catch { /* fragmento inválido */ }
+      };
+      ws.onclose = () => {
+        if (closed) return;
+        retry = setTimeout(open, 3000);
+      };
+    };
+    open();
+
+    return () => {
+      closed = true;
+      if (retry) clearTimeout(retry);
+      ws?.close();
+    };
   },
 
   addZone: (zone) =>

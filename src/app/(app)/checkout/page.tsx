@@ -107,7 +107,16 @@ export default function CheckoutPage() {
   // Backlog #1: crea la venta en el backend para obtener el número de factura
   // correlativo y luego abre el dialog de pago con ese número.
   const charge = async () => {
-    if (remaining <= 0 || !waiter.trim()) return;
+    // Sin esto el botón simplemente no hacía nada y no se sabía por qué.
+    if (lines.length === 0) {
+      toast.error("No hay nada que cobrar", { description: "Agrega productos o carga la cuenta de una mesa." });
+      return;
+    }
+    if (!waiter.trim()) {
+      toast.error("Falta el mesero", { description: "Selecciona quién atendió antes de cobrar." });
+      return;
+    }
+    if (remaining <= 0) return;
     try {
       const saved = await recordSale({
         total, subtotal: breakdown.subtotal, tax: breakdown.tax, discount: breakdown.discount,
@@ -393,7 +402,7 @@ export default function CheckoutPage() {
                   </button>
                 ))}
               </div>
-              <Button size="lg" className="mt-4 w-full text-base" onClick={charge} disabled={remaining <= 0 || !waiter.trim()}>
+              <Button size="lg" className="mt-4 w-full text-base" onClick={charge} disabled={remaining <= 0}>
                 Cobrar {formatCurrency(remaining)}
               </Button>
               {!waiter.trim() && remaining > 0 && (

@@ -31,6 +31,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadDeliveries = useDeliveryStore((s) => s.load);
   const connectRealtime = useMenuStore((s) => s.connectRealtime);
   const connectInventory = useInventoryStore((s) => s.connectRealtime);
+  const connectTables = useTablesStore((s) => s.connectRealtime);
   const tenantId = useAuthStore((s) => s.tenantId);
   const updateRestaurant = useAppStore((s) => s.updateRestaurant);
   const setFeatures = useAppStore((s) => s.setFeatures);
@@ -83,6 +84,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (!USE_API || !tenantId) return;
     return connectInventory(tenantId);
   }, [connectInventory, tenantId]);
+
+  // Mesas en tiempo real: un pedido por QR las ocupa desde el servidor.
+  useEffect(() => {
+    if (!USE_API || !tenantId) return;
+    return connectTables(tenantId);
+  }, [connectTables, tenantId]);
 
   return <>{children}</>;
 }
