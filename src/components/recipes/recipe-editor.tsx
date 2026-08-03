@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IngredientEditor } from "./ingredient-editor";
 import { useRecipesStore, emptyVariation, uid } from "@/store/recipes.store";
-import { computeRecipeCost, STATION, ALLERGENS, foodCostTone, TARGET_FOOD_COST } from "@/lib/recipes";
+import { alignToItemUnit, computeRecipeCost, STATION, ALLERGENS, foodCostTone, TARGET_FOOD_COST } from "@/lib/recipes";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const STATIONS = Object.keys(STATION) as RecipeStation[];
@@ -157,9 +157,8 @@ export function RecipeEditor({
           const existing = allItems.find((i) => sameName(i.name, ing.name));
           if (existing) inventoryId = String(existing.id);
           else if (!proposals.some((p) => sameName(p.name, ing.name))) {
-            // La IA cotiza el costo en escala "grande" (por kg/L) aunque la receta
-            // use gramos/mililitros. Si guardáramos el insumo nuevo con unidad "g"
-            // y ese mismo costo, el precio quedaría inflado ~1000x (bug food cost >7000%).
+            // El insumo se compra en unidad grande (kg/L) aunque la receta hable
+            // de gramos: guardarlo en "g" con el costo por kilo infla el food cost ~1000x.
             const SMALL_TO_BIG: Record<string, string> = { g: "kg", gr: "kg", ml: "L", cl: "L" };
             proposals.push({
               name: ing.name,
@@ -168,12 +167,18 @@ export function RecipeEditor({
             });
           }
         }
+        // La unidad la manda el inventario: si la ficha dice kg y el insumo está
+        // en ml (o al revés), el costeo multiplica magnitudes distintas.
+        const item = allItems.find((i) => String(i.id) === inventoryId);
+        const aligned = item
+          ? alignToItemUnit(Number(ing.quantity) || 1, ing.unit, item.unit)
+          : { quantity: Number(ing.quantity) || 1, unit: ing.unit ?? "und" };
         return {
           id: uid("ing"),
           inventoryId,
-          name: ing.name,
-          unit: ing.unit ?? "und",
-          quantity: Number(ing.quantity) || 1,
+          name: item?.name ?? ing.name,
+          unit: aligned.unit,
+          quantity: aligned.quantity,
           waste: Number(ing.waste) || 0,
         };
       });
@@ -264,7 +269,9 @@ export function RecipeEditor({
           ingredients: prev.ingredients.map((ing) => {
             if (ing.inventoryId) return ing;
             const match = created.find((c) => sameName(c.name, ing.name));
-            return match ? { ...ing, inventoryId: String(match.id) } : ing;
+            if (!match) return ing;
+            const aligned = alignToItemUnit(ing.quantity, ing.unit, match.unit);
+            return { ...ing, inventoryId: String(match.id), unit: aligned.unit, quantity: aligned.quantity };
           }),
         };
       });

@@ -17,6 +17,7 @@ import {
   Minus,
   Plus,
   Check,
+  AlertTriangle,
 } from "lucide-react";
 import type { RestaurantTable } from "@/types";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -27,6 +28,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TABLE_STATUS } from "@/lib/status";
 import { cn, formatCurrency, formatElapsed, initials, minutesAgo } from "@/lib/utils";
 import { useOrderStore } from "@/store/order.store";
+import { useTablesStore } from "@/store/tables.store";
 
 type Mode = "idle" | "move" | "merge" | "split";
 
@@ -59,6 +61,7 @@ export function TableDrawer({
   if (!table) return null;
   const status = TABLE_STATUS[table.status];
   const elapsed = table.seatedAt ? minutesAgo(new Date(table.seatedAt)) : 0;
+  const freeTable = useTablesStore((s) => s.free);
 
   const takeOrder = () => {
     setTable(table.number);
@@ -147,6 +150,28 @@ export function TableDrawer({
               ) : (
                 <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                   Esta mesa aún no tiene pedido.
+                </div>
+              )}
+
+              {/* Mesa ocupada que nadie va a cobrar: sin esto se queda bloqueada. */}
+              {table.status !== "available" && table.hasActiveOrder === false && !table.orderTotal && (
+                <div className="rounded-xl border border-warning/50 bg-warning/5 p-3">
+                  <p className="flex items-start gap-1.5 text-sm">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                    <span>Esta mesa está ocupada pero no tiene ningún pedido en curso.</span>
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 w-full"
+                    onClick={() => {
+                      freeTable(table.number);
+                      toast.success(`Mesa ${table.number} liberada`);
+                      close(false);
+                    }}
+                  >
+                    Liberar mesa
+                  </Button>
                 </div>
               )}
 

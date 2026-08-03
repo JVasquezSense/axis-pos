@@ -90,6 +90,8 @@ export interface RestaurantTable {
   guests?: number;
   seatedAt?: string; // ISO
   orderTotal?: number;
+  /** Lo calcula el backend: false = ocupada pero sin ningún pedido en curso. */
+  hasActiveOrder?: boolean;
   mergedInto?: number; // si está unida, número de la mesa principal
   x: number; // posición % en el mapa
   y: number;

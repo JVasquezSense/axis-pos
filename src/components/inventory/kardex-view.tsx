@@ -44,7 +44,10 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
 
   const summary: KardexSummary[] = useMemo(
     () =>
-      items.map((item) => {
+      // Alfabético: el kardex se lee buscando un insumo por nombre.
+      [...items]
+        .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
+        .map((item) => {
         const mv = byItem.get(String(item.id)) ?? [];
         const inicial = mv.find((m) => m.type === "inicial")?.quantity ?? 0;
         const entradas = Math.round(mv.filter((m) => m.type !== "inicial" && m.quantity > 0).reduce((s, m) => s + m.quantity, 0) * 1000) / 1000;

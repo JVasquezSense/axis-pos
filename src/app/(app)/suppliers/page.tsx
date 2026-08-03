@@ -411,10 +411,7 @@ function PurchaseRow({ purchase }: { purchase: import("@/types").Purchase }) {
         <TableCell className="font-medium">{purchase.code}</TableCell>
         <TableCell>{purchase.supplierName}</TableCell>
         <TableCell className="text-muted-foreground">
-          <span>{formatDate(purchase.receivedAt) || purchase.date}</span>
-          {purchase.invoiceNumber && (
-            <span className="block text-[11px]">Factura {purchase.invoiceNumber}</span>
-          )}
+          {formatDate(purchase.receivedAt) || purchase.date}
         </TableCell>
         <TableCell>
           {purchase.dueDate ? (
@@ -429,15 +426,18 @@ function PurchaseRow({ purchase }: { purchase: import("@/types").Purchase }) {
         <TableCell className="text-right">{purchase.lines.length}</TableCell>
         <TableCell className="text-right font-semibold">{formatCurrency(purchase.total)}</TableCell>
         <TableCell className="text-center">
+          {purchase.invoiceNumber && (
+            <span className="block text-xs font-medium text-foreground">{purchase.invoiceNumber}</span>
+          )}
           {purchase.invoicePhoto ? (
             <button
               onClick={() => setPhotoOpen(true)}
-              className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+              className="mt-0.5 inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary transition-colors"
             >
-              <ZoomIn className="h-3.5 w-3.5" /> Ver
+              <ZoomIn className="h-3.5 w-3.5" /> Ver foto
             </button>
           ) : (
-            <span className="text-xs text-muted-foreground">—</span>
+            !purchase.invoiceNumber && <span className="text-xs text-muted-foreground">—</span>
           )}
         </TableCell>
       </TableRow>

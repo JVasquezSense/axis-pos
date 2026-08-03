@@ -20,6 +20,7 @@ export type AiActionKind =
   | "register_purchase"
   | "create_recipe"
   | "add_order_lines"
+  | "create_table"
   | "none";
 
 export interface AiItemPayload {
@@ -55,8 +56,17 @@ export interface AiOrderPayload {
   lines: { name: string; quantity: number; notes?: string }[];
 }
 
+export interface AiTablePayload {
+  number: number;
+  capacity?: number;
+  zone?: string;
+  /** Cuántas mesas crear de corrido a partir de `number`. */
+  count?: number;
+}
+
 export interface AiAction {
   action: AiActionKind;
+  table?: AiTablePayload;
   item?: AiItemPayload;
   purchase?: AiPurchasePayload;
   recipe?: AiRecipePayload;
@@ -74,6 +84,7 @@ ACCIONES:
 - "register_purchase": registrar una COMPRA a un proveedor (entra al inventario).
 - "create_recipe": crear un PRODUCTO o RECETA de la carta.
 - "add_order_lines": agregar productos a un PEDIDO (tomar la orden de una mesa).
+- "create_table": crear MESAS del salón.
 - "none": preguntas, análisis, reportes o cualquier cosa que no sea una de las anteriores.
 
 FORMATOS (uno por acción):
@@ -83,6 +94,7 @@ FORMATOS (uno por acción):
 {"action":"register_purchase","purchase":{"supplier":"Distribuidora Sur","invoiceNumber":"FV-102","receivedAt":"2026-07-29","dueDate":"2026-08-29","lines":[{"name":"Coca Cola","quantity":24,"unitCost":2200,"taxRate":19}]}}
 {"action":"create_recipe","recipe":{"name":"Limonada de coco","price":12000,"category":"Bebidas","portions":1,"prepMinutes":5,"description":"","ingredients":[{"name":"Limón","quantity":0.1,"unit":"kg","waste":5}]}}
 {"action":"add_order_lines","order":{"table":4,"lines":[{"name":"Mojito","quantity":2,"notes":"sin hielo"}]}}
+{"action":"create_table","table":{"number":7,"capacity":4,"zone":"Terraza","count":1}}
 {"action":"none","missing":"nombre del insumo"}
 
 REGLAS:
@@ -189,6 +201,23 @@ function parseAction(raw: string): AiAction {
         prepMinutes: num(raw.prepMinutes),
         description: raw.description ? str(raw.description, 300) : undefined,
         ingredients,
+      },
+    };
+  }
+
+  if (kind === "create_table") {
+    const raw = (data.table ?? {}) as Record<string, unknown>;
+    const number = num(raw.number);
+    if (!number || number < 1) return { action: "none", missing: missing ?? "número de la mesa" };
+    const capacity = num(raw.capacity);
+    const count = num(raw.count);
+    return {
+      action: kind,
+      table: {
+        number: Math.round(number),
+        capacity: capacity && capacity > 0 ? Math.round(capacity) : undefined,
+        zone: raw.zone ? str(raw.zone, 60) : undefined,
+        count: count && count > 1 ? Math.min(Math.round(count), 20) : undefined,
       },
     };
   }

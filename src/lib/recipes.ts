@@ -51,6 +51,40 @@ function unitFactor(fromUnit: string, toUnit: string): number {
   return 1; // unidades de conteo o incompatibles — sin conversión
 }
 
+/**
+ * Pasa una cantidad a la unidad del insumo. Devuelve `null` si las unidades no
+ * son convertibles (kg contra ml, por ejemplo): ahí no hay factor honesto y hay
+ * que quedarse con la unidad del inventario en lugar de inventar una equivalencia.
+ */
+export function convertQuantity(quantity: number, fromUnit: string, toUnit: string): number | null {
+  const fu = (fromUnit || "").toLowerCase();
+  const tu = (toUnit || "").toLowerCase();
+  if (!fu || !tu || fu === tu) return quantity;
+
+  const MASS: Record<string, number> = { g: 1, gr: 1, kg: 1000, lb: 453.592, oz: 28.3495 };
+  const VOL: Record<string, number> = { ml: 1, cl: 10, l: 1000, lt: 1000 };
+  if (MASS[fu] != null && MASS[tu] != null) return quantity * (MASS[fu] / MASS[tu]);
+  if (VOL[fu] != null && VOL[tu] != null) return quantity * (VOL[fu] / VOL[tu]);
+  return null; // masa contra volumen, o unidades de conteo distintas
+}
+
+/**
+ * Alinea un ingrediente con la unidad real del insumo del inventario.
+ *
+ * La IA propone la unidad que le parece natural ("200 g de carne") mientras el
+ * inventario compra en kg: si el ingrediente se queda con la suya, la ficha dice
+ * kg y el inventario ml, y el costeo multiplica peras con litros.
+ */
+export function alignToItemUnit(
+  quantity: number,
+  unit: string | undefined,
+  itemUnit: string
+): { quantity: number; unit: string; converted: boolean } {
+  const converted = convertQuantity(quantity, unit ?? itemUnit, itemUnit);
+  if (converted === null) return { quantity, unit: itemUnit, converted: false };
+  return { quantity: Math.round(converted * 10000) / 10000, unit: itemUnit, converted: true };
+}
+
 /** Cantidad efectiva considerando la merma. */
 export function effectiveQty(ing: RecipeIngredient): number {
   return ing.quantity / Math.max(1 - ing.waste, 0.01);

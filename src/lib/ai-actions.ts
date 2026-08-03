@@ -9,6 +9,7 @@ import { useTablesStore } from "@/store/tables.store";
 import { menuService } from "@/services/menu.service";
 import { USE_API } from "@/services/http";
 import { matchProduct, normalize, singularize } from "@/lib/voice-order";
+import { alignToItemUnit } from "@/lib/recipes";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 /**
@@ -48,11 +49,13 @@ export function actionContext(): string {
   const products = useMenuStore.getState().products.map((p) => p.name);
   const suppliers = useSuppliersStore.getState().suppliers.map((s) => s.name);
   const tables = useTablesStore.getState().tables.map((t) => t.number);
+  const zones = useTablesStore.getState().zones.map((z) => z.name);
   return [
     items.length ? `Insumos: ${items.slice(0, 120).join(", ")}` : "Insumos: (ninguno)",
     products.length ? `Productos: ${products.slice(0, 120).join(", ")}` : "Productos: (ninguno)",
     suppliers.length ? `Proveedores: ${suppliers.join(", ")}` : "Proveedores: (ninguno)",
-    tables.length ? `Mesas: ${tables.join(", ")}` : "",
+    tables.length ? `Mesas: ${tables.join(", ")}` : "Mesas: (ninguna)",
+    zones.length ? `Zonas del salón: ${zones.join(", ")}` : "",
     `Hoy es ${new Date().toISOString().slice(0, 10)}`,
   ]
     .filter(Boolean)
@@ -74,6 +77,8 @@ export function planFor(action: AiAction): ActionPlan | null {
       return planRecipe(action);
     case "add_order_lines":
       return planOrder(action);
+    case "create_table":
+      return planTable(action);
     default:
       return null;
   }
@@ -356,17 +361,81 @@ function planRecipe(action: AiAction): ActionPlan | null {
         productId: String(savedProduct.id),
         ingredients: ingredients
           .filter((i) => i.item)
-          .map((i) => ({
-            id: uid("ing"),
-            inventoryId: String(i.item!.id),
-            name: i.item!.name,
-            unit: i.unit ?? i.item!.unit,
-            quantity: i.quantity,
-            waste: i.waste ?? 0,
-          })),
+          .map((i) => {
+            // La unidad la manda el insumo del inventario, no la que propuso la IA.
+            const aligned = alignToItemUnit(i.quantity, i.unit, i.item!.unit);
+            return {
+              id: uid("ing"),
+              inventoryId: String(i.item!.id),
+              name: i.item!.name,
+              unit: aligned.unit,
+              quantity: aligned.quantity,
+              waste: i.waste ?? 0,
+            };
+          }),
       };
       useRecipesStore.getState().create(recipe);
       return `Producto **${data.name}** creado con su ficha técnica.`;
+    },
+  };
+}
+
+// ─── Mesas ────────────────────────────────────────────────────────────────────
+
+function planTable(action: AiAction): ActionPlan | null {
+  const data = action.table;
+  if (!data) return null;
+  const { tables, zones } = useTablesStore.getState();
+
+  const count = Math.max(1, Math.min(data.count ?? 1, 20));
+  const capacity = data.capacity && data.capacity > 0 ? data.capacity : 4;
+  const zone = (data.zone ? findByName(zones, data.zone) : undefined)?.name ?? zones[0]?.name ?? "Salón";
+
+  // Números libres desde el que pidió: crear una mesa 4 cuando ya existe rompe el mapa.
+  const taken = new Set(tables.map((t) => t.number));
+  const numbers: number[] = [];
+  const repeated: number[] = [];
+  for (let n = data.number; numbers.length < count && n < data.number + count + 50; n++) {
+    if (taken.has(n)) repeated.push(n);
+    else numbers.push(n);
+  }
+
+  if (numbers.length === 0) {
+    return {
+      title: "Crear mesas",
+      details: [],
+      warnings: [],
+      blocked: `La mesa ${data.number} ya existe.`,
+      run: async () => "",
+    };
+  }
+
+  return {
+    title: numbers.length === 1 ? `Crear la mesa ${numbers[0]}` : `Crear ${numbers.length} mesas`,
+    details: [
+      `Números: ${numbers.join(", ")}`,
+      `Capacidad: ${capacity} personas`,
+      `Zona: ${zone}`,
+    ],
+    warnings: repeated.length ? [`Ya existen y se omiten: mesa ${repeated.join(", ")}.`] : [],
+    run: async () => {
+      const add = useTablesStore.getState().addTable;
+      numbers.forEach((number, i) => {
+        add({
+          id: uid("t"),
+          number,
+          capacity,
+          status: "available",
+          zone,
+          // En cuadrícula dentro del mapa, para que no se apilen en el mismo punto.
+          x: 12 + ((tables.length + i) % 6) * 14,
+          y: 15 + Math.floor((tables.length + i) / 6) * 18,
+          shape: "square",
+        });
+      });
+      return numbers.length === 1
+        ? `Mesa **${numbers[0]}** creada en ${zone}.`
+        : `${numbers.length} mesas creadas en ${zone} (${numbers.join(", ")}).`;
     },
   };
 }

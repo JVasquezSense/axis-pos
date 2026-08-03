@@ -114,6 +114,91 @@ function CartaTab() {
     [products, activeCat, query]
   );
 
+  const sueltos = useMemo(() => visible.filter((p) => !p.isCombo), [visible]);
+  const combos = useMemo(() => visible.filter((p) => p.isCombo), [visible]);
+
+  const renderCard = (p: Product) => (
+    <Card key={p.id} className={cn("group flex flex-col overflow-hidden", !p.available && "opacity-60")}>
+              <div className="relative">
+                <ProductImage emoji={p.image} category={p.category} className="h-24 w-full rounded-b-none" />
+                {p.isCombo && <Badge variant="secondary" className="absolute left-2 top-2 gap-1"><Package className="h-3 w-3" /> Combo</Badge>}
+                {p.popular && !p.isCombo && <Badge variant="warning" className="absolute left-2 top-2">★ Destacado</Badge>}
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-background/90 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100">
+                    <MoreVertical className="h-4 w-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (p.isCombo) { setComboEditing(p); setComboOpen(true); }
+                        else { setEditing(p); setFormOpen(true); }
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" /> Editar
+                    </DropdownMenuItem>
+                    {/* Un combo no lleva ficha técnica propia: la aportan sus componentes. */}
+                    {!p.isCombo && (
+                      <DropdownMenuItem onClick={() => openRecipe(p)}>
+                        <BookOpen className="h-4 w-4" /> {recipeFor(p.id) ? "Ver receta" : "Crear receta"}
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => setToDelete(p)} className="text-destructive focus:text-destructive">
+                      <Trash2 className="h-4 w-4" /> Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="flex flex-1 flex-col p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold leading-tight">{p.name}</p>
+                  {!p.available && <span className="shrink-0 text-[10px] font-medium text-muted-foreground">Agotado</span>}
+                </div>
+                <p className="line-clamp-1 text-xs text-muted-foreground">{p.description}</p>
+                {(() => {
+                  // Un combo no lleva ficha técnica: su costo sale de los
+                  // componentes. Se muestra su composición en lugar del food cost.
+                  if (p.isCombo) {
+                    const items = p.comboItems ?? [];
+                    return (
+                      <p className="mt-1.5 line-clamp-1 text-[10px] text-muted-foreground">
+                        {items.length > 0
+                          ? items.map((ci) => `${ci.quantity}× ${ci.name ?? ""}`).join(" · ")
+                          : "Sin productos"}
+                      </p>
+                    );
+                  }
+                  const rc = recipeFor(p.id);
+                  if (rc && rc.price > 0) {
+                    const c = computeRecipeCost(rc, invItems);
+                    return (
+                      <button onClick={() => openRecipe(p)} className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium hover:bg-accent">
+                        <BookOpen className="h-3 w-3" /> Food cost <span className={foodCostTone(c.foodCostPct)}>{(c.foodCostPct * 100).toFixed(0)}%</span>
+                      </button>
+                    );
+                  }
+                  return (
+                    <button onClick={() => openRecipe(p)} className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-primary hover:text-primary">
+                      <Plus className="h-3 w-3" /> {rc ? "Ver receta" : "Crear receta"}
+                    </button>
+                  );
+                })()}
+                <div className="mt-auto flex items-center justify-between pt-2">
+                  <span className="text-sm font-bold">{formatCurrency(p.price)}</span>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => {
+                      if (p.isCombo) { setComboEditing(p); setComboOpen(true); }
+                      else { setEditing(p); setFormOpen(true); }
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+  );
+
   const openNew = () => {
     // Crear producto = abrir RecipeEditor (crea el producto automáticamente al guardar)
     setRecipeEditing({
@@ -180,89 +265,31 @@ function CartaTab() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {visible.map((p) => (
-          <Card key={p.id} className={cn("group flex flex-col overflow-hidden", !p.available && "opacity-60")}>
-            <div className="relative">
-              <ProductImage emoji={p.image} category={p.category} className="h-24 w-full rounded-b-none" />
-              {p.isCombo && <Badge variant="secondary" className="absolute left-2 top-2 gap-1"><Package className="h-3 w-3" /> Combo</Badge>}
-              {p.popular && !p.isCombo && <Badge variant="warning" className="absolute left-2 top-2">★ Destacado</Badge>}
-              <DropdownMenu>
-                <DropdownMenuTrigger className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-background/90 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100">
-                  <MoreVertical className="h-4 w-4" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      if (p.isCombo) { setComboEditing(p); setComboOpen(true); }
-                      else { setEditing(p); setFormOpen(true); }
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" /> Editar
-                  </DropdownMenuItem>
-                  {/* Un combo no lleva ficha técnica propia: la aportan sus componentes. */}
-                  {!p.isCombo && (
-                    <DropdownMenuItem onClick={() => openRecipe(p)}>
-                      <BookOpen className="h-4 w-4" /> {recipeFor(p.id) ? "Ver receta" : "Crear receta"}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={() => setToDelete(p)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="h-4 w-4" /> Eliminar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <div className="flex flex-1 flex-col p-3">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold leading-tight">{p.name}</p>
-                {!p.available && <span className="shrink-0 text-[10px] font-medium text-muted-foreground">Agotado</span>}
-              </div>
-              <p className="line-clamp-1 text-xs text-muted-foreground">{p.description}</p>
-              {(() => {
-                // Un combo no lleva ficha técnica: su costo sale de los
-                // componentes. Se muestra su composición en lugar del food cost.
-                if (p.isCombo) {
-                  const items = p.comboItems ?? [];
-                  return (
-                    <p className="mt-1.5 line-clamp-1 text-[10px] text-muted-foreground">
-                      {items.length > 0
-                        ? items.map((ci) => `${ci.quantity}× ${ci.name ?? ""}`).join(" · ")
-                        : "Sin productos"}
-                    </p>
-                  );
-                }
-                const rc = recipeFor(p.id);
-                if (rc && rc.price > 0) {
-                  const c = computeRecipeCost(rc, invItems);
-                  return (
-                    <button onClick={() => openRecipe(p)} className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium hover:bg-accent">
-                      <BookOpen className="h-3 w-3" /> Food cost <span className={foodCostTone(c.foodCostPct)}>{(c.foodCostPct * 100).toFixed(0)}%</span>
-                    </button>
-                  );
-                }
-                return (
-                  <button onClick={() => openRecipe(p)} className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-primary hover:text-primary">
-                    <Plus className="h-3 w-3" /> {rc ? "Ver receta" : "Crear receta"}
-                  </button>
-                );
-              })()}
-              <div className="mt-auto flex items-center justify-between pt-2">
-                <span className="text-sm font-bold">{formatCurrency(p.price)}</span>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={() => {
-                    if (p.isCombo) { setComboEditing(p); setComboOpen(true); }
-                    else { setEditing(p); setFormOpen(true); }
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+      {/* Los combos van aparte: son productos vendibles pero se arman distinto. */}
+      {sueltos.length > 0 && (
+        <section className="space-y-2">
+          {combos.length > 0 && (
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Productos <span className="text-muted-foreground/70">({sueltos.length})</span>
+            </p>
+          )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {sueltos.map(renderCard)}
+          </div>
+        </section>
+      )}
+
+      {combos.length > 0 && (
+        <section className="space-y-2">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Package className="h-3.5 w-3.5" /> Combos <span className="text-muted-foreground/70">({combos.length})</span>
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {combos.map(renderCard)}
+          </div>
+        </section>
+      )}
+
       {visible.length === 0 && (
         <p className="py-12 text-center text-sm text-muted-foreground">No hay productos en esta vista.</p>
       )}
