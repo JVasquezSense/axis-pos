@@ -32,17 +32,24 @@ function ZoneRow({ zone, tablesInZone, onUpdate, onDelete, isOnly, onMoveUp, onM
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(zone.name);
   const [yStart, setYStart] = useState(zone.yStart);
+  const [height, setHeight] = useState(zone.height ?? 30);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const save = () => {
     if (!name.trim()) return;
-    onUpdate({ ...zone, name: name.trim(), yStart: Math.max(0, Math.min(90, yStart)) });
+    onUpdate({
+      ...zone,
+      name: name.trim(),
+      yStart: Math.max(0, Math.min(95, yStart)),
+      height: Math.max(5, Math.min(100 - yStart, height)),
+    });
     setEditing(false);
   };
 
   const cancel = () => {
     setName(zone.name);
     setYStart(zone.yStart);
+    setHeight(zone.height ?? 30);
     setEditing(false);
     setConfirmDelete(false);
   };
@@ -93,15 +100,33 @@ function ZoneRow({ zone, tablesInZone, onUpdate, onDelete, isOnly, onMoveUp, onM
             <span>Abajo (90%)</span>
           </div>
         </div>
-        {/* Mini preview */}
-        <div className="relative h-16 w-full overflow-hidden rounded-lg border border-border bg-muted/30">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Alto de la zona — {height}% del mapa
+          </label>
+          <input
+            type="range"
+            min={5}
+            max={100 - yStart}
+            value={Math.min(height, 100 - yStart)}
+            onChange={(e) => setHeight(Number(e.target.value))}
+            className="w-full accent-primary"
+          />
+          <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+            <span>Angosta (5%)</span>
+            <span>Hasta abajo ({100 - yStart}%)</span>
+          </div>
+        </div>
+
+        {/* Vista previa: la banda tal como quedará en el mapa. */}
+        <div className="relative h-20 w-full overflow-hidden rounded-lg border border-border bg-muted/30">
           <div
-            className="absolute left-0 right-0 border-t-2 border-dashed border-primary"
-            style={{ top: `${(yStart / 90) * 100}%` }}
+            className="absolute inset-x-0 border-y-2 border-dashed border-primary bg-primary/10"
+            style={{ top: `${yStart}%`, height: `${Math.min(height, 100 - yStart)}%` }}
           />
           <span
             className="absolute left-2 rounded-sm bg-primary/10 px-1 py-0.5 text-[9px] font-semibold text-primary"
-            style={{ top: `calc(${(yStart / 90) * 100}% + 2px)` }}
+            style={{ top: `calc(${yStart}% + 2px)` }}
           >
             {name || "Zona"}
           </span>
@@ -169,6 +194,7 @@ export function ZonesDialog({
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newY, setNewY] = useState(50);
+  const [newHeight, setNewHeight] = useState(30);
 
   const sorted = [...zones].sort((a, b) => a.yStart - b.yStart);
 
@@ -181,9 +207,15 @@ export function ZonesDialog({
 
   const submitAdd = () => {
     if (!newName.trim()) return;
-    onAdd({ id: uid(), name: newName.trim(), yStart: newY });
+    onAdd({
+      id: uid(),
+      name: newName.trim(),
+      yStart: newY,
+      height: Math.max(5, Math.min(100 - newY, newHeight)),
+    });
     setNewName("");
     setNewY(50);
+    setNewHeight(30);
     setAdding(false);
   };
 
@@ -233,6 +265,19 @@ export function ZonesDialog({
                 max={90}
                 value={newY}
                 onChange={(e) => setNewY(Number(e.target.value))}
+                className="w-full accent-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                Alto de la zona — {Math.min(newHeight, 100 - newY)}% del mapa
+              </label>
+              <input
+                type="range"
+                min={5}
+                max={100 - newY}
+                value={Math.min(newHeight, 100 - newY)}
+                onChange={(e) => setNewHeight(Number(e.target.value))}
                 className="w-full accent-primary"
               />
             </div>

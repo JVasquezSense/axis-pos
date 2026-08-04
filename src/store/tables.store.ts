@@ -124,18 +124,24 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
     };
   },
 
-  addZone: (zone) =>
-    set((s) => ({
-      zones: [...s.zones, zone].sort((a, b) => a.yStart - b.yStart),
-    })),
+  addZone: (zone) => {
+    set((s) => ({ zones: [...s.zones, zone].sort((a, b) => a.yStart - b.yStart) }));
+    if (USE_API) salonService.createZone(zone).then((saved) =>
+      set((s) => ({ zones: s.zones.map((z) => (z.id === zone.id ? saved : z)) }))
+    ).catch(apiErrorHandler("crear zona"));
+  },
 
-  updateZone: (zone) =>
+  updateZone: (zone) => {
     set((s) => ({
       zones: s.zones.map((z) => (z.id === zone.id ? zone : z)).sort((a, b) => a.yStart - b.yStart),
-    })),
+    }));
+    if (USE_API) salonService.updateZone(zone).catch(apiErrorHandler("actualizar zona"));
+  },
 
-  removeZone: (id) =>
-    set((s) => ({ zones: s.zones.filter((z) => z.id !== id) })),
+  removeZone: (id) => {
+    set((s) => ({ zones: s.zones.filter((z) => z.id !== id) }));
+    if (USE_API) salonService.deleteZone(id).catch(apiErrorHandler("eliminar zona"));
+  },
 
   moveOccupancy: (sourceId, targetId) =>
     set((s) => {

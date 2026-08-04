@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -18,8 +18,9 @@ import {
   Plus,
   Check,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
-import type { RestaurantTable } from "@/types";
+import type { Order, RestaurantTable } from "@/types";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ import { TABLE_STATUS } from "@/lib/status";
 import { cn, formatCurrency, formatElapsed, initials, minutesAgo } from "@/lib/utils";
 import { useOrderStore } from "@/store/order.store";
 import { useTablesStore } from "@/store/tables.store";
+import { ordersService } from "@/services/orders.service";
 
 type Mode = "idle" | "move" | "merge" | "split";
 
@@ -52,7 +54,29 @@ export function TableDrawer({
   const loadTableOrder = useOrderStore((s) => s.loadTableOrder);
   const freeTable = useTablesStore((s) => s.free);
   const [mode, setMode] = useState<Mode>("idle");
+  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [people, setPeople] = useState(2);
+
+  // La cuenta real de la mesa, cada vez que se abre el detalle.
+  useEffect(() => {
+    if (!open || !table) {
+      setOrders(null);
+      return;
+    }
+    let alive = true;
+    setLoadingOrders(true);
+    ordersService
+      .getActive(table.number)
+      .then((data) => { if (alive) setOrders(data); })
+      .catch(() => { if (alive) setOrders([]); })
+      .finally(() => { if (alive) setLoadingOrders(false); });
+    return () => { alive = false; };
+  }, [open, table]);
+
+  const orderLines = (orders ?? []).flatMap((o) => o.lines);
+  const orderTotal = orderLines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
+  const orderCodes = (orders ?? []).map((o) => o.code).join(", ");
 
   const close = (v: boolean) => {
     if (!v) setMode("idle");
@@ -132,18 +156,35 @@ export function TableDrawer({
                 </div>
               )}
 
-              {table.orderTotal ? (
+              {/* El pedido se lee del backend: el total local solo existía si esta
+                  misma pantalla había ocupado la mesa, así que una mesa con pedido
+                  (del mesero o del QR) aparecía como vacía hasta ir a cobrarla. */}
+              {loadingOrders ? (
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Cargando el pedido…
+                </div>
+              ) : orderLines.length > 0 ? (
                 <div>
-                  <p className="mb-2 text-sm font-semibold">Pedido actual</p>
+                  <p className="mb-2 text-sm font-semibold">
+                    Pedido actual
+                    {orderCodes && <span className="ml-1 font-normal text-muted-foreground">· {orderCodes}</span>}
+                  </p>
                   <div className="rounded-xl border border-border">
-                    <div className="flex items-center justify-between p-3 text-sm">
-                      <span className="text-muted-foreground">Pedido en curso · enviado a cocina</span>
-                      <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                    </div>
+                    {orderLines.map((l) => (
+                      <div key={l.id} className="flex items-start justify-between gap-2 px-3 py-2 text-sm">
+                        <span className="min-w-0">
+                          <span className="font-medium">{l.quantity}×</span> {l.product.name}
+                          {l.notes && <span className="block text-[11px] text-muted-foreground">{l.notes}</span>}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {formatCurrency(l.unitPrice * l.quantity)}
+                        </span>
+                      </div>
+                    ))}
                     <Separator />
                     <div className="flex items-center justify-between p-3">
                       <span className="text-sm font-medium">Total parcial</span>
-                      <span className="text-lg font-bold">{formatCurrency(table.orderTotal)}</span>
+                      <span className="text-lg font-bold">{formatCurrency(orderTotal)}</span>
                     </div>
                   </div>
                 </div>
@@ -154,7 +195,7 @@ export function TableDrawer({
               )}
 
               {/* Mesa ocupada que nadie va a cobrar: sin esto se queda bloqueada. */}
-              {table.status !== "available" && table.hasActiveOrder === false && !table.orderTotal && (
+              {table.status !== "available" && !loadingOrders && orderLines.length === 0 && (
                 <div className="rounded-xl border border-warning/50 bg-warning/5 p-3">
                   <p className="flex items-start gap-1.5 text-sm">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />

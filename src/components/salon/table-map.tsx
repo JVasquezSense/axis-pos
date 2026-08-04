@@ -141,12 +141,9 @@ export function TableMap({
       )}
     >
       {/* Zone labels + dividers */}
-      {sorted.map((zone, i) => {
-        const nextY = sorted[i + 1]?.yStart;
-        return (
-          <ZoneStrip key={zone.id} zone={zone} nextYStart={nextY} />
-        );
-      })}
+      {sorted.map((zone) => (
+        <ZoneStrip key={zone.id} zone={zone} />
+      ))}
 
       {/* Tables */}
       {tables.map((t, i) => (
@@ -172,22 +169,21 @@ export function TableMap({
   );
 }
 
-function ZoneStrip({ zone, nextYStart }: { zone: SalonZone; nextYStart?: number }) {
-  const labelTop = zone.yStart + 2;
+/** Franja de la zona: cada una ocupa el alto que le asignó el restaurante. */
+function ZoneStrip({ zone }: { zone: SalonZone }) {
+  const height = Math.max(zone.height ?? 30, 4);
   return (
     <>
+      <div
+        className="pointer-events-none absolute inset-x-0 border-t border-dashed border-border"
+        style={{ top: `${zone.yStart}%`, height: `${height}%` }}
+      />
       <span
         className="pointer-events-none absolute left-4 z-10 rounded-md bg-background/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur"
-        style={{ top: `${labelTop}%` }}
+        style={{ top: `${zone.yStart + 1}%` }}
       >
         {zone.name}
       </span>
-      {nextYStart !== undefined && (
-        <div
-          className="pointer-events-none absolute inset-x-6 border-t border-dashed border-border"
-          style={{ top: `${nextYStart}%` }}
-        />
-      )}
     </>
   );
 }

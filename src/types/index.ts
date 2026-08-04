@@ -77,7 +77,9 @@ export type TableStatus = "available" | "occupied" | "reserved" | "billing";
 export interface SalonZone {
   id: string;
   name: string;
-  yStart: number; // % from top of canvas (0–100)
+  yStart: number; // % desde arriba del lienzo (0–100)
+  /** Alto de la franja en % del lienzo. */
+  height: number;
 }
 
 export interface RestaurantTable {
