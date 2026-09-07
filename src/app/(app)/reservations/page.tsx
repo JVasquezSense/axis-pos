@@ -17,13 +17,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { cn, todayLocal } from "@/lib/utils";
 import { MoreVertical } from "lucide-react";
 
-const TODAY = new Date().toISOString().split("T")[0];
-
 function emptyReservation(): Omit<Reservation, "id"> {
-  return { name: "", phone: "", tableNumber: 1, date: TODAY, time: "12:00", guests: 2, notes: "", status: "pending" };
+  return { name: "", phone: "", tableNumber: 1, date: todayLocal(), time: "12:00", guests: 2, notes: "", status: "pending" };
 }
 
 export default function ReservationsPage() {
@@ -135,7 +133,7 @@ export default function ReservationsPage() {
             <div key={date}>
               <div className="mb-3 flex items-center gap-3">
                 <span className="text-sm font-semibold">
-                  {date === TODAY ? "Hoy" : new Date(date + "T00:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}
+                  {date === todayLocal() ? "Hoy" : new Date(date + "T00:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}
                 </span>
                 <div className="h-px flex-1 bg-border" />
                 <span className="text-xs text-muted-foreground">{list.length} reservas</span>
@@ -268,7 +266,7 @@ function ReservationFormDialog({
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Fecha *</label>
-            <Input value={form.date} onChange={(e) => set("date", e.target.value)} type="date" min={TODAY} />
+            <Input value={form.date} onChange={(e) => set("date", e.target.value)} type="date" min={todayLocal()} />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Hora *</label>

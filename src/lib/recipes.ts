@@ -90,12 +90,34 @@ export function effectiveQty(ing: RecipeIngredient): number {
   return ing.quantity / Math.max(1 - ing.waste, 0.01);
 }
 
+const COUNT_UNITS = new Set([
+  "und", "un", "u", "uni", "unid", "unidad", "unidades", "pieza", "piezas",
+  "pza", "pz", "botella", "botellas", "lata", "latas", "bolsa", "bolsas",
+  "paquete", "paquetes", "caja", "cajas", "porcion",
+]);
+
+/** Unidad de conteo: una gaseosa se descuenta entera, no en fracciones. */
+export function isCountUnit(unit: string): boolean {
+  return COUNT_UNITS.has((unit || "").trim().toLowerCase());
+}
+
+/**
+ * Cantidad que un ingrediente descuenta del inventario, ya en la unidad del
+ * insumo y con la merma incluida.
+ *
+ * Aquí se cruzaban dos errores: la receta se escribe en gramos mientras el
+ * insumo se lleva en kilos (el kardex mostraba salidas mil veces mayores), y la
+ * merma se aplicaba también a unidades enteras (1 gaseosa salía como 1,05).
+ * Es la misma fórmula que usa el backend al descontar la venta.
+ */
+export function consumptionInItemUnit(ing: RecipeIngredient, item: InventoryItem): number {
+  const base = isCountUnit(item.unit) ? ing.quantity : effectiveQty(ing);
+  return base * unitFactor(ing.unit, item.unit);
+}
+
 /** Costo de un insumo dentro de la receta con conversión de unidades correcta. */
 export function ingredientCost(ing: RecipeIngredient, item: InventoryItem): number {
-  // Convierte la cantidad de la receta (ing.unit) a la unidad del insumo (item.unit)
-  // para multiplicar por el costo unitario del inventario.
-  const factor = unitFactor(ing.unit, item.unit);
-  return effectiveQty(ing) * factor * item.cost;
+  return consumptionInItemUnit(ing, item) * item.cost;
 }
 
 /**
@@ -122,10 +144,8 @@ export function computeRecipeCost(recipe: Recipe, liveItems?: InventoryItem[]): 
   for (const ing of recipe.ingredients) {
     const item = lookup(ing.inventoryId);
     if (!item) continue;
-    const perPortion = effectiveQty(ing) / portions; // en ing.unit
-    if (perPortion <= 0) continue;
-    // Convierte a item.unit para comparar con item.stock
-    const perPortionInItemUnit = perPortion * unitFactor(ing.unit, item.unit);
+    const perPortionInItemUnit = consumptionInItemUnit(ing, item) / portions;
+    if (perPortionInItemUnit <= 0) continue;
     maxPortions = Math.min(maxPortions, Math.floor(item.stock / perPortionInItemUnit));
   }
   if (!isFinite(maxPortions)) maxPortions = 0;

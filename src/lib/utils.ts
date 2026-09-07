@@ -103,3 +103,15 @@ export function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 }
+
+/**
+ * Fecha de hoy en la zona del restaurante, como "YYYY-MM-DD".
+ *
+ * `toISOString()` da la fecha en UTC: en Colombia, después de las 7 p.m. ya
+ * marcaba el día siguiente, así que el calendario de reservas bloqueaba
+ * reservar para hoy mismo.
+ */
+export function todayLocal(date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}

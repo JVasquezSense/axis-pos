@@ -30,8 +30,13 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
 
   load: async () => {
     if (!USE_API) return;
-    const tables = await salonService.getTables();
-    set({ tables });
+    // Las zonas también viven en el servidor: sin traerlas, el mapa se dibujaba
+    // con las zonas de ejemplo y las que el restaurante había creado no salían.
+    const [tables, zones] = await Promise.all([
+      salonService.getTables(),
+      salonService.getZones().catch(() => [] as SalonZone[]),
+    ]);
+    set(zones.length > 0 ? { tables, zones } : { tables });
   },
 
   addTable: (t) => {

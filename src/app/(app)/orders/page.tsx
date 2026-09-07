@@ -112,7 +112,12 @@ export default function OrdersPage() {
                     </span>
                   )}
                   <div className="flex flex-1 flex-col p-2.5">
-                    <p className="line-clamp-1 text-sm font-semibold">{p.name}</p>
+                    {/* El nombre completo: "Aguardiente Antioqueño sin azúcar"
+                        y "Aguardiente Antioqueño tradicional" se veían iguales
+                        recortados a una línea. */}
+                    <p className="text-sm font-semibold leading-tight [overflow-wrap:anywhere]" title={p.name}>
+                      {p.name}
+                    </p>
                     <p className="line-clamp-1 text-xs text-muted-foreground">{p.description}</p>
                     <div className="mt-auto flex items-center justify-between pt-2">
                       <span className="text-sm font-bold">{formatCurrency(p.price)}</span>

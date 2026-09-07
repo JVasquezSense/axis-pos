@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User } from "lucide-react";
+import { Bike, CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User } from "lucide-react";
 import { useEmployeesStore } from "@/store/employees.store";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
 import { PageHeader } from "@/components/shared/page-header";
@@ -21,6 +21,9 @@ import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
 import { computeTaxes } from "@/lib/taxes";
 import { useTablesStore } from "@/store/tables.store";
+import { useDeliveryStore } from "@/store/delivery.store";
+import { useMenuStore } from "@/store/menu.store";
+import { matchProduct } from "@/lib/voice-order";
 import { useSalesStore } from "@/store/sales.store";
 import { useInventoryStore } from "@/store/inventory.store";
 import { inventoryService } from "@/services/inventory.service";
@@ -30,6 +33,9 @@ import { USE_API } from "@/services/http";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const TIP_OPTIONS = [0, 0.05, 0.1, 0.15];
+
+/** Prefijo del origen "domicilio" en el selector de mesa. */
+const DELIVERY_PREFIX = "delivery:";
 
 export default function CheckoutPage() {
   const storeLines = useOrderStore((s) => s.lines);
@@ -62,6 +68,20 @@ export default function CheckoutPage() {
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitCollected, setSplitCollected] = useState(0);
   const [invoiceNumber, setInvoiceNumber] = useState<string>("");
+  const [deliveryId, setDeliveryId] = useState<string | null>(null);
+
+  // Los domicilios se cobraban "a ojo" como venta directa: no había forma de
+  // traer la cuenta del pedido ni de dejarlo marcado como cobrado.
+  const deliveries = useDeliveryStore((s) => s.orders);
+  const updateDeliveryStatus = useDeliveryStore((s) => s.updateStatus);
+  const products = useMenuStore((s) => s.products);
+  const openDeliveries = useMemo(
+    () => deliveries.filter((d) => d.status !== "delivered" && d.status !== "cancelled"),
+    [deliveries]
+  );
+  const delivery = deliveries.find((d) => d.id === deliveryId) ?? null;
+  const addProduct = useOrderStore((s) => s.addProduct);
+  const increment = useOrderStore((s) => s.increment);
 
   // Sincronizar table local cuando el store cambia (ej. navegando desde salón)
   useEffect(() => { setTableLocal(storeTable ?? null); }, [storeTable]);
@@ -166,6 +186,12 @@ export default function CheckoutPage() {
       occupyTable(table, undefined, waiter.trim() || undefined);
       freeTable(table);
     }
+    // El domicilio cobrado sale de la lista de pendientes; si no, reaparecería
+    // como origen y se podría cobrar dos veces.
+    if (deliveryId) {
+      updateDeliveryStatus(deliveryId, "delivered");
+      setDeliveryId(null);
+    }
     await markPaid();
     clear();
     auditLog({ action: "Venta cobrada", details: `${st.label} · ${formatCurrency(total)} · ${PAYMENT_LABEL[method]}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}${invoiceNumber ? ` · ${invoiceNumber}` : ""}`, user: waiter.trim() || "Sistema", module: "ventas" });
@@ -173,7 +199,45 @@ export default function CheckoutPage() {
     setInvoiceNumber("");
   };
 
+  /**
+   * Carga en la caja la cuenta de un domicilio. El pedido a domicilio guarda los
+   * productos por nombre (se toman por teléfono), así que hay que resolverlos
+   * contra la carta para poder cobrarlos con sus precios e impuestos reales.
+   */
+  const loadDelivery = (id: string) => {
+    const order = deliveries.find((d) => d.id === id);
+    if (!order) return;
+    setTableLocal(null);
+    setStoreTable(null);
+    clear();
+    setDeliveryId(id);
+    setSaleType("delivery");
+
+    const missing: string[] = [];
+    order.items.forEach((item) => {
+      const match = matchProduct(item.name, products);
+      if (!match || match.score < 0.6) {
+        missing.push(item.name);
+        return;
+      }
+      addProduct(match.product);
+      const line = useOrderStore.getState().lines.find((l) => l.product.id === match.product.id);
+      for (let i = 1; i < item.quantity && line; i++) increment(line.id);
+    });
+
+    if (missing.length > 0) {
+      toast.warning("Productos sin identificar en la carta", {
+        description: `${missing.join(", ")} · agrégalos a mano antes de cobrar.`,
+      });
+    }
+  };
+
   const changeTable = (value: string) => {
+    if (value.startsWith(DELIVERY_PREFIX)) {
+      loadDelivery(value.slice(DELIVERY_PREFIX.length));
+      return;
+    }
+    setDeliveryId(null);
     const next = value === "none" ? null : Number(value);
     setTableLocal(next);
     if (next !== null && USE_API) {
@@ -187,7 +251,7 @@ export default function CheckoutPage() {
     <div className="space-y-6">
       <PageHeader
         title="Caja y Cobro"
-        description={table ? `Cobrando mesa ${table}` : "Venta directa"}
+        description={delivery ? `Domicilio ${delivery.code} · ${delivery.customerName}` : table ? `Cobrando mesa ${table}` : "Venta directa"}
         icon={<CreditCard className="h-5 w-5" />}
         actions={<Badge variant="secondary">{orderSelectors.count(lines)} ítems</Badge>}
       />
@@ -197,7 +261,10 @@ export default function CheckoutPage() {
         <CardContent className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-3">
           <div>
             <label className="mb-1.5 block text-sm font-medium">Mesa / origen</label>
-            <Select value={table === null ? "none" : String(table)} onValueChange={changeTable}>
+            <Select
+              value={deliveryId ? `${DELIVERY_PREFIX}${deliveryId}` : table === null ? "none" : String(table)}
+              onValueChange={changeTable}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -208,6 +275,13 @@ export default function CheckoutPage() {
                 {allTables.map((t) => (
                   <SelectItem key={t.id} value={String(t.number)}>
                     <span className="flex items-center gap-2"><Hash className="h-4 w-4" /> Mesa {t.number} · {t.zone}</span>
+                  </SelectItem>
+                ))}
+                {openDeliveries.map((d) => (
+                  <SelectItem key={d.id} value={`${DELIVERY_PREFIX}${d.id}`}>
+                    <span className="flex items-center gap-2">
+                      <Bike className="h-4 w-4" /> Domicilio {d.code} · {d.customerName}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { InventoryItem, InventoryMovement, StockStatus } from "@/types";
 import { INVENTORY } from "@/mock/datasets";
 import { MOVEMENTS } from "@/mock/kardex";
-import { effectiveQty } from "@/lib/recipes";
+import { consumptionInItemUnit } from "@/lib/recipes";
 import { useRecipesStore } from "./recipes.store";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { inventoryService } from "@/services/inventory.service";
@@ -180,9 +180,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       recipe.ingredients.forEach((ing) => {
         const idx = items.findIndex((i) => String(i.id) === String(ing.inventoryId));
         if (idx < 0) return;
-        const consumed = r((effectiveQty(ing) / portions) * line.quantity);
-        if (consumed <= 0) return;
         const it = items[idx];
+        // En la unidad del insumo: la receta puede estar en gramos y el
+        // inventario en kilos.
+        const consumed = r((consumptionInItemUnit(ing, it) / portions) * line.quantity);
+        if (consumed <= 0) return;
         const newStock = r(Math.max(it.stock - consumed, 0));
         items[idx] = { ...it, stock: newStock, status: statusFor(newStock, it.minStock), updatedAt: "Justo ahora" };
         moves.push({

@@ -14,9 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSuppliersStore } from "@/store/suppliers.store";
+import { useInventoryStore } from "@/store/inventory.store";
 
 const NO_SUPPLIER = "none";
+const NEW_CATEGORY = "__new__";
 
+/** Punto de partida: cada restaurante agrega las suyas desde este mismo diálogo. */
 const CATEGORIES = ["Carnes", "Lácteos", "Verduras", "Frutas", "Panadería", "Abarrotes", "Bebidas", "Pescados", "Congelados"];
 const UNITS = ["Kg", "Gr", "Lt", "Ml", "Und"];
 
@@ -52,6 +55,18 @@ export function AddSupplyDialog({
   const [cost, setCost] = useState(0);
   const [supplier, setSupplier] = useState("");
 
+  // La categoría dejó de ser una lista cerrada: a la base fija se suman las que
+  // el restaurante ya usa, y se puede escribir una nueva sin salir del diálogo.
+  const inventoryItems = useInventoryStore((s) => s.items);
+  const [newCategory, setNewCategory] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const categories = useMemo(() => {
+    const used = inventoryItems.map((i) => i.category).filter(Boolean);
+    const all = [...CATEGORIES, ...used];
+    if (category) all.push(category);
+    return [...new Set(all)].sort((a, b) => a.localeCompare(b));
+  }, [inventoryItems, category]);
+
   const suppliers = useSuppliersStore((s) => s.suppliers);
   const supplierNames = useMemo(() => {
     const names = suppliers.filter((s) => s.active).map((s) => s.name);
@@ -74,8 +89,18 @@ export function AddSupplyDialog({
       } else {
         setName(""); setCategory(CATEGORIES[0]); setStock(0); setUnit("Kg"); setMinStock(0); setCost(0); setSupplier("");
       }
+      setCreatingCategory(false);
+      setNewCategory("");
     }
   }, [open, initialItem]);
+
+  const confirmNewCategory = () => {
+    const clean = newCategory.trim();
+    if (!clean) return;
+    setCategory(clean);
+    setCreatingCategory(false);
+    setNewCategory("");
+  };
 
   const valid = name.trim() && cost > 0 && minStock >= 0;
 
@@ -128,12 +153,34 @@ export function AddSupplyDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-sm font-medium">Categoría</label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              {creatingCategory ? (
+                <div className="flex gap-2">
+                  <Input
+                    autoFocus
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); confirmNewCategory(); }
+                      if (e.key === "Escape") setCreatingCategory(false);
+                    }}
+                    placeholder="Ej: Licores"
+                  />
+                  <Button variant="outline" size="sm" onClick={confirmNewCategory} disabled={!newCategory.trim()}>
+                    Añadir
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={category}
+                  onValueChange={(v) => (v === NEW_CATEGORY ? setCreatingCategory(true) : setCategory(v))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    <SelectItem value={NEW_CATEGORY}>+ Nueva categoría…</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Unidad</label>
