@@ -979,6 +979,51 @@ Para cada ítem del backlog, aplicar el bucle:
 
 ---
 
+### Axis Mini y productos sin ficha técnica
+
+Hay restaurantes —bares, estancos, cafeterías— que no cocinan: venden lo que
+compran. Montarles una ficha técnica de un solo ingrediente por producto para
+que el inventario se mueva era trabajo inútil que nadie hacía, y el resultado
+era un kardex que no registraba las ventas.
+
+**Plan `mini`** (`Plan.code = "mini"`, seleccionable desde el admin). Trae salón,
+pedidos, cocina, caja, cierre de turno, productos, empleados, inventario y Axis
+IA. No trae fichas técnicas.
+
+**Capacidad `recipes`.** Es una feature más del plan, activa en todos los planes
+salvo Mini. Cuando está apagada:
+
+- `RecipeViewSet` responde vacío (`required_feature = "recipes"`).
+- El módulo se llama **Productos** en vez de «Menú & Recetas» (`navLabel`).
+- Desaparecen la pestaña de fichas técnicas y la de «Salida por plato».
+- La IA no ofrece acciones de recetas ni menciona en su contexto módulos que el
+  plan no incluye (`ACTION_FEATURE` en `src/lib/ai-actions.ts`).
+
+**El producto se basta solo.** `Product` gana:
+
+| Campo | Para qué |
+|---|---|
+| `cost` | Costo de producción. Sin ficha técnica es el único costo que hay, y de él sale el margen que muestra la carta. |
+| `inventory_item` | Insumo que descuenta al venderse. Es lo que hace que una cerveza o una cajetilla muevan el kardex sin receta. |
+| `inventory_qty` | Unidades del insumo por venta (un six-pack descuenta 6). |
+| `variations` | Variaciones propias. Antes solo existían dentro de la receta, así que un producto sin ficha no podía tener ninguna. |
+
+`consume_recipe_demand()` resuelve primero el enlace directo y solo después la
+receta, de modo que el mismo camino de consumo sirve a los dos modelos. Las
+variaciones de la receta se siguen exponiendo en el producto para poder elegirlas
+al pedir, marcadas como `inherited`; al guardar se descartan, para que editar el
+producto no le arrebate a la receta el control sobre ellas.
+
+Las migraciones `0027` y `0029` vinculan los productos que ya existían con su
+insumo. El criterio es deliberadamente estrecho: nombre idéntico, o el insumo con
+hasta dos palabras de categoría **al principio** («Cigarrillo Lucky Strike
+Alaska» ↔ «Lucky Strike Alaska»). Lo que difiere al final distingue variantes —
+«Coca Cola» no es «Coca Cola Zero»— y confundirlas descontaría del insumo
+equivocado. Ante dos candidatos, no se adivina: se vincula a mano desde el
+producto.
+
+---
+
 ## 16. Decisiones técnicas y deuda conocida
 
 ### Decisiones (justificadas)
