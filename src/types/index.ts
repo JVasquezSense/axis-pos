@@ -165,6 +165,8 @@ export interface ProductVariation {
   name: string;
   /** +/- sobre el precio base del producto. */
   priceDelta: number;
+  /** Viene de la ficha técnica, no del producto: se muestra pero no se edita aquí. */
+  inherited?: boolean;
 }
 
 export interface ComboItem {

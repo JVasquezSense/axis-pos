@@ -20,7 +20,7 @@ import { emptyTax } from "@/lib/taxes";
 import { shrinkImageFile } from "@/lib/image";
 import { useInventoryStore } from "@/store/inventory.store";
 import { useFeatures } from "@/lib/features";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 const NO_SUPPLY = "none";
 
@@ -267,6 +267,11 @@ export function ProductFormDialog({
                 <Plus className="h-3.5 w-3.5" /> Agregar variación
               </button>
             </div>
+            {variations.some((v) => v.inherited) && (
+              <p className="mb-2 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                Estas variaciones vienen de la ficha técnica; se editan desde la receta.
+              </p>
+            )}
             {variations.length === 0 ? (
               <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                 Sin variaciones. Por ejemplo: Doble +$8.000, Sin azúcar +$0.
@@ -274,13 +279,14 @@ export function ProductFormDialog({
             ) : (
               <div className="space-y-2">
                 {variations.map((v, i) => (
-                  <div key={v.id} className="flex items-end gap-2">
+                  <div key={v.id} className={cn("flex items-end gap-2", v.inherited && "opacity-60")}>
                     <div className="flex-1">
                       <label className="mb-1 block text-[11px] text-muted-foreground">Nombre</label>
                       <Input
                         value={v.name}
                         onChange={(e) => updateVariation(i, { name: e.target.value })}
                         placeholder="Ej: Doble"
+                        disabled={v.inherited}
                         className="h-9"
                       />
                     </div>
@@ -290,13 +296,15 @@ export function ProductFormDialog({
                         type="number"
                         value={v.priceDelta}
                         onChange={(e) => updateVariation(i, { priceDelta: Number(e.target.value) })}
+                        disabled={v.inherited}
                         className="h-9"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => set({ variations: variations.filter((_, x) => x !== i) })}
-                      className="mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      disabled={v.inherited}
+                      className="mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
                       title="Quitar variación"
                     >
                       <Trash2 className="h-4 w-4" />
