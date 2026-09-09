@@ -24,9 +24,24 @@ import { cn, formatCurrency } from "@/lib/utils";
 
 const NO_SUPPLY = "none";
 
-const KINDS: { id: NonNullable<Product["kind"]>; label: string; desc: string }[] = [
-  { id: "simple", label: "Producto simple", desc: "Se vende tal cual y descuenta su propio insumo. Una gaseosa, una cajetilla." },
-  { id: "compound", label: "Requiere insumos", desc: "Se prepara: descuenta los ingredientes de su ficha técnica." },
+const KINDS: {
+  id: NonNullable<Product["kind"]>;
+  label: string;
+  desc: string;
+  examples: string;
+}[] = [
+  {
+    id: "simple",
+    label: "Producto simple",
+    desc: "Se vende tal cual y descuenta su propio insumo del inventario.",
+    examples: "Una Coca-Cola, una cerveza, una cajetilla de cigarrillos.",
+  },
+  {
+    id: "compound",
+    label: "Requiere insumos",
+    desc: "Se prepara y descuenta los ingredientes de su ficha técnica.",
+    examples: "Una hamburguesa, un roll de sushi, un cóctel.",
+  },
 ];
 
 /** "Cada venta descuenta 1 Und de Cerveza Poker." */
@@ -51,6 +66,9 @@ export function ProductFormDialog({
   onSave: (p: Product) => void;
 }) {
   const [draft, setDraft] = useState<Product | null>(product);
+  // El tipo se elige ANTES del formulario: el de un producto simple es la mitad
+  // de largo, y preguntarlo a mitad de camino obligaba a rehacer lo escrito.
+  const [kindChosen, setKindChosen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const supplies = useInventoryStore((s) => s.items);
@@ -70,8 +88,13 @@ export function ProductFormDialog({
   };
 
   useEffect(() => {
-    if (open) setDraft(product ? structuredClone(product) : null);
-  }, [open, product]);
+    if (!open) return;
+    setDraft(product ? structuredClone(product) : null);
+    // Solo se pregunta al crear. Editar uno que ya existe entra directo al
+    // formulario, con su tipo visible y cambiable arriba.
+    const editing = Boolean(product?.name);
+    setKindChosen(editing || !hasRecipes || Boolean(product?.isCombo));
+  }, [open, product, hasRecipes]);
 
   if (!draft) return null;
   const set = (patch: Partial<Product>) => setDraft({ ...draft, ...patch });
@@ -102,6 +125,14 @@ export function ProductFormDialog({
   const margin = draft.price > 0 && cost > 0 ? (draft.price - cost) / draft.price : null;
   const linkedItem = supplies.find((i) => String(i.id) === String(draft.inventoryId ?? ""));
 
+  const chooseKind = (next: NonNullable<Product["kind"]>) => {
+    // Una gaseosa no se prepara: dejarle los 10 minutos por defecto le pone al
+    // KDS un tiempo objetivo que no existe.
+    const prep = next === "simple" && isNew ? { prepMinutes: 0 } : {};
+    set({ kind: next, ...prep });
+    setKindChosen(true);
+  };
+
   const save = () => {
     if (!draft.name.trim() || draft.price <= 0) return;
     // Un producto que pasa a "requiere insumos" no puede conservar el enlace
@@ -109,6 +140,36 @@ export function ProductFormDialog({
     onSave(isSimple ? { ...draft, kind } : { ...draft, kind, inventoryId: null });
     onOpenChange(false);
   };
+
+  if (!kindChosen) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>¿Qué tipo de producto?</DialogTitle>
+            <DialogDescription>Define cómo descuenta del inventario al venderse.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {KINDS.map((k) => (
+              <button
+                key={k.id}
+                type="button"
+                onClick={() => chooseKind(k.id)}
+                className="rounded-xl border border-border p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <p className="text-sm font-semibold">{k.label}</p>
+                <p className="mt-1 text-xs leading-snug text-muted-foreground">{k.desc}</p>
+                <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">{k.examples}</p>
+              </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,25 +180,22 @@ export function ProductFormDialog({
         </DialogHeader>
 
         <div className="-mr-2 flex-1 space-y-4 overflow-y-auto pr-2">
-          {/* Cómo descuenta inventario. Antes se deducía de si el producto tenía
-              ficha técnica, y lo que se vende tal cual se quedaba sin descontar
-              nada sin que nadie supiera por qué. */}
+          {/* Cómo descuenta inventario. Se eligió antes de entrar; aquí solo se
+              recuerda, con la puerta abierta a cambiarlo. */}
           {hasRecipes && !draft.isCombo && (
-            <div className="grid grid-cols-2 gap-2">
-              {KINDS.map((k) => (
-                <button
-                  key={k.id}
-                  type="button"
-                  onClick={() => set({ kind: k.id })}
-                  className={cn(
-                    "rounded-xl border p-3 text-left transition-colors",
-                    kind === k.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted"
-                  )}
-                >
-                  <p className={cn("text-sm font-semibold", kind === k.id && "text-primary")}>{k.label}</p>
-                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{k.desc}</p>
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2">
+              <p className="min-w-0 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{KINDS.find((k) => k.id === kind)?.label}</span>
+                {" · "}
+                {isSimple ? "descuenta su propio insumo" : "descuenta los insumos de su ficha técnica"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setKindChosen(false)}
+                className="shrink-0 text-xs font-medium text-primary hover:underline"
+              >
+                Cambiar
+              </button>
             </div>
           )}
 
@@ -187,10 +245,13 @@ export function ProductFormDialog({
             </div>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Descripción</label>
-            <Input value={draft.description} onChange={(e) => set({ description: e.target.value })} placeholder="Ingredientes principales…" />
-          </div>
+          {/* Una gaseosa no necesita que le describan los ingredientes. */}
+          {!isSimple && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Descripción</label>
+              <Input value={draft.description} onChange={(e) => set({ description: e.target.value })} placeholder="Ingredientes principales…" />
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -223,11 +284,15 @@ export function ProductFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Preparación (min)</label>
-              <Input type="number" min={0} value={draft.prepMinutes} onChange={(e) => set({ prepMinutes: Number(e.target.value) })} />
-            </div>
+          <div className={cn("grid gap-3", isSimple ? "grid-cols-1" : "grid-cols-2")}>
+            {/* Un producto que no se prepara no tiene tiempo de preparación que
+                darle al KDS. */}
+            {!isSimple && (
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Preparación (min)</label>
+                <Input type="number" min={0} value={draft.prepMinutes} onChange={(e) => set({ prepMinutes: Number(e.target.value) })} />
+              </div>
+            )}
             <div>
               <label className="mb-1.5 block text-sm font-medium">Margen</label>
               <div className="flex h-9 items-center rounded-md border border-border bg-muted/40 px-3 text-sm">
@@ -428,6 +493,7 @@ export function ProductFormDialog({
             )}
           </div>
 
+          {!isSimple && (
           <div>
             <label className="mb-1.5 block text-sm font-medium">Etiquetas</label>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -446,6 +512,7 @@ export function ProductFormDialog({
               />
             </div>
           </div>
+          )}
 
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
             <div className="flex items-center justify-between gap-3">

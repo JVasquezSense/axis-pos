@@ -32,6 +32,8 @@ import { ProductFormDialog } from "@/components/menu/product-form-dialog";
 import { ComboFormDialog } from "@/components/menu/combo-form-dialog";
 import { MenuScanDialog } from "@/components/menu/menu-scan-dialog";
 import { useFeatures } from "@/lib/features";
+import { menuService } from "@/services/menu.service";
+import { USE_API, apiErrorHandler } from "@/services/http";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const ICON_OPTIONS = ["Salad", "Beef", "Drumstick", "CupSoda", "IceCream", "Pizza", "Coffee", "Soup", "Fish", "Cookie"];
@@ -78,7 +80,7 @@ function TabBtn({ active, onClick, label, icon }: { active: boolean; onClick: ()
 /* ─── TAB: CARTA ─────────────────────────────────────────────────────────── */
 
 function CartaTab() {
-  const { categories, products, addCategory, removeCategory, addProduct, updateProduct, removeProduct, syncRecipePrice } = useMenuStore();
+  const { categories, products, addCategory, removeCategory, addProduct, addProductLocal, updateProduct, removeProduct, syncRecipePrice } = useMenuStore();
   const recipes = useRecipesStore((s) => s.recipes);
   const invRaw = useInventoryStore((s) => s.items);
   const invItems = inventoryOrDemo(invRaw);
@@ -101,7 +103,17 @@ function CartaTab() {
   const openRecipe = (p: Product) => {
     const existing = recipeFor(p.id);
     setRecipeEditing(
-      existing ?? { ...emptyRecipe(), name: p.name, emoji: p.image, category: p.category, price: p.price, productId: p.id }
+      existing ?? {
+        ...emptyRecipe(),
+        name: p.name,
+        emoji: p.image,
+        category: p.category,
+        price: p.price,
+        productId: p.id,
+        // La ficha nace como borrador; heredar la disponibilidad del producto
+        // evita que darle receta lo deje marcado "Agotado" sin querer.
+        status: p.available ? "active" : "draft",
+      }
     );
     setRecipeIsNew(!existing);
     setRecipeOpen(true);
@@ -219,28 +231,47 @@ function CartaTab() {
   );
 
   const openNew = () => {
-    // Crear producto = abrir RecipeEditor (crea el producto automáticamente al guardar)
-    setRecipeEditing({
-      ...emptyRecipe(),
-      category: activeCat === "all" ? (categories[0]?.id ?? "") : activeCat,
-    });
-    setRecipeIsNew(true);
-    setRecipeOpen(true);
+    // Crear producto empieza por el formulario del producto, que pregunta
+    // primero si es simple o requiere insumos. Antes abría directamente la
+    // ficha técnica, así que todo lo que se vende tal cual -una gaseosa, una
+    // cajetilla- tenía que inventarse una receta para poder existir. Si resulta
+    // ser de los que requieren insumos, `save` abre la ficha a continuación.
+    setEditing(emptyProduct(activeCat === "all" ? (categories[0]?.id ?? "") : activeCat));
+    setFormOpen(true);
   };
-  const save = (p: Product) => {
+  /**
+   * "Requiere insumos" sin ficha técnica no descuenta nada, así que se abre
+   * para armarla en el momento en vez de dejar el producto a medias.
+   */
+  const needsRecipe = (p: Product) =>
+    hasRecipes && p.kind === "compound" && !p.isCombo && !recipeFor(p.id);
+
+  const save = async (p: Product) => {
     if (products.some((x) => x.id === p.id)) {
       updateProduct(p);
       syncRecipePrice(String(p.id), p.price);
       toast.success("Producto actualizado", { description: p.name });
+      if (needsRecipe(p)) openRecipe(p);
+      return;
+    }
+
+    // Se espera al id real antes de abrir la ficha: `addProduct` cambia el id
+    // temporal por el del servidor de forma asíncrona, y la receta quedaría
+    // colgada de un producto que no existe.
+    let saved = p;
+    if (USE_API) {
+      try {
+        saved = await menuService.createProduct(p);
+        addProductLocal(saved);
+      } catch (err) {
+        apiErrorHandler("producto")(err);
+        return;
+      }
     } else {
       addProduct(p);
-      toast.success("Producto creado", { description: p.name });
     }
-    // "Requiere insumos" sin ficha técnica no descuenta nada. Se abre para
-    // armarla en el momento, en vez de dejar el producto a medias.
-    if (hasRecipes && p.kind === "compound" && !p.isCombo && !recipeFor(p.id)) {
-      setTimeout(() => openRecipe(p), 250);
-    }
+    toast.success("Producto creado", { description: saved.name });
+    if (needsRecipe(saved)) openRecipe(saved);
   };
 
   return (
