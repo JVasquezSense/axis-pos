@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductFormDialog } from "@/components/menu/product-form-dialog";
+import { ProductKindDialog, type ProductKind } from "@/components/menu/product-kind-dialog";
 import { ComboFormDialog } from "@/components/menu/combo-form-dialog";
 import { MenuScanDialog } from "@/components/menu/menu-scan-dialog";
 import { useFeatures } from "@/lib/features";
@@ -96,6 +97,7 @@ function CartaTab() {
   const [recipeEditing, setRecipeEditing] = useState<Recipe | null>(null);
   const [recipeIsNew, setRecipeIsNew] = useState(false);
   const [recipeOpen, setRecipeOpen] = useState(false);
+  const [kindOpen, setKindOpen] = useState(false);
 
   const hasRecipes = useFeatures().has("recipes");
   const recipeFor = (pid: string | number) => recipes.find((r) => String(r.productId) === String(pid));
@@ -230,15 +232,39 @@ function CartaTab() {
             </Card>
   );
 
+  const defaultCategory = () => (activeCat === "all" ? (categories[0]?.id ?? "") : activeCat);
+
+  /**
+   * Crear producto pregunta primero el tipo, porque cada uno lleva a una
+   * pantalla distinta. Antes se abría siempre la ficha técnica, así que lo que
+   * se vende tal cual -una gaseosa, una cajetilla- tenía que inventarse una
+   * receta para poder existir.
+   */
   const openNew = () => {
-    // Crear producto empieza por el formulario del producto, que pregunta
-    // primero si es simple o requiere insumos. Antes abría directamente la
-    // ficha técnica, así que todo lo que se vende tal cual -una gaseosa, una
-    // cajetilla- tenía que inventarse una receta para poder existir. Si resulta
-    // ser de los que requieren insumos, `save` abre la ficha a continuación.
-    setEditing(emptyProduct(activeCat === "all" ? (categories[0]?.id ?? "") : activeCat));
+    if (!hasRecipes) {
+      // Sin fichas técnicas no hay nada que elegir: todo es simple.
+      pickKind("simple");
+      return;
+    }
+    setKindOpen(true);
+  };
+
+  const pickKind = (kind: ProductKind) => {
+    setKindOpen(false);
+    if (kind === "compound") {
+      // Los que requieren insumos entran por su ficha técnica, que es donde se
+      // definen: al guardarla crea el producto ya vinculado.
+      setRecipeEditing({ ...emptyRecipe(), category: defaultCategory() });
+      setRecipeIsNew(true);
+      setRecipeOpen(true);
+      return;
+    }
+    // Una gaseosa no se prepara: los 10 minutos por defecto le ponen al KDS un
+    // tiempo objetivo que no existe.
+    setEditing({ ...emptyProduct(defaultCategory()), kind: "simple", prepMinutes: 0 });
     setFormOpen(true);
   };
+
   /**
    * "Requiere insumos" sin ficha técnica no descuenta nada, así que se abre
    * para armarla en el momento en vez de dejar el producto a medias.
@@ -348,6 +374,8 @@ function CartaTab() {
       {visible.length === 0 && (
         <p className="py-12 text-center text-sm text-muted-foreground">No hay productos en esta vista.</p>
       )}
+
+      <ProductKindDialog open={kindOpen} onOpenChange={setKindOpen} onPick={pickKind} />
 
       <ProductFormDialog product={editing} categories={categories} open={formOpen} onOpenChange={setFormOpen} onSave={save} />
 
