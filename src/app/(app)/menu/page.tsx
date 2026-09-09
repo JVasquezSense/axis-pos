@@ -30,6 +30,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductFormDialog } from "@/components/menu/product-form-dialog";
 import { ProductKindDialog, type ProductKind } from "@/components/menu/product-kind-dialog";
+import { CATEGORY_ICONS, searchCategoryIcons } from "@/lib/category-icons";
 import { ComboFormDialog } from "@/components/menu/combo-form-dialog";
 import { MenuScanDialog } from "@/components/menu/menu-scan-dialog";
 import { useFeatures } from "@/lib/features";
@@ -37,7 +38,6 @@ import { menuService } from "@/services/menu.service";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { cn, formatCurrency } from "@/lib/utils";
 
-const ICON_OPTIONS = ["Salad", "Beef", "Drumstick", "CupSoda", "IceCream", "Pizza", "Coffee", "Soup", "Fish", "Cookie"];
 type Tab = "carta" | "recetas";
 
 export default function MenuPage() {
@@ -573,15 +573,17 @@ function AddCategoryDialog({ open, onOpenChange, onCreate }: {
   open: boolean; onOpenChange: (v: boolean) => void; onCreate: (c: Category) => void;
 }) {
   const [name, setName] = useState("");
-  const [icon, setIcon] = useState(ICON_OPTIONS[0]);
+  const [icon, setIcon] = useState(CATEGORY_ICONS[0].name);
+  const [iconQuery, setIconQuery] = useState("");
+  const matches = searchCategoryIcons(iconQuery);
   const submit = () => {
     if (!name.trim()) return;
     onCreate({ id: uid("cat"), name: name.trim(), icon, count: 0 });
-    setName(""); setIcon(ICON_OPTIONS[0]); onOpenChange(false);
+    setName(""); setIcon(CATEGORY_ICONS[0].name); setIconQuery(""); onOpenChange(false);
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Nueva categoría</DialogTitle>
           <DialogDescription>Agrupa los productos de tu carta (ej. Entradas, Bebidas).</DialogDescription>
@@ -591,18 +593,44 @@ function AddCategoryDialog({ open, onOpenChange, onCreate }: {
             <label className="mb-1.5 block text-sm font-medium">Nombre</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Entradas" />
           </div>
+          {/* Rejilla en vez de lista: el icono se reconoce de un vistazo, y el
+              buscador entiende español porque el nombre de lucide no. */}
           <div>
             <label className="mb-1.5 block text-sm font-medium">Icono</label>
-            <Select value={icon} onValueChange={setIcon}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ICON_OPTIONS.map((i) => (
-                  <SelectItem key={i} value={i}>
-                    <span className="flex items-center gap-2"><Icon name={i} className="h-4 w-4" /> {i}</span>
-                  </SelectItem>
+            <Input
+              value={iconQuery}
+              onChange={(e) => setIconQuery(e.target.value)}
+              placeholder="Buscar: cerveza, postres, pollo…"
+              className="mb-2 h-9"
+            />
+            {matches.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
+                Ningún icono coincide con «{iconQuery}».
+              </p>
+            ) : (
+              <div className="scrollbar-thin grid max-h-52 grid-cols-6 gap-1.5 overflow-y-auto rounded-xl border border-border p-2">
+                {matches.map((i) => (
+                  <button
+                    key={i.name}
+                    type="button"
+                    title={i.label}
+                    onClick={() => setIcon(i.name)}
+                    className={cn(
+                      "flex h-10 items-center justify-center rounded-xl border transition-colors",
+                      icon === i.name
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-transparent hover:bg-muted"
+                    )}
+                  >
+                    <Icon name={i.name} className="h-5 w-5" />
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+            )}
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Icon name={icon} className="h-3.5 w-3.5" />
+              {CATEGORY_ICONS.find((i) => i.name === icon)?.label ?? icon}
+            </p>
           </div>
         </div>
         <DialogFooter>

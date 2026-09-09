@@ -60,13 +60,16 @@ export function ProductKindDialog({
           <DialogDescription>Define cómo descuenta del inventario al venderse.</DialogDescription>
         </DialogHeader>
 
+        {/* grid-cols-2 reparte en columnas iguales (minmax(0,1fr)); con w-full y
+            min-w-0 en la tarjeta, el texto más largo ya no ensancha su columna
+            y las dos quedan del mismo ancho. */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {KINDS.map((k) => (
             <button
               key={k.id}
               type="button"
               onClick={() => onPick(k.id)}
-              className="group flex flex-col items-center gap-3 rounded-3xl border-2 border-border p-6 text-center transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/5 hover:shadow-lg"
+              className="group flex w-full min-w-0 flex-col items-center gap-3 rounded-3xl border-2 border-border p-6 text-center transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/5 hover:shadow-lg"
             >
               <span
                 className={cn(
