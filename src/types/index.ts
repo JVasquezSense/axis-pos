@@ -143,6 +143,12 @@ export interface Product {
   /** Costo de producción del plato. Único costo cuando no hay ficha técnica. */
   cost?: number;
   /**
+   * Cómo consume inventario:
+   *  - "simple": ES un insumo y lo descuenta directo (una gaseosa, una cajetilla).
+   *  - "compound": se prepara y descuenta los insumos de su ficha técnica.
+   */
+  kind?: ProductKind;
+  /**
    * Insumo que descuenta este producto al venderse. Para lo que se vende tal
    * cual —una cerveza, una cajetilla— sin necesidad de ficha técnica.
    */
@@ -159,6 +165,8 @@ export interface ProductTax {
   /** % cuando es porcentual, COP por unidad cuando es fijo. */
   rate: number;
 }
+
+export type ProductKind = "simple" | "compound";
 
 export interface ProductVariation {
   id: string;

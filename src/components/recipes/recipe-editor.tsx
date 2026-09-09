@@ -314,6 +314,8 @@ export function RecipeEditor({
         available: finalDraft.status === "active",
         prepMinutes: finalDraft.prepMinutes,
         popular: false,
+        // Se crea desde una ficha técnica: descuenta sus insumos.
+        kind: "compound",
       };
       if (USE_API) {
         try {
@@ -330,7 +332,7 @@ export function RecipeEditor({
         addProduct(newProduct);
         finalDraft = { ...finalDraft, productId: newProduct.id };
       }
-    } else if (!isNew && finalDraft.productId) {
+    } else if (finalDraft.productId) {
       // Sincroniza campos básicos del producto si ya existe
       const existing = products.find((p) => String(p.id) === String(finalDraft.productId));
       if (existing) {
@@ -343,6 +345,10 @@ export function RecipeEditor({
           tags: finalDraft.tags,
           available: finalDraft.status === "active",
           prepMinutes: finalDraft.prepMinutes,
+          // Darle ficha técnica lo convierte en compuesto: a partir de aquí
+          // descuenta sus ingredientes, no el insumo que tuviera enlazado.
+          kind: "compound",
+          inventoryId: null,
         });
       }
     }

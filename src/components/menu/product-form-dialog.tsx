@@ -24,6 +24,11 @@ import { cn, formatCurrency } from "@/lib/utils";
 
 const NO_SUPPLY = "none";
 
+const KINDS: { id: NonNullable<Product["kind"]>; label: string; desc: string }[] = [
+  { id: "simple", label: "Producto simple", desc: "Se vende tal cual y descuenta su propio insumo. Una gaseosa, una cajetilla." },
+  { id: "compound", label: "Requiere insumos", desc: "Se prepara: descuenta los ingredientes de su ficha técnica." },
+];
+
 /** "Cada venta descuenta 1 Und de Cerveza Poker." */
 const SUPPLY_HINT = (qty: number, unit: string, name: string) =>
   `Cada venta descuenta ${qty} ${unit} de ${name}.`;
@@ -89,13 +94,19 @@ export function ProductFormDialog({
       variations: [...variations, { id: `var-${Date.now().toString(36)}`, name: "", priceDelta: 0 }],
     });
 
+  // Sin fichas técnicas todo es simple: no hay dónde definir los insumos.
+  const kind = hasRecipes ? (draft.kind ?? "simple") : "simple";
+  const isSimple = kind === "simple";
+
   const cost = Number(draft.cost ?? 0);
   const margin = draft.price > 0 && cost > 0 ? (draft.price - cost) / draft.price : null;
   const linkedItem = supplies.find((i) => String(i.id) === String(draft.inventoryId ?? ""));
 
   const save = () => {
     if (!draft.name.trim() || draft.price <= 0) return;
-    onSave(draft);
+    // Un producto que pasa a "requiere insumos" no puede conservar el enlace
+    // directo: descontaría el insumo Y los de la receta.
+    onSave(isSimple ? { ...draft, kind } : { ...draft, kind, inventoryId: null });
     onOpenChange(false);
   };
 
@@ -108,6 +119,28 @@ export function ProductFormDialog({
         </DialogHeader>
 
         <div className="-mr-2 flex-1 space-y-4 overflow-y-auto pr-2">
+          {/* Cómo descuenta inventario. Antes se deducía de si el producto tenía
+              ficha técnica, y lo que se vende tal cual se quedaba sin descontar
+              nada sin que nadie supiera por qué. */}
+          {hasRecipes && !draft.isCombo && (
+            <div className="grid grid-cols-2 gap-2">
+              {KINDS.map((k) => (
+                <button
+                  key={k.id}
+                  type="button"
+                  onClick={() => set({ kind: k.id })}
+                  className={cn(
+                    "rounded-xl border p-3 text-left transition-colors",
+                    kind === k.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted"
+                  )}
+                >
+                  <p className={cn("text-sm font-semibold", kind === k.id && "text-primary")}>{k.label}</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{k.desc}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="flex gap-3">
             <div>
               <label className="mb-1.5 block text-sm font-medium">Foto / Icono</label>
@@ -212,7 +245,17 @@ export function ProductFormDialog({
           {/* Insumo que descuenta al venderse. Lo que se vende tal cual (una
               cerveza, una cajetilla) no movía el kardex porque descontar exigía
               montarle una ficha técnica de un solo ingrediente. */}
-          {hasInventory && !draft.isCombo && (
+          {hasInventory && !draft.isCombo && !isSimple && (
+            <div className="rounded-xl border border-dashed border-border p-3">
+              <p className="text-sm font-medium">Insumos de este producto</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Se definen en su ficha técnica: cada venta descuenta los ingredientes de la receta,
+                con su cantidad y su merma.
+              </p>
+            </div>
+          )}
+
+          {hasInventory && !draft.isCombo && isSimple && (
             <div>
               <label className="mb-1.5 block text-sm font-medium">
                 Descuenta del inventario <span className="text-muted-foreground">(opcional)</span>
@@ -246,9 +289,7 @@ export function ProductFormDialog({
               <p className="mt-1 text-xs text-muted-foreground">
                 {linkedItem
                   ? SUPPLY_HINT(draft.inventoryQty ?? 1, linkedItem.unit, linkedItem.name)
-                  : hasRecipes
-                    ? "Para platos preparados usa la ficha técnica; esto es para lo que se vende tal cual."
-                    : "Elige el insumo si quieres que la venta descuente stock."}
+                  : "Elige el insumo si quieres que la venta descuente stock."}
               </p>
             </div>
           )}

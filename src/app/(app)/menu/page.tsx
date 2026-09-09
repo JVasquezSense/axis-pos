@@ -144,7 +144,7 @@ function CartaTab() {
                       <Pencil className="h-4 w-4" /> Editar
                     </DropdownMenuItem>
                     {/* Un combo no lleva ficha técnica propia: la aportan sus componentes. */}
-                    {!p.isCombo && hasRecipes && (
+                    {!p.isCombo && hasRecipes && p.kind !== "simple" && (
                       <DropdownMenuItem onClick={() => openRecipe(p)}>
                         <BookOpen className="h-4 w-4" /> {recipeFor(p.id) ? "Ver receta" : "Crear receta"}
                       </DropdownMenuItem>
@@ -174,8 +174,9 @@ function CartaTab() {
                       </p>
                     );
                   }
-                  // Sin fichas técnicas el margen sale del costo del producto.
-                  if (!hasRecipes) {
+                  // El producto simple no tiene receta que costear: su margen
+                  // sale del costo de producción, igual que en el plan Mini.
+                  if (!hasRecipes || p.kind === "simple") {
                     const cost = Number(p.cost ?? 0);
                     if (cost <= 0 || p.price <= 0) return null;
                     const foodCost = cost / p.price;
@@ -234,6 +235,11 @@ function CartaTab() {
     } else {
       addProduct(p);
       toast.success("Producto creado", { description: p.name });
+    }
+    // "Requiere insumos" sin ficha técnica no descuenta nada. Se abre para
+    // armarla en el momento, en vez de dejar el producto a medias.
+    if (hasRecipes && p.kind === "compound" && !p.isCombo && !recipeFor(p.id)) {
+      setTimeout(() => openRecipe(p), 250);
     }
   };
 

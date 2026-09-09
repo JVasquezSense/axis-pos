@@ -392,6 +392,8 @@ function planRecipe(action: AiAction): ActionPlan | null {
         available: true,
         prepMinutes: data.prepMinutes ?? 10,
         popular: false,
+        // Nace con ficha técnica: descuenta sus insumos, no un insumo suelto.
+        kind: "compound",
       };
       const savedProduct = USE_API ? await menuService.createProduct(product) : product;
       if (USE_API) useMenuStore.getState().addProductLocal(savedProduct);
