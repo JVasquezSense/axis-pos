@@ -50,9 +50,17 @@ export const inventoryService = {
     return USE_API ? request<InventoryMovement[]>("/inventory/movements/") : mockRequest(MOVEMENTS, 500);
   },
   /** Salida por Plato (backlog #2): consumo de insumos por plato, filtrado por tenant. */
-  async getDishConsumption(days = 30): Promise<DishConsumptionReport> {
+  async getDishConsumption(
+    period: number | { from: string; to: string } = 30
+  ): Promise<DishConsumptionReport> {
+    // El backend acepta una ventana en días o un rango explícito; el reporte no
+    // servía para cuadrar un mes cerrado sin poder fijar las fechas.
+    const query =
+      typeof period === "number"
+        ? `days=${period}`
+        : `from=${encodeURIComponent(period.from)}&to=${encodeURIComponent(period.to)}`;
     return USE_API
-      ? request<DishConsumptionReport>(`/reports/dish-consumption/?days=${days}`)
+      ? request<DishConsumptionReport>(`/reports/dish-consumption/?${query}`)
       : mockRequest({ period: { from: "", to: "" }, dishes: [], supplies: [] } as DishConsumptionReport, 500);
   },
   async getPhysicalCounts(): Promise<PhysicalCount[]> {

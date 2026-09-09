@@ -37,6 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useFeatures } from "@/lib/features";
 import { KardexView } from "@/components/inventory/kardex-view";
 import { PhysicalCountView } from "@/components/inventory/physical-count-view";
 import { ConsumptionView } from "@/components/inventory/consumption-view";
@@ -50,6 +51,7 @@ const STATUS_RANK: Record<StockStatus, number> = { critical: 0, low: 1, normal: 
 export default function InventoryPage() {
   // Fuente única de verdad: el store (se alimenta de las ventas en Caja)
   const items = useInventoryStore((s) => s.items);
+  const hasRecipes = useFeatures().has("recipes");
   const movements = useInventoryStore((s) => s.movements);
   const addItemStore = useInventoryStore((s) => s.addItem);
   const updateItemStore = useInventoryStore((s) => s.updateItem);
@@ -150,7 +152,8 @@ export default function InventoryPage() {
           <TabsTrigger value="stock">Existencias</TabsTrigger>
           <TabsTrigger value="kardex">Kardex</TabsTrigger>
           <TabsTrigger value="physical">Conteo físico</TabsTrigger>
-          <TabsTrigger value="consumption">Salida por plato</TabsTrigger>
+          {/* Sin fichas técnicas no hay de dónde sacar el consumo por plato. */}
+          {hasRecipes && <TabsTrigger value="consumption">Salida por plato</TabsTrigger>}
         </TabsList>
 
         {/* EXISTENCIAS */}
@@ -242,7 +245,7 @@ export default function InventoryPage() {
 
         {/* SALIDA POR PLATO */}
         <TabsContent value="consumption">
-          <ConsumptionView />
+          {hasRecipes && <ConsumptionView />}
         </TabsContent>
       </Tabs>
 

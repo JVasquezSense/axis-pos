@@ -140,6 +140,15 @@ export interface Product {
   variations?: ProductVariation[];
   /** Impuestos propios del producto; vacío = usa el impuesto general. */
   taxes?: ProductTax[];
+  /** Costo de producción del plato. Único costo cuando no hay ficha técnica. */
+  cost?: number;
+  /**
+   * Insumo que descuenta este producto al venderse. Para lo que se vende tal
+   * cual —una cerveza, una cajetilla— sin necesidad de ficha técnica.
+   */
+  inventoryId?: string | number | null;
+  /** Unidades del insumo por venta (un six-pack descuenta 6). */
+  inventoryQty?: number;
 }
 
 /** Un impuesto del producto: porcentual (IVA) o fijo por unidad (Ipoconsumo). */
@@ -336,7 +345,7 @@ export interface ReportData {
 // ---------------------------------------------------------------------------
 // Super Admin SaaS
 // ---------------------------------------------------------------------------
-export type TenantPlan = "starter" | "growth" | "enterprise";
+export type TenantPlan = "mini" | "starter" | "growth" | "enterprise";
 export type TenantStatus = "active" | "trial" | "past_due" | "churned";
 
 /**

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Truck, Plus, ShoppingCart, Pencil, Trash2, Phone, Mail, Package, Minus, ImagePlus, X, ZoomIn } from "lucide-react";
 import type { Supplier, PurchaseLine } from "@/types";
 import { useSuppliersStore, emptySupplier, type InvoiceData } from "@/store/suppliers.store";
+import { shrinkImageFile, dataUrlBytes } from "@/lib/image";
 import { useInventoryStore } from "@/store/inventory.store";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -207,12 +208,19 @@ function PurchaseDialog({
     }
   }, [open]);
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setInvoicePhoto(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    // Sin reducirla, una foto de celular pasa de 2,5 MB en base64 y el servidor
+    // rechaza la compra entera.
+    const shrunk = await shrinkImageFile(file);
+    if (dataUrlBytes(shrunk) > 2_000_000) {
+      toast.error("La foto es demasiado grande", {
+        description: "Tómala de nuevo con menos resolución o registra la compra sin foto.",
+      });
+      return;
+    }
+    setInvoicePhoto(shrunk);
   };
 
   const addLine = () => setLines((l) => [...l, { inventoryId: "", name: "", unit: "", quantity: 1, unitCost: 0, taxRate: 0 }]);
@@ -229,12 +237,14 @@ function PurchaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); }}>
-      <DialogContent className="max-w-xl">
+      {/* Alto acotado y cuerpo con scroll propio: con muchos insumos el diálogo
+          crecía más que la pantalla y el botón de registrar quedaba cortado. */}
+      <DialogContent className="flex max-h-[88vh] max-w-xl flex-col">
         <DialogHeader>
           <DialogTitle>Registrar compra</DialogTitle>
           <DialogDescription>Suma stock al inventario y registra la entrada en el kardex.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="-mr-2 flex-1 space-y-3 overflow-y-auto pr-2">
           {/* Proveedor obligatorio */}
           <div>
             <label className="mb-1.5 block text-sm font-medium">

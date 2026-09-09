@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ProductFormDialog } from "@/components/menu/product-form-dialog";
 import { ComboFormDialog } from "@/components/menu/combo-form-dialog";
 import { MenuScanDialog } from "@/components/menu/menu-scan-dialog";
+import { useFeatures } from "@/lib/features";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const ICON_OPTIONS = ["Salad", "Beef", "Drumstick", "CupSoda", "IceCream", "Pizza", "Coffee", "Soup", "Fish", "Cookie"];
@@ -38,19 +39,24 @@ type Tab = "carta" | "recetas";
 
 export default function MenuPage() {
   const [tab, setTab] = useState<Tab>("carta");
+  // Sin fichas tecnicas (plan Mini) el modulo es solo la carta: el producto
+  // lleva su costo de produccion y, si descuenta stock, apunta a un insumo.
+  const hasRecipes = useFeatures().has("recipes");
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Menú & Recetas"
-        description="Carta, categorías, fichas técnicas y costeo"
+        title={hasRecipes ? "Menú & Recetas" : "Productos"}
+        description={hasRecipes ? "Carta, categorías, fichas técnicas y costeo" : "Carta, categorías y precios"}
         icon={<UtensilsCrossed className="h-5 w-5" />}
       />
-      <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1 w-fit">
-        <TabBtn active={tab === "carta"} onClick={() => setTab("carta")} label="Carta" icon={<UtensilsCrossed className="h-4 w-4" />} />
-        <TabBtn active={tab === "recetas"} onClick={() => setTab("recetas")} label="Fichas técnicas" icon={<BookOpen className="h-4 w-4" />} />
-      </div>
-      {tab === "carta" ? <CartaTab /> : <RecetasTab />}
+      {hasRecipes && (
+        <div className="flex gap-1 rounded-xl border border-border bg-muted/40 p-1 w-fit">
+          <TabBtn active={tab === "carta"} onClick={() => setTab("carta")} label="Carta" icon={<UtensilsCrossed className="h-4 w-4" />} />
+          <TabBtn active={tab === "recetas"} onClick={() => setTab("recetas")} label="Fichas técnicas" icon={<BookOpen className="h-4 w-4" />} />
+        </div>
+      )}
+      {!hasRecipes || tab === "carta" ? <CartaTab /> : <RecetasTab />}
     </div>
   );
 }
@@ -89,6 +95,7 @@ function CartaTab() {
   const [recipeIsNew, setRecipeIsNew] = useState(false);
   const [recipeOpen, setRecipeOpen] = useState(false);
 
+  const hasRecipes = useFeatures().has("recipes");
   const recipeFor = (pid: string | number) => recipes.find((r) => String(r.productId) === String(pid));
 
   const openRecipe = (p: Product) => {
@@ -137,7 +144,7 @@ function CartaTab() {
                       <Pencil className="h-4 w-4" /> Editar
                     </DropdownMenuItem>
                     {/* Un combo no lleva ficha técnica propia: la aportan sus componentes. */}
-                    {!p.isCombo && (
+                    {!p.isCombo && hasRecipes && (
                       <DropdownMenuItem onClick={() => openRecipe(p)}>
                         <BookOpen className="h-4 w-4" /> {recipeFor(p.id) ? "Ver receta" : "Crear receta"}
                       </DropdownMenuItem>
@@ -165,6 +172,17 @@ function CartaTab() {
                           ? items.map((ci) => `${ci.quantity}× ${ci.name ?? ""}`).join(" · ")
                           : "Sin productos"}
                       </p>
+                    );
+                  }
+                  // Sin fichas técnicas el margen sale del costo del producto.
+                  if (!hasRecipes) {
+                    const cost = Number(p.cost ?? 0);
+                    if (cost <= 0 || p.price <= 0) return null;
+                    const foodCost = cost / p.price;
+                    return (
+                      <span className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                        Costo <span className={foodCostTone(foodCost)}>{(foodCost * 100).toFixed(0)}%</span>
+                      </span>
                     );
                   }
                   const rc = recipeFor(p.id);

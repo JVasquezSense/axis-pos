@@ -6,6 +6,8 @@ import { useRecipesStore, emptyRecipe } from "@/store/recipes.store";
 import { useSuppliersStore } from "@/store/suppliers.store";
 import { useOrderStore } from "@/store/order.store";
 import { useTablesStore } from "@/store/tables.store";
+import { useAppStore } from "@/store/app.store";
+import { isFeatureEnabled } from "@/lib/features";
 import { menuService } from "@/services/menu.service";
 import { USE_API } from "@/services/http";
 import { matchProduct, normalize, singularize } from "@/lib/voice-order";
@@ -45,25 +47,63 @@ export interface ActionPlan {
 
 /** Contexto que se le pasa al modelo para que use nombres reales. */
 export function actionContext(): string {
+  const { features } = useAppStore.getState();
+  const on = (key: string) => isFeatureEnabled(features, key);
+
   const items = useInventoryStore.getState().items.map((i) => i.name);
   const products = useMenuStore.getState().products.map((p) => p.name);
   const suppliers = useSuppliersStore.getState().suppliers.map((s) => s.name);
   const tables = useTablesStore.getState().tables.map((t) => t.number);
   const zones = useTablesStore.getState().zones.map((z) => z.name);
   return [
-    items.length ? `Insumos: ${items.slice(0, 120).join(", ")}` : "Insumos: (ninguno)",
+    // Solo lo que el plan incluye: nombrar proveedores en un plan que no los
+    // tiene solo consigue que el modelo proponga algo irrealizable.
+    on("inventory") ? (items.length ? `Insumos: ${items.slice(0, 120).join(", ")}` : "Insumos: (ninguno)") : "",
     products.length ? `Productos: ${products.slice(0, 120).join(", ")}` : "Productos: (ninguno)",
-    suppliers.length ? `Proveedores: ${suppliers.join(", ")}` : "Proveedores: (ninguno)",
+    on("suppliers") ? (suppliers.length ? `Proveedores: ${suppliers.join(", ")}` : "Proveedores: (ninguno)") : "",
     tables.length ? `Mesas: ${tables.join(", ")}` : "Mesas: (ninguna)",
     zones.length ? `Zonas del salón: ${zones.join(", ")}` : "",
+    on("recipes") ? "" : "El restaurante no usa fichas técnicas: los productos llevan su costo de producción.",
     `Hoy es ${new Date().toISOString().slice(0, 10)}`,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
+/**
+ * Módulo del plan que necesita cada acción. La IA no puede hacer por la ventana
+ * lo que el plan no incluye: en Axis Mini no hay fichas técnicas ni proveedores,
+ * y ofrecerlo llevaría a una pantalla que el restaurante no tiene.
+ */
+const ACTION_FEATURE: Record<string, string> = {
+  create_inventory_item: "inventory",
+  update_inventory_item: "inventory",
+  delete_inventory_item: "inventory",
+  register_purchase: "suppliers",
+  create_recipe: "recipes",
+  add_order_lines: "orders",
+  create_table: "salon",
+};
+
+/** Qué se le puede pedir a la IA con el plan actual. */
+export function aiCan(action: string): boolean {
+  const feature = ACTION_FEATURE[action];
+  if (!feature) return true;
+  const { features } = useAppStore.getState();
+  return isFeatureEnabled(features, feature);
+}
+
 /** Traduce la acción del modelo a un plan confirmable, o null si no aplica. */
 export function planFor(action: AiAction): ActionPlan | null {
+  if (!aiCan(action.action)) {
+    return {
+      title: "No disponible en tu plan",
+      details: [],
+      warnings: [],
+      blocked: `Tu plan no incluye ${FEATURE_LABEL[ACTION_FEATURE[action.action]] ?? "ese módulo"}.`,
+      run: async () => "",
+    };
+  }
   switch (action.action) {
     case "create_inventory_item":
       return planCreateItem(action);
@@ -83,6 +123,14 @@ export function planFor(action: AiAction): ActionPlan | null {
       return null;
   }
 }
+
+const FEATURE_LABEL: Record<string, string> = {
+  inventory: "inventario",
+  suppliers: "proveedores y compras",
+  recipes: "fichas técnicas",
+  orders: "pedidos",
+  salon: "salón",
+};
 
 // ─── Insumos ──────────────────────────────────────────────────────────────────
 

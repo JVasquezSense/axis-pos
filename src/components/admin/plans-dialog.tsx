@@ -110,13 +110,14 @@ export function PlansDialog({ open, onOpenChange }: { open: boolean; onOpenChang
         ) : (
           <div className="space-y-4">
             {/* Selector de plan */}
-            <div className="flex gap-2">
+            {/* Con el plan Mini son cuatro: en pantallas chicas se envuelven. */}
+            <div className="flex flex-wrap gap-2">
               {plans.map((p, i) => (
                 <button
                   key={p.code}
                   onClick={() => setActive(i)}
                   className={cn(
-                    "flex-1 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                    "min-w-[8.5rem] flex-1 rounded-xl border px-3 py-2.5 text-left transition-colors",
                     i === active ? "border-primary bg-primary/5" : "border-border hover:bg-muted"
                   )}
                 >

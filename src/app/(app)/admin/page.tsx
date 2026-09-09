@@ -406,6 +406,7 @@ function TenantFormDialog({
               <Select value={plan} onValueChange={(v) => setPlan(v as TenantPlan)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="mini">Axis Mini</SelectItem>
                   <SelectItem value="starter">Básico</SelectItem>
                   <SelectItem value="growth">Pro</SelectItem>
                   <SelectItem value="enterprise">Enterprise</SelectItem>

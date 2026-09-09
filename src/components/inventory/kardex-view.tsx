@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportCsv } from "@/lib/export";
+import { DateRangeFilter, inRange, describeRange, ALL_TIME, type DateRange } from "@/components/shared/date-range-filter";
 import { cn, formatCurrency, formatDateTime } from "@/lib/utils";
 
 const TYPE_BADGE: Record<InventoryMovement["type"], { label: string; variant: "success" | "warning" | "secondary" | "destructive" }> = {
@@ -30,17 +31,26 @@ interface KardexSummary {
 export function KardexView({ items, movements }: { items: InventoryItem[]; movements: InventoryMovement[] }) {
   const [mode, setMode] = useState<"summary" | "detail">("summary");
   const [selectedId, setSelectedId] = useState(String(items[0]?.id ?? ""));
+  // Por defecto todo el histórico: es el saldo que cuadra con el stock actual.
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
+
+  const filtered = Boolean(range.from || range.to);
+
+  const inPeriod = useMemo(
+    () => movements.filter((m) => inRange(m.date, range)),
+    [movements, range]
+  );
 
   const byItem = useMemo(() => {
     const map = new Map<string, InventoryMovement[]>();
-    movements.forEach((m) => {
+    inPeriod.forEach((m) => {
       const key = String(m.inventoryId);
       const arr = map.get(key) ?? [];
       arr.push(m);
       map.set(key, arr);
     });
     return map;
-  }, [movements]);
+  }, [inPeriod]);
 
   const summary: KardexSummary[] = useMemo(
     () =>
@@ -52,9 +62,13 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
         const inicial = mv.find((m) => m.type === "inicial")?.quantity ?? 0;
         const entradas = Math.round(mv.filter((m) => m.type !== "inicial" && m.quantity > 0).reduce((s, m) => s + m.quantity, 0) * 1000) / 1000;
         const salidas = Math.round(mv.filter((m) => m.quantity < 0).reduce((s, m) => s + Math.abs(m.quantity), 0) * 1000) / 1000;
-        return { item, inicial, entradas, salidas, final: item.stock, value: item.stock * item.cost };
+        // Con un periodo acotado el saldo del corte es el del último movimiento
+        // del periodo, no el stock de hoy: si no, las columnas no cuadran.
+        const last = mv.length > 0 ? mv[mv.length - 1].balance : item.stock;
+        const final = filtered ? last : item.stock;
+        return { item, inicial, entradas, salidas, final, value: final * item.cost };
       }),
-    [items, byItem]
+    [items, byItem, filtered]
   );
 
   const detail = byItem.get(selectedId) ?? [];
@@ -62,7 +76,7 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
 
   const exportSummary = () => {
     exportCsv(
-      "kardex-resumido-axis",
+      `kardex-resumido-axis${filtered ? `-${range.from || "inicio"}_${range.to || "hoy"}` : ""}`,
       ["Insumo", "Categoría", "Unidad", "Saldo inicial", "Entradas", "Salidas", "Saldo final", "Costo unit.", "Valor"],
       summary.map((s) => [s.item.name, s.item.category, s.item.unit, s.inicial, s.entradas, s.salidas, s.final, s.item.cost, Math.round(s.value)])
     );
@@ -95,6 +109,8 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
           <Download className="h-4 w-4" /> Exportar
         </Button>
       </div>
+
+      <DateRangeFilter value={range} onChange={setRange} />
 
       {mode === "summary" ? (
         <Card className="overflow-hidden">
@@ -131,7 +147,9 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
           <div className="flex items-center justify-between border-b border-border p-4">
             <div>
               <p className="font-semibold">{detailItem?.name}</p>
-              <p className="text-xs text-muted-foreground">Movimientos del periodo · saldo final {detailItem?.stock} {detailItem?.unit}</p>
+              <p className="text-xs text-muted-foreground">
+                {describeRange(range)} · saldo final {filtered ? (detail.at(-1)?.balance ?? detailItem?.stock) : detailItem?.stock} {detailItem?.unit}
+              </p>
             </div>
             <Badge variant="secondary">{detail.length} mov.</Badge>
           </div>
@@ -147,6 +165,13 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
               </TableRow>
             </TableHeader>
             <TableBody>
+              {detail.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                    Sin movimientos en {describeRange(range)}.
+                  </TableCell>
+                </TableRow>
+              )}
               {detail.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(m.date)}</TableCell>

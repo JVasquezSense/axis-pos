@@ -37,6 +37,7 @@ export const TENANT_STATUS: Record<TenantStatus, { label: string; variant: "succ
 };
 
 export const PLAN_LABEL: Record<string, string> = {
+  mini: "Axis Mini",
   starter: "Básico",
   growth: "Pro",
   enterprise: "Enterprise",

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
-import { NAV_ITEMS, NAV_GROUPS } from "@/lib/nav";
+import { NAV_ITEMS, NAV_GROUPS, navLabel } from "@/lib/nav";
 import { useFeatures } from "@/lib/features";
 import { ROLE_NAV } from "@/lib/roles";
 import { useAppStore } from "@/store/app.store";
@@ -71,7 +71,7 @@ export function Sidebar() {
                       key={item.key}
                       href={item.href}
                       data-tour={item.key}
-                      title={sidebarCollapsed ? item.label : undefined}
+                      title={sidebarCollapsed ? navLabel(item, has) : undefined}
                       className={cn(
                         "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                         active
@@ -81,7 +81,7 @@ export function Sidebar() {
                       )}
                     >
                       <Icon name={item.icon} className="h-5 w-5 shrink-0" />
-                      {!sidebarCollapsed && <span className="flex-1 truncate">{item.label}</span>}
+                      {!sidebarCollapsed && <span className="flex-1 truncate">{navLabel(item, has)}</span>}
                       {!sidebarCollapsed && item.badge === "live" && (
                         <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-emerald-400">
                           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />

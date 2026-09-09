@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu } from "lucide-react";
-import { NAV_ITEMS, NAV_GROUPS } from "@/lib/nav";
+import { NAV_ITEMS, NAV_GROUPS, navLabel } from "@/lib/nav";
 import { ROLE_NAV } from "@/lib/roles";
 import { useFeatures } from "@/lib/features";
 import { useAppStore } from "@/store/app.store";
@@ -70,7 +70,7 @@ export function MobileNav() {
                         )}
                       >
                         <Icon name={item.icon} className="h-5 w-5" />
-                        {item.label}
+                        {navLabel(item, has)}
                       </Link>
                     );
                   })}

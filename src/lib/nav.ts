@@ -33,3 +33,12 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const NAV_GROUPS = ["Operación", "Gestión", "Plataforma"] as const;
+
+/**
+ * Nombre de la sección según el plan. Sin fichas técnicas (plan Mini) el módulo
+ * es solo la carta, y llamarlo "Recetas" prometía algo que no está.
+ */
+export function navLabel(item: NavItem, has: (key: string) => boolean): string {
+  if (item.key === "menu" && !has("recipes")) return "Productos";
+  return item.label;
+}

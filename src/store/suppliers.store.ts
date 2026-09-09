@@ -96,7 +96,12 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
         dueDate: invoice?.dueDate || undefined,
       }).then((saved) =>
         set((st) => ({ purchases: st.purchases.map((p) => (p.id === purchase.id ? { ...saved } : p)) }))
-      ).catch(apiErrorHandler("registrar compra"));
+      ).catch((err) => {
+        // Si el servidor la rechaza, la compra NO puede quedarse en la lista:
+        // se veía registrada, el stock nunca subía y nadie entendía por qué.
+        set((st) => ({ purchases: st.purchases.filter((p) => p.id !== purchase.id) }));
+        return apiErrorHandler("registrar compra")(err);
+      });
     } else {
       useInventoryStore.getState().addPurchase(
         `${code} · ${supplier.name}`,

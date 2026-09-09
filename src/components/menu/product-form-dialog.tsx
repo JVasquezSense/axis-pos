@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, X, Plus, Trash2 } from "lucide-react";
-import type { Category, Product, ProductTax } from "@/types";
+import type { Category, Product, ProductTax, ProductVariation } from "@/types";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,16 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductImage } from "@/components/shared/product-image";
 import { emptyTax } from "@/lib/taxes";
+import { shrinkImageFile } from "@/lib/image";
+import { useInventoryStore } from "@/store/inventory.store";
+import { useFeatures } from "@/lib/features";
+import { formatCurrency } from "@/lib/utils";
+
+const NO_SUPPLY = "none";
+
+/** "Cada venta descuenta 1 Und de Cerveza Poker." */
+const SUPPLY_HINT = (qty: number, unit: string, name: string) =>
+  `Cada venta descuenta ${qty} ${unit} de ${name}.`;
 
 function isImageUrl(src: string) {
   return src.startsWith("data:") || src.startsWith("http") || src.startsWith("/") || src.startsWith("blob:");
@@ -38,16 +48,20 @@ export function ProductFormDialog({
   const [draft, setDraft] = useState<Product | null>(product);
   const [tagInput, setTagInput] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const supplies = useInventoryStore((s) => s.items);
+  const { has } = useFeatures();
+  // Sin fichas técnicas (plan Mini) el costo del producto se escribe aquí: es el
+  // único dato con el que se puede calcular margen.
+  const hasRecipes = has("recipes");
+  const hasInventory = has("inventory");
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Reducida antes de guardarla: una foto de celular en base64 supera el límite
+  // de cuerpo de petición del servidor y tumba el guardado entero.
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result as string;
-      if (draft) setDraft({ ...draft, image: result });
-    };
-    reader.readAsDataURL(file);
+    const image = await shrinkImageFile(file, { maxSide: 900, quality: 0.75 });
+    setDraft((d) => (d ? { ...d, image } : d));
   };
 
   useEffect(() => {
@@ -67,6 +81,18 @@ export function ProductFormDialog({
   const updateTax = (index: number, patch: Partial<ProductTax>) =>
     set({ taxes: (draft.taxes ?? []).map((t, i) => (i === index ? { ...t, ...patch } : t)) });
 
+  const variations = draft.variations ?? [];
+  const updateVariation = (index: number, patch: Partial<ProductVariation>) =>
+    set({ variations: variations.map((v, i) => (i === index ? { ...v, ...patch } : v)) });
+  const addVariation = () =>
+    set({
+      variations: [...variations, { id: `var-${Date.now().toString(36)}`, name: "", priceDelta: 0 }],
+    });
+
+  const cost = Number(draft.cost ?? 0);
+  const margin = draft.price > 0 && cost > 0 ? (draft.price - cost) / draft.price : null;
+  const linkedItem = supplies.find((i) => String(i.id) === String(draft.inventoryId ?? ""));
+
   const save = () => {
     if (!draft.name.trim() || draft.price <= 0) return;
     onSave(draft);
@@ -75,13 +101,13 @@ export function ProductFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="flex max-h-[88vh] max-w-lg flex-col">
         <DialogHeader>
           <DialogTitle>{isNew ? "Nuevo producto" : "Editar producto"}</DialogTitle>
           <DialogDescription>Define el plato que verá el cliente en el POS y la web.</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="-mr-2 flex-1 space-y-4 overflow-y-auto pr-2">
           <div className="flex gap-3">
             <div>
               <label className="mb-1.5 block text-sm font-medium">Foto / Icono</label>
@@ -135,12 +161,20 @@ export function ProductFormDialog({
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Precio (COP)</label>
+              <label className="mb-1.5 block text-sm font-medium">Precio de venta</label>
               <Input type="number" min={0} value={draft.price} onChange={(e) => set({ price: Number(e.target.value) })} />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Prep (min)</label>
-              <Input type="number" min={0} value={draft.prepMinutes} onChange={(e) => set({ prepMinutes: Number(e.target.value) })} />
+              <label className="mb-1.5 block text-sm font-medium">
+                Costo de producción
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={draft.cost ?? 0}
+                onChange={(e) => set({ cost: Number(e.target.value) })}
+                placeholder="0"
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Categoría</label>
@@ -154,6 +188,123 @@ export function ProductFormDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Preparación (min)</label>
+              <Input type="number" min={0} value={draft.prepMinutes} onChange={(e) => set({ prepMinutes: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Margen</label>
+              <div className="flex h-9 items-center rounded-md border border-border bg-muted/40 px-3 text-sm">
+                {margin === null ? (
+                  <span className="text-muted-foreground">Falta precio o costo</span>
+                ) : (
+                  <span className={margin < 0.3 ? "font-medium text-destructive" : "font-medium text-emerald-600 dark:text-emerald-400"}>
+                    {formatCurrency(draft.price - cost)} · {Math.round(margin * 100)}%
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Insumo que descuenta al venderse. Lo que se vende tal cual (una
+              cerveza, una cajetilla) no movía el kardex porque descontar exigía
+              montarle una ficha técnica de un solo ingrediente. */}
+          {hasInventory && !draft.isCombo && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">
+                Descuenta del inventario <span className="text-muted-foreground">(opcional)</span>
+              </label>
+              <div className="flex gap-2">
+                <Select
+                  value={draft.inventoryId ? String(draft.inventoryId) : NO_SUPPLY}
+                  onValueChange={(v) => set({ inventoryId: v === NO_SUPPLY ? null : v, inventoryQty: draft.inventoryQty ?? 1 })}
+                >
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Sin descuento directo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_SUPPLY}>Sin descuento directo</SelectItem>
+                    {supplies.map((i) => (
+                      <SelectItem key={i.id} value={String(i.id)}>{i.name} ({i.unit})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {draft.inventoryId && (
+                  <div className="w-32">
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.001"
+                      value={draft.inventoryQty ?? 1}
+                      onChange={(e) => set({ inventoryQty: Number(e.target.value) })}
+                      title="Unidades del insumo por venta"
+                    />
+                  </div>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {linkedItem
+                  ? SUPPLY_HINT(draft.inventoryQty ?? 1, linkedItem.unit, linkedItem.name)
+                  : hasRecipes
+                    ? "Para platos preparados usa la ficha técnica; esto es para lo que se vende tal cual."
+                    : "Elige el insumo si quieres que la venta descuente stock."}
+              </p>
+            </div>
+          )}
+
+          {/* Variaciones: sin ficha técnica no había dónde definirlas. */}
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-sm font-medium">
+                Variaciones <span className="text-muted-foreground">(opcional)</span>
+              </label>
+              <button
+                type="button"
+                onClick={addVariation}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                <Plus className="h-3.5 w-3.5" /> Agregar variación
+              </button>
+            </div>
+            {variations.length === 0 ? (
+              <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                Sin variaciones. Por ejemplo: Doble +$8.000, Sin azúcar +$0.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {variations.map((v, i) => (
+                  <div key={v.id} className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="mb-1 block text-[11px] text-muted-foreground">Nombre</label>
+                      <Input
+                        value={v.name}
+                        onChange={(e) => updateVariation(i, { name: e.target.value })}
+                        placeholder="Ej: Doble"
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <label className="mb-1 block text-[11px] text-muted-foreground">+/- precio</label>
+                      <Input
+                        type="number"
+                        value={v.priceDelta}
+                        onChange={(e) => updateVariation(i, { priceDelta: Number(e.target.value) })}
+                        className="h-9"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => set({ variations: variations.filter((_, x) => x !== i) })}
+                      className="mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      title="Quitar variación"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Impuestos: un campo por defecto y tantos como haga falta. Una cerveza

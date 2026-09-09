@@ -40,11 +40,13 @@ export const CAPABILITY_FEATURES: FeatureDef[] = [
   { id: "whatsapp", label: "Chatbot WhatsApp", desc: "Pedidos y atención por WhatsApp" },
   { id: "ai", label: "Axis IA", desc: "Copiloto e importar carta con IA" },
   { id: "voice", label: "Pedidos por voz", desc: "El mesero dicta el pedido" },
+  { id: "recipes", label: "Fichas técnicas", desc: "Recetas, costeo por insumo y salida por plato" },
 ];
 
 export const ALL_FEATURES = [...SECTION_FEATURES, ...CAPABILITY_FEATURES];
 
 export const PLAN_LABEL: Record<string, string> = {
+  mini: "Axis Mini",
   starter: "Básico",
   growth: "Pro",
   enterprise: "Enterprise",

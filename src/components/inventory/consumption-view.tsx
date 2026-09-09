@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportCsv } from "@/lib/export";
+import { DateRangeFilter, describeRange, lastDays, type DateRange } from "@/components/shared/date-range-filter";
 import { formatCurrency } from "@/lib/utils";
 
 interface Consumed {
@@ -52,16 +53,19 @@ interface DishCard {
 export function ConsumptionView() {
   const [report, setReport] = useState<DishConsumptionReport | null>(null);
   const [loading, setLoading] = useState(USE_API);
+  const [range, setRange] = useState<DateRange>(() => lastDays(30));
 
   useEffect(() => {
     if (!USE_API) return;
     let alive = true;
-    inventoryService.getDishConsumption(30)
+    setLoading(true);
+    // Sin rango, el backend usa su ventana de 30 días por defecto.
+    inventoryService.getDishConsumption(range.from && range.to ? range : 30)
       .then((r) => { if (alive) setReport(r); })
       .catch(() => { if (alive) setReport(null); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, []);
+  }, [range]);
 
   // En modo API el backend ya calcula, por plato, los insumos consumidos con su
   // cantidad y costo (cruzando OrderLine × Recipe × InventoryItem del tenant).
@@ -108,21 +112,13 @@ export function ConsumptionView() {
     exportCsv("salida-insumos-por-plato-axis", ["Plato", "Uds vendidas", "Insumo", "Cantidad", "Unidad", "Costo"], rows);
   };
 
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-semibold">Salida de insumos por plato</p>
           <p className="text-sm text-muted-foreground">
-            Consumo teórico de materia prima según recetas y unidades vendidas del periodo.
+            Consumo teórico de materia prima según recetas y unidades vendidas · {describeRange(range)}.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -136,9 +132,15 @@ export function ConsumptionView() {
         </div>
       </div>
 
-      {cards.length === 0 ? (
+      {USE_API && <DateRangeFilter value={range} onChange={setRange} />}
+
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
+        </div>
+      ) : cards.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-          Sin ventas en el periodo para calcular consumo de insumos.
+          Sin ventas en {describeRange(range)} para calcular consumo de insumos.
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -8,9 +8,13 @@ import { USE_API, request, mockRequest } from "./http";
  * ("29900.008000") y `priceDelta` no ajusta el total. Normalizamos en el borde.
  */
 function normalizeProduct(p: Product): Product {
+  // La API serializa los decimales como string ("12000.00"); comparar o sumar
+  // strings da resultados absurdos en el POS.
   return {
     ...p,
     price: Number(p.price),
+    cost: p.cost != null ? Number(p.cost) : 0,
+    inventoryQty: p.inventoryQty != null ? Number(p.inventoryQty) : 1,
     variations: (p.variations ?? []).map((v) => ({ ...v, priceDelta: Number(v.priceDelta) })),
   };
 }
