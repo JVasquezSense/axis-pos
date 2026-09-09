@@ -999,17 +999,33 @@ salvo Mini. Cuando está apagada:
 - La IA no ofrece acciones de recetas ni menciona en su contexto módulos que el
   plan no incluye (`ACTION_FEATURE` en `src/lib/ai-actions.ts`).
 
+**Simple o compuesto.** Al crear un producto se elige cómo consume inventario, y
+la elección se guarda en `Product.kind`:
+
+- `simple` — se vende tal cual y descuenta **su propio insumo**: una gaseosa, una
+  cajetilla, una botella.
+- `compound` — se prepara y descuenta **los ingredientes de su ficha técnica**.
+
+Antes esto se deducía de tener receta o no, y lo que se vende tal cual quedaba en
+tierra de nadie: no descontaba nada y nadie sabía por qué. Los dos modos son
+excluyentes por construcción — marcar un producto como compuesto le borra el
+enlace directo, y darle ficha técnica a uno simple lo convierte en compuesto —
+porque con ambos activos descontaría el insumo *y* los de la receta.
+
 **El producto se basta solo.** `Product` gana:
 
 | Campo | Para qué |
 |---|---|
+| `kind` | Si descuenta su propio insumo o los de su receta. |
 | `cost` | Costo de producción. Sin ficha técnica es el único costo que hay, y de él sale el margen que muestra la carta. |
 | `inventory_item` | Insumo que descuenta al venderse. Es lo que hace que una cerveza o una cajetilla muevan el kardex sin receta. |
 | `inventory_qty` | Unidades del insumo por venta (un six-pack descuenta 6). |
 | `variations` | Variaciones propias. Antes solo existían dentro de la receta, así que un producto sin ficha no podía tener ninguna. |
 
-`consume_recipe_demand()` resuelve primero el enlace directo y solo después la
-receta, de modo que el mismo camino de consumo sirve a los dos modelos. Las
+`consume_recipe_demand()` resuelve primero los simples y solo después las recetas,
+de modo que el mismo camino de consumo sirve a los dos modelos. La migración
+`0031` marca como compuesto todo lo que ya tenía ficha técnica, para que siga
+descontando igual que antes. Las
 variaciones de la receta se siguen exponiendo en el producto para poder elegirlas
 al pedir, marcadas como `inherited`; al guardar se descartan, para que editar el
 producto no le arrebate a la receta el control sobre ellas.
