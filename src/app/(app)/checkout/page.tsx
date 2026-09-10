@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaymentDialog } from "@/components/checkout/payment-dialog";
-import { SplitBillDialog } from "@/components/checkout/split-bill-dialog";
+import { SplitBillDialog, type PersonShare } from "@/components/checkout/split-bill-dialog";
 import { PAYMENT_METHODS, PAYMENT_LABEL } from "@/lib/payments";
 import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
 import { useOrderStore, orderSelectors } from "@/store/order.store";
@@ -154,6 +154,39 @@ export default function CheckoutPage() {
     }
   };
 
+  /**
+   * Cobro de un comensal en la cuenta dividida: una venta por persona, con su
+   * medio de pago y su factura. Antes la división solo marcaba "pagado" en
+   * pantalla y al terminar no se registraba ninguna venta.
+   */
+  const payPerson = async (share: PersonShare, personMethod: PaymentMethod) => {
+    if (!waiter.trim()) {
+      toast.error("Falta el mesero", { description: "Selecciona quién atendió antes de cobrar." });
+      throw new Error("sin mesero");
+    }
+    const saved = await recordSale({
+      total: share.total,
+      subtotal: share.subtotal,
+      tax: share.tax,
+      discount: share.discount,
+      items: share.items,
+      method: personMethod,
+      saleType: st.label,
+      table,
+      tip: share.tip,
+      waiter: waiter.trim(),
+      observations: `Cuenta dividida · persona ${share.index + 1}`,
+    });
+    setSplitCollected((prev) => Math.min(prev + share.total, total));
+    auditLog({
+      action: "Cobro parcial (cuenta dividida)",
+      details: `Persona ${share.index + 1} · ${formatCurrency(share.total)} · ${PAYMENT_LABEL[personMethod]}${table ? ` · Mesa ${table}` : ""}${saved.invoiceNumber ? ` · ${saved.invoiceNumber}` : ""}`,
+      user: waiter.trim(),
+      module: "ventas",
+    });
+    return saved.invoiceNumber;
+  };
+
   const completeSale = async () => {
     const ref = table ? `mesa ${table}` : "mostrador";
     // BACKLOG #5: el inventario se descuenta cuando la cocina prepara el pedido
@@ -197,8 +230,15 @@ export default function CheckoutPage() {
     }
     await markPaid();
     clear();
-    auditLog({ action: "Venta cobrada", details: `${st.label} · ${formatCurrency(total)} · ${PAYMENT_LABEL[method]}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}${invoiceNumber ? ` · ${invoiceNumber}` : ""}`, user: waiter.trim() || "Sistema", module: "ventas" });
-    toast.success("Venta registrada", { description: st.label });
+    if (splitCollected > 0) {
+      // Los cobros ya quedaron registrados uno a uno; aquí solo se cierra.
+      auditLog({ action: "Cuenta dividida cerrada", details: `${st.label} · ${formatCurrency(total)}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}`, user: waiter.trim() || "Sistema", module: "ventas" });
+      toast.success("Cuenta cerrada", { description: `${formatCurrency(total)} cobrados en partes` });
+    } else {
+      auditLog({ action: "Venta cobrada", details: `${st.label} · ${formatCurrency(total)} · ${PAYMENT_LABEL[method]}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}${invoiceNumber ? ` · ${invoiceNumber}` : ""}`, user: waiter.trim() || "Sistema", module: "ventas" });
+      toast.success("Venta registrada", { description: st.label });
+    }
+    setSplitCollected(0);
     setInvoiceNumber("");
   };
 
@@ -243,6 +283,9 @@ export default function CheckoutPage() {
     setDeliveryId(null);
     const next = value === "none" ? null : Number(value);
     setTableLocal(next);
+    // Con mesa la venta es en salón; el tipo se quedaba en "Para llevar" (el
+    // valor de arranque) y así se registraba.
+    if (next !== null && saleType === "takeaway") setSaleType("dine_in");
     if (next !== null && USE_API) {
       loadTableOrder(next); // trae la cuenta real del backend (sobrevive recarga / multi-dispositivo)
     } else {
@@ -494,10 +537,9 @@ export default function CheckoutPage() {
         open={splitOpen}
         onOpenChange={setSplitOpen}
         lines={lines}
-        subtotal={subtotal}
-        total={total}
+        breakdown={{ subtotal, tax, tip, discount: effectiveDiscount, total }}
+        onPayPerson={payPerson}
         onComplete={completeSale}
-        onPartialPay={(collected) => setSplitCollected((prev) => Math.min(prev + collected, total))}
       />
 
       <PaymentDialog

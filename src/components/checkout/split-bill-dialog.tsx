@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Minus, Plus, Check, Users, UtensilsCrossed, Receipt } from "lucide-react";
-import type { OrderLine } from "@/types";
+import { Minus, Plus, Check, Users, UtensilsCrossed, Receipt, Loader2 } from "lucide-react";
+import type { OrderLine, PaymentMethod } from "@/types";
 import { ProductImage } from "@/components/shared/product-image";
+import { Icon } from "@/components/shared/icon";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { orderSelectors } from "@/store/order.store";
+import { PAYMENT_METHODS, PAYMENT_LABEL } from "@/lib/payments";
+import { lineUnitPrice } from "@/lib/taxes";
 import { distribute } from "@/lib/split";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -23,211 +25,352 @@ const PERSON_COLORS = [
   "bg-rose-500", "bg-fuchsia-500", "bg-cyan-500", "bg-orange-500",
 ];
 
+/** Lo que paga un comensal, con el desglose que va a su factura. */
+export interface PersonShare {
+  index: number;
+  subtotal: number;
+  tax: number;
+  tip: number;
+  discount: number;
+  total: number;
+  /** Unidades que consumió, para la factura: "2× Cerveza, 1× Mojito". */
+  items: number;
+}
+
+export interface SplitBreakdown {
+  subtotal: number;
+  tax: number;
+  tip: number;
+  discount: number;
+  total: number;
+}
+
+interface Payment {
+  method: PaymentMethod;
+  invoiceNumber?: string;
+  amount: number;
+}
+
+/**
+ * División de la cuenta.
+ *
+ * Dos modos: en partes iguales, o cada quien paga lo suyo. En el segundo, cada
+ * unidad de cada producto se asigna a una persona —dos cervezas pueden ir una a
+ * cada uno— y lo que nadie reclama se reparte entre todos.
+ *
+ * Cada comensal se cobra por separado, con su medio de pago y su factura.
+ * Antes el diálogo solo marcaba "pagado" en pantalla y al terminar no se
+ * registraba ninguna venta: la mesa se liberaba y el dinero no quedaba en
+ * ningún sitio.
+ */
 export function SplitBillDialog({
   open,
   onOpenChange,
   lines,
-  subtotal,
-  total,
+  breakdown,
+  onPayPerson,
   onComplete,
-  onPartialPay,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   lines: OrderLine[];
-  subtotal: number;
-  total: number;
-  onComplete?: () => void;
-  onPartialPay?: (collected: number) => void;
+  breakdown: SplitBreakdown;
+  /** Registra la venta de un comensal y devuelve su número de factura. */
+  onPayPerson: (share: PersonShare, method: PaymentMethod) => Promise<string | undefined | null>;
+  /** Todos cobrados: cerrar la mesa. */
+  onComplete: () => void;
 }) {
   const [people, setPeople] = useState(2);
-  const [mode, setMode] = useState<"people" | "items">("people");
-  // Asignación de cada línea a comensales (índices). Vacío = compartido por todos.
-  const [assign, setAssign] = useState<Record<string, number[]>>({});
-  const [paid, setPaid] = useState<number[]>([]);
+  const [mode, setMode] = useState<"equal" | "items">("equal");
+  // Unidades de cada línea asignadas a cada persona: units[lineId][persona].
+  const [units, setUnits] = useState<Record<string, number[]>>({});
+  const [payments, setPayments] = useState<Record<number, Payment>>({});
+  const [method, setMethod] = useState<Record<number, PaymentMethod>>({});
+  const [paying, setPaying] = useState<number | null>(null);
+
+  // Estado limpio cuando cambia la cuenta, no al reabrir: cerrar con "Seguir
+  // luego" y volver tiene que encontrar los cobros ya hechos, pero una mesa
+  // nueva no puede heredar los de la anterior (se cobraba dos veces a la misma
+  // persona).
+  const signature = lines.map((l) => `${l.id}:${l.quantity}`).join("|");
+  useEffect(() => {
+    setPeople(2);
+    setMode("equal");
+    setUnits({});
+    setPayments({});
+    setMethod({});
+    setPaying(null);
+  }, [signature]);
+
+  const anyPaid = Object.keys(payments).length > 0;
 
   const setCount = (n: number) => {
+    if (anyPaid) return; // con cobros hechos ya no se puede cambiar el reparto
     const next = Math.min(Math.max(n, 2), 8);
     setPeople(next);
-    setAssign((prev) => {
+    setUnits((prev) => {
       const out: Record<string, number[]> = {};
-      for (const k in prev) out[k] = prev[k].filter((i) => i < next);
+      for (const k in prev) out[k] = Array.from({ length: next }, (_, i) => prev[k][i] ?? 0);
       return out;
     });
-    setPaid((p) => p.filter((i) => i < next));
   };
 
-  const toggleAssign = (lineId: string, person: number) =>
-    setAssign((prev) => {
-      const cur = prev[lineId] ?? [];
-      return { ...prev, [lineId]: cur.includes(person) ? cur.filter((p) => p !== person) : [...cur, person] };
+  const countsFor = (line: OrderLine) =>
+    units[line.id] ?? Array.from({ length: people }, () => 0);
+  const assignedOf = (line: OrderLine) => countsFor(line).reduce((s, n) => s + n, 0);
+
+  const bump = (line: OrderLine, person: number, delta: number) => {
+    if (anyPaid) return;
+    setUnits((prev) => {
+      const cur = prev[line.id] ?? Array.from({ length: people }, () => 0);
+      const assigned = cur.reduce((s, n) => s + n, 0);
+      const next = [...cur];
+      const value = next[person] + delta;
+      if (value < 0) return prev;
+      if (delta > 0 && assigned >= line.quantity) return prev;
+      next[person] = value;
+      return { ...prev, [line.id]: next };
     });
+  };
 
-  // Pesos por comensal según ítems consumidos (los sin asignar se reparten entre todos)
-  const shares = useMemo(() => {
-    const s = Array(people).fill(0);
-    lines.forEach((line) => {
-      const lt = orderSelectors.lineTotal(line);
-      const a = assign[line.id] ?? [];
-      if (a.length === 0) {
-        for (let i = 0; i < people; i++) s[i] += lt / people;
-      } else {
-        a.forEach((i) => (s[i] += lt / a.length));
-      }
-    });
-    return s;
-  }, [lines, assign, people]);
+  /** Peso de cada persona = lo que consumió (lo libre se reparte entre todos). */
+  const weights = useMemo(() => {
+    if (mode === "equal") return Array.from({ length: people }, () => 1);
+    const w = Array.from({ length: people }, () => 0);
+    for (const line of lines) {
+      const unit = lineUnitPrice(line);
+      const counts = countsFor(line);
+      const free = line.quantity - counts.reduce((s, n) => s + n, 0);
+      counts.forEach((n, i) => { w[i] += n * unit; });
+      if (free > 0) for (let i = 0; i < people; i++) w[i] += (free * unit) / people;
+    }
+    // Nadie consumió nada aún: mientras se asigna, se muestra en partes iguales.
+    return w.some((x) => x > 0) ? w : Array.from({ length: people }, () => 1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, people, lines, units]);
 
-  const amounts = useMemo(
-    () => (mode === "people" ? distribute(total, Array(people).fill(1)) : distribute(total, shares)),
-    [mode, total, people, shares]
-  );
+  /** Cada componente se reparte con los mismos pesos y suma exactamente el total. */
+  const shares: PersonShare[] = useMemo(() => {
+    const sub = distribute(breakdown.subtotal, weights);
+    const tax = distribute(breakdown.tax, weights);
+    const tip = distribute(breakdown.tip, weights);
+    const disc = distribute(breakdown.discount, weights);
+    const itemsPer = Array.from({ length: people }, () => 0);
+    if (mode === "items") {
+      for (const line of lines) countsFor(line).forEach((n, i) => { itemsPer[i] += n; });
+    }
+    return weights.map((_, i) => ({
+      index: i,
+      subtotal: sub[i],
+      tax: tax[i],
+      tip: tip[i],
+      discount: disc[i],
+      total: sub[i] + tax[i] + tip[i] - disc[i],
+      items: itemsPer[i],
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weights, breakdown, people, mode, lines, units]);
 
-  const togglePaid = (i: number) =>
-    setPaid((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
-
-  const unassignedCount = mode === "items"
-    ? lines.filter((l) => !(assign[l.id]?.length)).length
+  const unassigned = mode === "items"
+    ? lines.reduce((s, l) => s + (l.quantity - assignedOf(l)), 0)
     : 0;
+
+  const pending = shares.filter((s) => s.total > 0 && !payments[s.index]);
+  const collected = Object.values(payments).reduce((s, p) => s + p.amount, 0);
+  const allPaid = pending.length === 0 && shares.some((s) => s.total > 0);
+
+  const pay = async (share: PersonShare) => {
+    const m = method[share.index] ?? "cash";
+    setPaying(share.index);
+    try {
+      const invoice = await onPayPerson(share, m);
+      setPayments((p) => ({ ...p, [share.index]: { method: m, invoiceNumber: invoice ?? undefined, amount: share.total } }));
+      toast.success(`Persona ${share.index + 1} cobrada`, {
+        description: `${formatCurrency(share.total)} · ${PAYMENT_LABEL[m]}${invoice ? ` · ${invoice}` : ""}`,
+      });
+    } catch {
+      toast.error("No se pudo registrar el cobro");
+    } finally {
+      setPaying(null);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 p-0">
         <DialogHeader className="border-b border-border p-5">
           <DialogTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" /> Dividir cuenta</DialogTitle>
-          <DialogDescription>Reparte {formatCurrency(total)} entre los comensales.</DialogDescription>
+          <DialogDescription>Reparte {formatCurrency(breakdown.total)} entre los comensales y cobra a cada uno por separado.</DialogDescription>
         </DialogHeader>
 
-        {/* Selector de personas */}
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <span className="flex items-center gap-2 text-sm font-medium"><Users className="h-4 w-4" /> Personas</span>
-          <div className="flex items-center gap-1 rounded-lg border border-border">
-            <button onClick={() => setCount(people - 1)} className="flex h-8 w-8 items-center justify-center rounded-l-lg hover:bg-muted">
+          <div className={cn("flex items-center gap-1 rounded-lg border border-border", anyPaid && "opacity-50")}>
+            <button onClick={() => setCount(people - 1)} disabled={anyPaid} className="flex h-8 w-8 items-center justify-center rounded-l-lg hover:bg-muted disabled:cursor-not-allowed">
               <Minus className="h-4 w-4" />
             </button>
             <span className="w-8 text-center text-sm font-bold">{people}</span>
-            <button onClick={() => setCount(people + 1)} className="flex h-8 w-8 items-center justify-center rounded-r-lg hover:bg-muted">
+            <button onClick={() => setCount(people + 1)} disabled={anyPaid} className="flex h-8 w-8 items-center justify-center rounded-r-lg hover:bg-muted disabled:cursor-not-allowed">
               <Plus className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <Tabs value={mode} onValueChange={(v) => setMode(v as "people" | "items")} className="p-5">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="people"><Users className="h-4 w-4" /> Por personas</TabsTrigger>
-            <TabsTrigger value="items"><UtensilsCrossed className="h-4 w-4" /> Por producto</TabsTrigger>
-          </TabsList>
+        <div className="-mr-1 min-h-0 flex-1 overflow-y-auto pr-1">
+          <Tabs value={mode} onValueChange={(v) => { if (!anyPaid) setMode(v as "equal" | "items"); }} className="p-5">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="equal" disabled={anyPaid}><Users className="h-4 w-4" /> Partes iguales</TabsTrigger>
+              <TabsTrigger value="items" disabled={anyPaid}><UtensilsCrossed className="h-4 w-4" /> Cada quien lo suyo</TabsTrigger>
+            </TabsList>
 
-          {/* POR PERSONAS */}
-          <TabsContent value="people">
-            <div className="grid grid-cols-2 gap-2">
-              {amounts.map((amt, i) => (
-                <PersonCard key={i} index={i} amount={amt} paid={paid.includes(i)} onToggle={() => togglePaid(i)} />
-              ))}
-            </div>
-          </TabsContent>
+            <TabsContent value="items">
+              <p className="mb-2 text-xs text-muted-foreground">
+                Toca el número de la persona para darle una unidad. Lo que nadie reclame se reparte entre todos.
+              </p>
+              <div className="space-y-2">
+                {lines.map((line) => {
+                  const counts = countsFor(line);
+                  const free = line.quantity - assignedOf(line);
+                  return (
+                    <div key={line.id} className="rounded-xl border border-border p-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-2 text-sm">
+                          <ProductImage emoji={line.product.image} category={line.product.category} size="sm" className="h-8 w-8 shrink-0" />
+                          <span className="truncate font-medium">{line.quantity}× {line.product.name}</span>
+                        </span>
+                        <span className="shrink-0 text-sm font-semibold">{formatCurrency(lineUnitPrice(line) * line.quantity)}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {counts.map((n, i) => (
+                          <span key={i} className="inline-flex items-center overflow-hidden rounded-full border border-border">
+                            {n > 0 && (
+                              <button
+                                onClick={() => bump(line, i, -1)}
+                                className="flex h-7 w-6 items-center justify-center text-muted-foreground hover:bg-muted"
+                                title="Quitar una"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => bump(line, i, +1)}
+                              disabled={free === 0}
+                              className={cn(
+                                "flex h-7 min-w-7 items-center justify-center gap-1 px-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed",
+                                n > 0 ? cn(PERSON_COLORS[i % PERSON_COLORS.length], "text-white") : "text-muted-foreground hover:bg-muted"
+                              )}
+                              title={`Persona ${i + 1}`}
+                            >
+                              {i + 1}{n > 0 && <span className="font-normal">×{n}</span>}
+                            </button>
+                          </span>
+                        ))}
+                        <span className="ml-1 text-[11px] text-muted-foreground">
+                          {free === line.quantity
+                            ? "Compartido por todos"
+                            : free > 0
+                              ? `${free} sin asignar · se reparte`
+                              : "Asignado"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {unassigned > 0 && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {unassigned} unidad(es) sin asignar se reparten en partes iguales.
+                </p>
+              )}
+            </TabsContent>
 
-          {/* POR PRODUCTO */}
-          <TabsContent value="items">
-            <div className="scrollbar-thin max-h-52 space-y-2 overflow-y-auto pr-1">
-              {lines.map((line) => {
-                const a = assign[line.id] ?? [];
+            {/* Tarjetas de cobro: iguales en los dos modos */}
+            <div className={cn("grid grid-cols-1 gap-2 sm:grid-cols-2", mode === "items" && "mt-3 border-t border-border pt-3")}>
+              {shares.map((share) => {
+                const paid = payments[share.index];
+                const m = method[share.index] ?? "cash";
                 return (
-                  <div key={line.id} className="rounded-xl border border-border p-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-2 text-sm">
-                        <ProductImage emoji={line.product.image} category={line.product.category} size="sm" className="h-8 w-8 shrink-0" />
-                        <span className="font-medium">{line.quantity}× {line.product.name}</span>
+                  <div
+                    key={share.index}
+                    className={cn(
+                      "rounded-xl border p-3 transition-colors",
+                      paid ? "border-success bg-success/5" : share.total === 0 ? "border-dashed border-border opacity-60" : "border-border"
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white", PERSON_COLORS[share.index % PERSON_COLORS.length])}>
+                        {paid ? <Check className="h-4 w-4" /> : share.index + 1}
                       </span>
-                      <span className="text-sm font-semibold">{formatCurrency(orderSelectors.lineTotal(line))}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] text-muted-foreground">
+                          Persona {share.index + 1}
+                          {mode === "items" && share.items > 0 && ` · ${share.items} ítem${share.items > 1 ? "s" : ""}`}
+                        </p>
+                        <p className="truncate text-base font-bold">{formatCurrency(share.total)}</p>
+                      </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-1">
-                      {Array.from({ length: people }).map((_, i) => (
-                        <button
-                          key={i}
-                          onClick={() => toggleAssign(line.id, i)}
-                          className={cn(
-                            "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold text-white transition-all",
-                            a.includes(i) ? PERSON_COLORS[i % PERSON_COLORS.length] : "bg-muted text-muted-foreground"
-                          )}
-                          title={`Persona ${i + 1}`}
-                        >
-                          {i + 1}
-                        </button>
-                      ))}
-                      {a.length === 0 && <span className="ml-1 text-[11px] text-muted-foreground">Compartido por todos</span>}
-                      {a.length > 1 && <span className="ml-1 text-[11px] text-muted-foreground">÷ {a.length}</span>}
-                    </div>
+
+                    {paid ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Cobrado · {PAYMENT_LABEL[paid.method]}{paid.invoiceNumber ? ` · ${paid.invoiceNumber}` : ""}
+                      </p>
+                    ) : share.total === 0 ? (
+                      <p className="mt-2 text-xs text-muted-foreground">Sin consumo</p>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <div className="flex flex-1 gap-1">
+                          {PAYMENT_METHODS.map((pm) => (
+                            <button
+                              key={pm.id}
+                              onClick={() => setMethod((x) => ({ ...x, [share.index]: pm.id }))}
+                              title={pm.label}
+                              className={cn(
+                                "flex h-8 w-8 items-center justify-center rounded-lg border transition-colors",
+                                m === pm.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"
+                              )}
+                            >
+                              <Icon name={pm.icon} className="h-4 w-4" />
+                            </button>
+                          ))}
+                        </div>
+                        <Button size="sm" onClick={() => pay(share)} disabled={paying !== null}>
+                          {paying === share.index ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Cobrar"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+          </Tabs>
+        </div>
 
-            {unassignedCount > 0 && (
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                {unassignedCount} ítem(s) sin asignar se reparten en partes iguales.
-              </p>
-            )}
-
-            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
-              {amounts.map((amt, i) => (
-                <PersonCard key={i} index={i} amount={amt} paid={paid.includes(i)} onToggle={() => togglePaid(i)} />
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        <div className="flex items-center justify-between border-t border-border p-4">
+        <div className="flex items-center justify-between gap-3 border-t border-border p-4">
           <div className="text-sm">
             <span className="text-muted-foreground">Cobrado </span>
-            <span className="font-semibold">{paid.length}/{people}</span>
+            <span className="font-semibold">{Object.keys(payments).length}/{shares.filter((s) => s.total > 0).length}</span>
             <span className="text-muted-foreground"> · </span>
-            <span className="font-semibold">{formatCurrency(paid.reduce((s, i) => s + amounts[i], 0))}</span>
+            <span className="font-semibold">{formatCurrency(collected)}</span>
+            {collected < breakdown.total && collected > 0 && (
+              <span className="text-muted-foreground"> · faltan {formatCurrency(breakdown.total - collected)}</span>
+            )}
           </div>
-          {paid.length === people ? (
+          {allPaid ? (
             <Button
               onClick={() => {
                 onOpenChange(false);
-                onComplete?.();
-                toast.success("Cuenta dividida y cobrada", { description: `${people} pagos · ${formatCurrency(total)}` });
+                onComplete();
               }}
             >
-              <Check className="h-4 w-4" /> Finalizar
+              <Check className="h-4 w-4" /> Finalizar y liberar mesa
             </Button>
           ) : (
-            <Button
-              variant="outline"
-              onClick={() => {
-                const collected = paid.reduce((s, i) => s + amounts[i], 0);
-                if (collected > 0) onPartialPay?.(collected);
-                onOpenChange(false);
-              }}
-            >
-              {paid.length > 0 ? `Cerrar · ${paid.length} cobrado${paid.length > 1 ? "s" : ""}` : "Cerrar"}
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {anyPaid ? "Seguir luego" : "Cerrar"}
             </Button>
           )}
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function PersonCard({ index, amount, paid, onToggle }: { index: number; amount: number; paid: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      className={cn(
-        "flex items-center gap-2.5 rounded-xl border p-3 text-left transition-all",
-        paid ? "border-success bg-success/5" : "border-border hover:bg-muted"
-      )}
-    >
-      <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white", PERSON_COLORS[index % PERSON_COLORS.length])}>
-        {paid ? <Check className="h-4 w-4" /> : index + 1}
-      </span>
-      <div className="min-w-0">
-        <p className="text-[11px] text-muted-foreground">Persona {index + 1}</p>
-        <p className="truncate text-sm font-bold">{formatCurrency(amount)}</p>
-      </div>
-    </button>
   );
 }
