@@ -84,7 +84,10 @@ export function describeTaxes(product: Product): string {
 
 /** "IVA 19%" o "Ipoconsumo $400". */
 export function describeTax(tax: ProductTax | Tax): string {
-  return `${tax.name} ${tax.type === "percent" ? `${tax.rate}%` : `$${tax.rate}`}`;
+  // La API serializa los decimales como string ("8.00"), y "IVA 8.00%" se lee
+  // como si alguien hubiera tecleado de más.
+  const rate = Number(tax.rate);
+  return `${tax.name} ${tax.type === "percent" ? `${rate}%` : `$${rate}`}`;
 }
 
 export function emptyTax(): ProductTax {
