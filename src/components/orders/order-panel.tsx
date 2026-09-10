@@ -17,7 +17,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/shared/empty-state";
-import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
+import { useOrderStore, orderSelectors } from "@/store/order.store";
+import { useTaxesStore } from "@/store/taxes.store";
+import { computeTaxes } from "@/lib/taxes";
 import { useTablesStore } from "@/store/tables.store";
 import { VoiceOrder } from "@/components/orders/voice-order";
 import { useAuditStore } from "@/store/audit.store";
@@ -29,7 +31,10 @@ export function OrderPanel() {
   const allTables = useTablesStore((s) => s.tables);
   const occupyTable = useTablesStore((s) => s.occupy);
   const subtotal = orderSelectors.subtotal(lines);
-  const tax = Math.round(subtotal * TAX_RATE);
+  // Los impuestos salen del catálogo del restaurante y de los propios de cada
+  // producto, no de un porcentaje fijo sobre el total.
+  const taxCatalog = useTaxesStore((s) => s.taxes);
+  const { totals: taxTotals, total: tax } = computeTaxes(lines, taxCatalog);
   const total = subtotal + tax;
   const count = orderSelectors.count(lines);
   const auditLog = useAuditStore((s) => s.log);
@@ -177,7 +182,11 @@ export function OrderPanel() {
         <div className="relative z-[60] border-t border-border bg-background p-4">
           <div className="space-y-1.5 text-sm">
             <Row label="Subtotal" value={formatCurrency(subtotal)} />
-            <Row label={`Impuesto (${Math.round(TAX_RATE * 100)}%)`} value={formatCurrency(tax)} muted />
+            {taxTotals.length === 0 ? (
+              <Row label="Impuestos" value={formatCurrency(0)} muted />
+            ) : (
+              taxTotals.map((t) => <Row key={t.name} label={t.name} value={formatCurrency(t.amount)} muted />)
+            )}
             <Separator className="my-2" />
             <div className="flex items-center justify-between">
               <span className="font-semibold">Total</span>

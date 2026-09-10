@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   UtensilsCrossed, Plus, Search, MoreVertical, Pencil, Trash2, Tag, BookOpen,
-  DollarSign, Percent, Package, Layers, ScanLine,
+  DollarSign, Percent, Package, Layers, ScanLine, Receipt,
 } from "lucide-react";
 import type { Category, Product, Recipe } from "@/types";
 import { useMenuStore, emptyProduct, uid } from "@/store/menu.store";
@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ProductFormDialog } from "@/components/menu/product-form-dialog";
 import { ProductKindDialog, type ProductKind } from "@/components/menu/product-kind-dialog";
 import { CATEGORY_ICONS, searchCategoryIcons } from "@/lib/category-icons";
+import { TaxesDialog } from "@/components/menu/taxes-dialog";
 import { ComboFormDialog } from "@/components/menu/combo-form-dialog";
 import { MenuScanDialog } from "@/components/menu/menu-scan-dialog";
 import { useFeatures } from "@/lib/features";
@@ -98,6 +99,7 @@ function CartaTab() {
   const [recipeIsNew, setRecipeIsNew] = useState(false);
   const [recipeOpen, setRecipeOpen] = useState(false);
   const [kindOpen, setKindOpen] = useState(false);
+  const [taxesOpen, setTaxesOpen] = useState(false);
 
   const hasRecipes = useFeatures().has("recipes");
   const recipeFor = (pid: string | number) => recipes.find((r) => String(r.productId) === String(pid));
@@ -306,6 +308,9 @@ function CartaTab() {
         <Button variant="outline" size="sm" onClick={() => setCatOpen(true)}>
           <Tag className="h-4 w-4" /> Categoría
         </Button>
+        <Button variant="outline" size="sm" onClick={() => setTaxesOpen(true)}>
+          <Receipt className="h-4 w-4" /> Impuestos
+        </Button>
         <Button variant="outline" size="sm" onClick={() => setScanOpen(true)}>
           <ScanLine className="h-4 w-4" /> Importar desde foto
         </Button>
@@ -374,6 +379,8 @@ function CartaTab() {
       {visible.length === 0 && (
         <p className="py-12 text-center text-sm text-muted-foreground">No hay productos en esta vista.</p>
       )}
+
+      <TaxesDialog open={taxesOpen} onOpenChange={setTaxesOpen} />
 
       <ProductKindDialog open={kindOpen} onOpenChange={setKindOpen} onPick={pickKind} />
 

@@ -156,7 +156,10 @@ export default function OrdersPage() {
                     !p.available && "cursor-not-allowed opacity-50"
                   )}
                 >
-                  <ProductImage emoji={p.image} category={p.category} className="h-24 w-full rounded-b-none" />
+                  {/* shrink-0: dentro de una columna flex la imagen se encogía
+                      cuando la tarjeta se quedaba sin alto, y el nombre y el
+                      precio quedaban cortados a media línea. */}
+                  <ProductImage emoji={p.image} category={p.category} className="h-24 w-full shrink-0 rounded-b-none" />
                   {p.popular && (
                     <Badge className="absolute left-2 top-2" variant="warning">
                       ★ Popular
@@ -167,7 +170,9 @@ export default function OrdersPage() {
                       Agotado
                     </span>
                   )}
-                  <div className="flex flex-1 flex-col p-2.5">
+                  {/* grow con base automática: `flex-1` parte de 0 y colapsaba
+                      el bloque entero al primer apretón de espacio. */}
+                  <div className="flex shrink-0 grow basis-auto flex-col p-2.5">
                     {/* El nombre completo: "Aguardiente Antioqueño sin azúcar"
                         y "Aguardiente Antioqueño tradicional" se veían iguales
                         recortados a una línea. */}

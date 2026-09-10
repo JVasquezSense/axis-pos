@@ -18,7 +18,8 @@ import { PaymentDialog } from "@/components/checkout/payment-dialog";
 import { SplitBillDialog } from "@/components/checkout/split-bill-dialog";
 import { PAYMENT_METHODS, PAYMENT_LABEL } from "@/lib/payments";
 import { SALE_TYPES, SALE_TYPE_MAP, type SaleTypeId } from "@/lib/sale-types";
-import { useOrderStore, orderSelectors, TAX_RATE } from "@/store/order.store";
+import { useOrderStore, orderSelectors } from "@/store/order.store";
+import { useTaxesStore } from "@/store/taxes.store";
 import { computeTaxes } from "@/lib/taxes";
 import { useTablesStore } from "@/store/tables.store";
 import { useDeliveryStore } from "@/store/delivery.store";
@@ -101,9 +102,10 @@ export default function CheckoutPage() {
   // Cada producto puede traer sus propios impuestos (IVA % + consumo fijo); los
   // que no traen ninguno usan el impuesto general del restaurante. El descuento
   // se reparte proporcionalmente sobre la base gravable.
-  const { totals: taxTotals, total: taxOnFullPrice } = useMemo(
-    () => computeTaxes(lines, TAX_RATE, st.noTax === true),
-    [lines, st.noTax]
+  const taxCatalog = useTaxesStore((s) => s.taxes);
+  const { totals: taxTotals } = useMemo(
+    () => computeTaxes(lines, taxCatalog, st.noTax === true),
+    [lines, taxCatalog, st.noTax]
   );
   const discountFactor = subtotal > 0 ? taxedBase / subtotal : 0;
   const taxes = taxTotals.map((t) => ({ name: t.name, amount: Math.round(t.amount * discountFactor) }));
@@ -115,7 +117,8 @@ export default function CheckoutPage() {
   const breakdown: PaymentBreakdown = {
     subtotal,
     tax,
-    taxRate: st.noTax ? 0 : TAX_RATE,
+    // Solo informativo en el ticket: el desglose real va en `taxes`.
+    taxRate: 0,
     taxes,
     discount: effectiveDiscount,
     tip,
@@ -421,7 +424,7 @@ export default function CheckoutPage() {
               ) : taxes.length > 0 ? (
                 taxes.map((t) => <Row key={t.name} label={t.name} value={formatCurrency(t.amount)} muted />)
               ) : (
-                <Row label={`IVA (${Math.round(TAX_RATE * 100)}%)`} value={formatCurrency(0)} muted />
+                <Row label="Impuestos" value={formatCurrency(0)} muted />
               )}
               <Row label="Propina" value={formatCurrency(tip)} muted />
               <Separator className="my-2" />

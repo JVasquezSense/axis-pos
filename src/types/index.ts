@@ -157,6 +157,21 @@ export interface Product {
   inventoryQty?: number;
 }
 
+/**
+ * Impuesto del restaurante. Cada uno gestiona los suyos: el 8% venía fijo en el
+ * código y no valía para todos.
+ */
+export interface Tax {
+  id: string;
+  name: string;
+  type: "percent" | "fixed";
+  /** % cuando es porcentual, COP por unidad cuando es fijo. */
+  rate: number;
+  /** Se aplica a los productos que no declaran impuestos propios. */
+  isDefault?: boolean;
+  active?: boolean;
+}
+
 /** Un impuesto del producto: porcentual (IVA) o fijo por unidad (Ipoconsumo). */
 export interface ProductTax {
   id: string;

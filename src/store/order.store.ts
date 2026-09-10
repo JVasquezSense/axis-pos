@@ -4,8 +4,6 @@ import { USE_API, apiErrorHandler } from "@/services/http";
 import { ordersService } from "@/services/orders.service";
 import { useKitchenStore } from "./kitchen.store";
 
-export const TAX_RATE = 0.08;
-
 interface OrderState {
   tableNumber: number | null;
   lines: OrderLine[];
