@@ -416,17 +416,32 @@ export function AxisAI() {
 
   return (
     <>
-      {/* Botón flotante */}
+      {/* Botón flotante.
+
+          En reposo es solo el círculo del icono: con el nombre siempre visible
+          tapaba el contenido de debajo, sobre todo en pantallas estrechas. El
+          texto se despliega al pasar por encima (o al enfocarlo con el teclado)
+          para saber qué es antes de pulsarlo. */}
       <button
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "fixed bottom-5 right-5 z-50 flex h-14 items-center gap-2 rounded-full bg-gradient-to-br from-primary to-gold px-4 text-primary-foreground shadow-xl transition-transform hover:scale-105 active:scale-95",
+          "group fixed bottom-5 right-5 z-50 flex h-14 min-w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-gold px-4 text-primary-foreground shadow-xl transition-all duration-200 hover:scale-105 active:scale-95",
           open && "scale-0"
         )}
         aria-label="Axis IA"
       >
-        <Sparkles className="h-5 w-5" />
-        <span className="pr-1 text-sm font-semibold">Axis IA</span>
+        <Sparkles className="h-5 w-5 shrink-0" />
+        <span
+          className={cn(
+            // max-w en vez de width: `auto` no se puede animar y el botón daría
+            // un salto en vez de abrirse.
+            "ml-0 max-w-0 overflow-hidden whitespace-nowrap text-sm font-semibold opacity-0 transition-all duration-200",
+            "group-hover:ml-2 group-hover:max-w-32 group-hover:opacity-100",
+            "group-focus-visible:ml-2 group-focus-visible:max-w-32 group-focus-visible:opacity-100"
+          )}
+        >
+          Axis IA
+        </span>
         {alerts.length > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
             {alerts.length}
