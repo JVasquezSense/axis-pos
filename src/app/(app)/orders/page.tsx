@@ -152,14 +152,18 @@ export default function OrdersPage() {
                   onClick={() => handleAdd(p)}
                   disabled={!p.available}
                   className={cn(
-                    "group relative flex flex-col overflow-hidden rounded-xl border border-border bg-background text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
+                    // Sin overflow-hidden: en un elemento de rejilla convierte
+                    // la fila en una sola línea de alto y la tarjeta salía
+                    // recortada, sin nombre ni precio. Las esquinas las redondea
+                    // la propia imagen.
+                    "group relative flex flex-col rounded-xl border border-border bg-background text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
                     !p.available && "cursor-not-allowed opacity-50"
                   )}
                 >
                   {/* shrink-0: dentro de una columna flex la imagen se encogía
                       cuando la tarjeta se quedaba sin alto, y el nombre y el
                       precio quedaban cortados a media línea. */}
-                  <ProductImage emoji={p.image} category={p.category} className="h-24 w-full shrink-0 rounded-b-none" />
+                  <ProductImage emoji={p.image} category={p.category} className="h-24 w-full shrink-0 rounded-b-none rounded-t-xl" />
                   {p.popular && (
                     <Badge className="absolute left-2 top-2" variant="warning">
                       ★ Popular
