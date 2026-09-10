@@ -35,6 +35,8 @@ export function OrderPanel() {
   // producto, no de un porcentaje fijo sobre el total.
   const taxCatalog = useTaxesStore((s) => s.taxes);
   const { totals: taxTotals, total: tax } = computeTaxes(lines, taxCatalog);
+  // Basta con que una línea lo necesite para que el pedido pase por cocina.
+  const needsKitchen = lines.length === 0 || lines.some((l) => l.product.needsPreparation !== false);
   const total = subtotal + tax;
   const count = orderSelectors.count(lines);
   const auditLog = useAuditStore((s) => s.log);
@@ -246,7 +248,10 @@ export function OrderPanel() {
                   }
                 }}
               >
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar a cocina
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{" "}
+                {/* Prometer "a cocina" un pedido que no pasa por cocina confunde
+                    al mesero: sale listo para entregar en el acto. */}
+                {needsKitchen ? "Enviar a cocina" : "Enviar · listo para entregar"}
               </Button>
               )
             ) : (

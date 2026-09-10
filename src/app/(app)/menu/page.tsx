@@ -261,9 +261,14 @@ function CartaTab() {
       setRecipeOpen(true);
       return;
     }
-    // Una gaseosa no se prepara: los 10 minutos por defecto le ponen al KDS un
-    // tiempo objetivo que no existe.
-    setEditing({ ...emptyProduct(defaultCategory()), kind: "simple", prepMinutes: 0 });
+    // Una gaseosa no se prepara: arranca sin paso por cocina y sin tiempo
+    // objetivo. Se puede activar en el formulario si el producto sí lo lleva.
+    setEditing({
+      ...emptyProduct(defaultCategory()),
+      kind: "simple",
+      prepMinutes: 0,
+      needsPreparation: false,
+    });
     setFormOpen(true);
   };
 

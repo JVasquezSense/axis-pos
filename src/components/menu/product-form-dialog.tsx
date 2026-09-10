@@ -108,6 +108,8 @@ export function ProductFormDialog({
   const kind = hasRecipes ? (draft.kind ?? "simple") : "simple";
   const isSimple = kind === "simple";
 
+  const needsPrep = draft.needsPreparation !== false;
+
   const cost = Number(draft.cost ?? 0);
   const margin = draft.price > 0 && cost > 0 ? (draft.price - cost) / draft.price : null;
   const linkedItem = supplies.find((i) => String(i.id) === String(draft.inventoryId ?? ""));
@@ -237,10 +239,9 @@ export function ProductFormDialog({
             </div>
           </div>
 
-          <div className={cn("grid gap-3", isSimple ? "grid-cols-1" : "grid-cols-2")}>
-            {/* Un producto que no se prepara no tiene tiempo de preparación que
-                darle al KDS. */}
-            {!isSimple && (
+          <div className={cn("grid gap-3", needsPrep ? "grid-cols-2" : "grid-cols-1")}>
+            {/* Sin preparación no hay tiempo que darle al KDS. */}
+            {needsPrep && (
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Preparación (min)</label>
                 <Input type="number" min={0} value={draft.prepMinutes} onChange={(e) => set({ prepMinutes: Number(e.target.value) })} />
@@ -257,6 +258,26 @@ export function ProductFormDialog({
                   </span>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Pasa o no por cocina. Antes lo decidía el KDS para todo por igual,
+              y una cerveza tenía que recorrer el tablero para que el mesero
+              pudiera entregarla. */}
+          <div className="rounded-xl border border-border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Requiere preparación</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {needsPrep
+                    ? "Pasa por cocina y recorre el KDS: pendiente, preparando y listo."
+                    : "Se omite el KDS: el pedido entra directamente como listo para entregar."}
+                </p>
+              </div>
+              <Switch
+                checked={needsPrep}
+                onCheckedChange={(v) => set({ needsPreparation: v, ...(v ? {} : { prepMinutes: 0 }) })}
+              />
             </div>
           </div>
 

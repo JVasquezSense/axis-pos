@@ -149,6 +149,11 @@ export interface Product {
    */
   kind?: ProductKind;
   /**
+   * ¿Pasa por cocina? Lo que no se prepara —una cerveza de la nevera— nace
+   * listo en el KDS en vez de obligar al mesero a ir a marcarlo.
+   */
+  needsPreparation?: boolean;
+  /**
    * Insumo que descuenta este producto al venderse. Para lo que se vende tal
    * cual —una cerveza, una cajetilla— sin necesidad de ficha técnica.
    */

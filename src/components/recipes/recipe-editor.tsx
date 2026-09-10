@@ -314,8 +314,10 @@ export function RecipeEditor({
         available: finalDraft.status === "active",
         prepMinutes: finalDraft.prepMinutes,
         popular: false,
-        // Se crea desde una ficha técnica: descuenta sus insumos.
+        // Se crea desde una ficha técnica: descuenta sus insumos y pasa por
+        // cocina. Si algún plato no se prepara, se desmarca en el producto.
         kind: "compound",
+        needsPreparation: true,
       };
       if (USE_API) {
         try {

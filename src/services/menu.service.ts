@@ -15,6 +15,7 @@ function normalizeProduct(p: Product): Product {
     price: Number(p.price),
     cost: p.cost != null ? Number(p.cost) : 0,
     kind: p.kind ?? "simple",
+    needsPreparation: p.needsPreparation ?? true,
     inventoryQty: p.inventoryQty != null ? Number(p.inventoryQty) : 1,
     variations: (p.variations ?? []).map((v) => ({ ...v, priceDelta: Number(v.priceDelta) })),
   };

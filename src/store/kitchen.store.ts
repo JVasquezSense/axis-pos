@@ -54,12 +54,16 @@ export const useKitchenStore = create<KitchenState>()((set, get) => ({
       quantity: l.quantity,
       notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
     }));
+    // Un pedido sin nada que preparar nace listo, igual que en el servidor:
+    // recorrer el KDS para nada obligaba al mesero a ir a marcarlo para poder
+    // entregarlo. Basta con que una línea lo necesite para pasar por cocina.
+    const needsKitchen = lines.length === 0 || lines.some((l) => l.product.needsPreparation !== false);
     const ticket: KdsTicket = {
       id: `kds-${Date.now()}`,
       code,
       table: table ?? undefined,
       channel,
-      status: "pending",
+      status: needsKitchen ? "pending" : "ready",
       createdAt: new Date().toISOString(),
       items,
       priority: false,

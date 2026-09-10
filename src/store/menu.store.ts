@@ -209,5 +209,6 @@ export function emptyProduct(category: string): Product {
     // Arranca simple: es lo más común y lo más fácil de entender. Quien vende
     // platos preparados marca "Requiere insumos" y le arma la ficha técnica.
     kind: "simple",
+    needsPreparation: true,
   };
 }
