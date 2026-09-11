@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Bike, CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User } from "lucide-react";
+import { Bike, CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User, MonitorSmartphone } from "lucide-react";
+import { publishDisplay, openDisplayWindow } from "@/lib/customer-display";
+import { lineUnitPrice } from "@/lib/taxes";
 import { useEmployeesStore } from "@/store/employees.store";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
 import { PageHeader } from "@/components/shared/page-header";
@@ -113,6 +115,40 @@ export default function CheckoutPage() {
   const tip = st.full ? 0 : Math.round(subtotal * tipRate);
   const total = taxedBase + tax + tip;
   const remaining = Math.max(total - splitCollected, 0);
+
+  // Pantalla del cliente: un segundo monitor de cara al comprador que muestra
+  // lo que se le está cobrando. Se publica en cada cambio; la ventana /display
+  // lo recibe por BroadcastChannel dentro del mismo navegador.
+  useEffect(() => {
+    if (lines.length === 0) {
+      publishDisplay({
+        phase: "idle", lines: [], subtotal: 0, taxes: [], tip: 0, discount: 0, total: 0,
+        collected: 0, table: null, origin: "", waiter: "",
+      });
+      return;
+    }
+    publishDisplay({
+      phase: "billing",
+      lines: lines.map((l) => ({
+        name: l.product.name,
+        quantity: l.quantity,
+        unitPrice: lineUnitPrice(l),
+        total: lineUnitPrice(l) * l.quantity,
+        notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
+      })),
+      subtotal,
+      taxes,
+      tip,
+      discount: effectiveDiscount,
+      total,
+      collected: splitCollected,
+      table,
+      origin: delivery ? `Domicilio ${delivery.code}` : st.label,
+      waiter: waiter.trim(),
+    });
+  // Solo lo que se muestra; `taxes` se recalcula en cada render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, subtotal, tip, effectiveDiscount, total, splitCollected, table, delivery?.code, st.label, waiter, JSON.stringify(taxes)]);
 
   const breakdown: PaymentBreakdown = {
     subtotal,
@@ -228,6 +264,13 @@ export default function CheckoutPage() {
       updateDeliveryStatus(deliveryId, "delivered");
       setDeliveryId(null);
     }
+    publishDisplay({
+      phase: "paid",
+      lines: [], subtotal, taxes, tip, discount: effectiveDiscount, total,
+      collected: total, table, origin: st.label, waiter: waiter.trim(),
+      invoiceNumber: invoiceNumber || undefined,
+      method: splitCollected > 0 ? "varios medios" : PAYMENT_LABEL[method],
+    });
     await markPaid();
     clear();
     if (splitCollected > 0) {
@@ -299,7 +342,14 @@ export default function CheckoutPage() {
         title="Caja y Cobro"
         description={delivery ? `Domicilio ${delivery.code} · ${delivery.customerName}` : table ? `Cobrando mesa ${table}` : "Venta directa"}
         icon={<CreditCard className="h-5 w-5" />}
-        actions={<Badge variant="secondary">{orderSelectors.count(lines)} ítems</Badge>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={openDisplayWindow} title="Abrir la pantalla que mira el cliente en otra ventana">
+              <MonitorSmartphone className="h-4 w-4" /> Pantalla cliente
+            </Button>
+            <Badge variant="secondary">{orderSelectors.count(lines)} ítems</Badge>
+          </div>
+        }
       />
 
       {/* Datos de la venta: mesa + tipo */}
