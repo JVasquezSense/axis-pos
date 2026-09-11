@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Bike, CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User, MonitorSmartphone } from "lucide-react";
 import { publishDisplay, openDisplayWindow, type DisplayPerson } from "@/lib/customer-display";
@@ -120,8 +120,13 @@ export default function CheckoutPage() {
   // Pantalla del cliente: un segundo monitor de cara al comprador que muestra
   // lo que se le está cobrando. Se publica en cada cambio; la ventana /display
   // lo recibe por BroadcastChannel dentro del mismo navegador.
+  // Tras cobrar, el carrito se vacía y este efecto publicaría "bienvenida"
+  // encima del "gracias" sin dar tiempo a leerlo. La propia pantalla vuelve a
+  // la bienvenida sola pasados unos segundos.
+  const paidAt = useRef(0);
   useEffect(() => {
     if (lines.length === 0) {
+      if (Date.now() - paidAt.current < 12_000) return;
       publishDisplay({
         phase: "idle", lines: [], subtotal: 0, taxes: [], tip: 0, discount: 0, total: 0,
         collected: 0, table: null, origin: "", waiter: "",
@@ -276,6 +281,7 @@ export default function CheckoutPage() {
       updateDeliveryStatus(deliveryId, "delivered");
       setDeliveryId(null);
     }
+    paidAt.current = Date.now();
     publishDisplay({
       phase: "paid",
       lines: [], subtotal, taxes, tip, discount: effectiveDiscount, total,
