@@ -136,6 +136,7 @@ export default function CheckoutPage() {
     publishDisplay({
       phase: "billing",
       lines: lines.map((l) => ({
+        image: l.product.image?.startsWith("data:") ? undefined : l.product.image,
         name: l.product.name,
         quantity: l.quantity,
         unitPrice: lineUnitPrice(l),

@@ -12,6 +12,9 @@
 export type DisplayPhase = "idle" | "billing" | "paid";
 
 export interface DisplayLine {
+  /** Emoji o URL corta del producto. Nunca una foto en base64: pesa demasiado
+   *  para publicarla en cada cambio. */
+  image?: string;
   name: string;
   quantity: number;
   unitPrice: number;
