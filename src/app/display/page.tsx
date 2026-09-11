@@ -6,6 +6,11 @@ import { useAppStore } from "@/store/app.store";
 import { readDisplay, subscribeDisplay, IDLE_STATE, type DisplayState } from "@/lib/customer-display";
 import { cn, formatCurrency } from "@/lib/utils";
 
+const PERSON_COLORS = [
+  "bg-violet-500", "bg-emerald-500", "bg-sky-500", "bg-amber-500",
+  "bg-rose-500", "bg-fuchsia-500", "bg-cyan-500", "bg-orange-500",
+];
+
 function isImageUrl(src: string) {
   return src.startsWith("data:") || src.startsWith("http") || src.startsWith("/");
 }
@@ -124,8 +129,35 @@ export default function CustomerDisplayPage() {
               ))}
               {state.tip > 0 && <Row label="Propina" value={formatCurrency(state.tip)} muted />}
             </dl>
+            {state.split && state.split.length > 0 && (
+              <div className="mt-5 border-t border-border pt-4">
+                <p className="mb-2 text-sm uppercase tracking-wider text-muted-foreground">Cuenta dividida</p>
+                <ul className="space-y-1.5">
+                  {state.split.map((p) => (
+                    <li
+                      key={p.index}
+                      className={cn(
+                        "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-lg",
+                        p.paid ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-background/60"
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className={cn("flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white", PERSON_COLORS[p.index % PERSON_COLORS.length])}>
+                          {p.paid ? <Check className="h-4 w-4" /> : p.index + 1}
+                        </span>
+                        Persona {p.index + 1}
+                        {p.paid && p.method && <span className="text-sm opacity-80">· {p.method}</span>}
+                      </span>
+                      <span className="font-semibold tabular-nums">{p.total === 0 ? "—" : formatCurrency(p.total)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="mt-5 border-t-2 border-border pt-5">
-              <p className="text-lg uppercase tracking-wider text-muted-foreground">Total a pagar</p>
+              <p className="text-lg uppercase tracking-wider text-muted-foreground">
+                {state.split && state.split.length > 0 ? "Pendiente por pagar" : "Total a pagar"}
+              </p>
               <p className="text-6xl font-black tabular-nums text-primary">{formatCurrency(pending)}</p>
               {state.collected > 0 && (
                 <p className="mt-2 text-lg text-muted-foreground">

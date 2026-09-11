@@ -70,6 +70,7 @@ export function SplitBillDialog({
   breakdown,
   onPayPerson,
   onComplete,
+  onSplitChange,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -79,6 +80,8 @@ export function SplitBillDialog({
   onPayPerson: (share: PersonShare, method: PaymentMethod) => Promise<string | undefined | null>;
   /** Todos cobrados: cerrar la mesa. */
   onComplete: () => void;
+  /** Reparto actual (o null al cerrar), para la pantalla del cliente. */
+  onSplitChange?: (people: { index: number; total: number; paid: boolean; method?: string }[] | null) => void;
 }) {
   const [people, setPeople] = useState(2);
   const [mode, setMode] = useState<"equal" | "items">("equal");
@@ -213,6 +216,22 @@ export function SplitBillDialog({
     ? lines.reduce((s, l) => s + (l.quantity - assignedOf(l)), 0)
     : 0;
 
+  // La pantalla del cliente muestra el reparto mientras el diálogo esté
+  // abierto: cuánto paga cada quien y quién ya pagó.
+  useEffect(() => {
+    if (!onSplitChange) return;
+    if (!open) { onSplitChange(null); return; }
+    onSplitChange(
+      shares.map((sh) => ({
+        index: sh.index,
+        total: sh.total,
+        paid: Boolean(payments[sh.index]),
+        method: payments[sh.index] ? PAYMENT_LABEL[payments[sh.index].method] : undefined,
+      }))
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, shares, payments]);
+
   const pending = shares.filter((s) => s.total > 0 && !payments[s.index]);
   const collected = Object.values(payments).reduce((s, p) => s + p.amount, 0);
   const allPaid = pending.length === 0 && shares.some((s) => s.total > 0);
@@ -226,8 +245,12 @@ export function SplitBillDialog({
       toast.success(`Persona ${share.index + 1} cobrada`, {
         description: `${formatCurrency(share.total)} · ${PAYMENT_LABEL[m]}${invoice ? ` · ${invoice}` : ""}`,
       });
-    } catch {
-      toast.error("No se pudo registrar el cobro");
+    } catch (err) {
+      // El motivo importa: "Daviplata no es una elección válida" no se arregla
+      // reintentando, y sin verlo el cajero no sabe qué cambiar.
+      toast.error("No se pudo registrar el cobro", {
+        description: err instanceof Error ? err.message.slice(0, 140) : undefined,
+      });
     } finally {
       setPaying(null);
     }

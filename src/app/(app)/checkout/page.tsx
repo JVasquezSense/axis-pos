@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Bike, CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User, MonitorSmartphone } from "lucide-react";
-import { publishDisplay, openDisplayWindow } from "@/lib/customer-display";
+import { publishDisplay, openDisplayWindow, type DisplayPerson } from "@/lib/customer-display";
 import { lineUnitPrice } from "@/lib/taxes";
 import { useEmployeesStore } from "@/store/employees.store";
 import type { PaymentMethod, PaymentBreakdown } from "@/types";
@@ -72,6 +72,7 @@ export default function CheckoutPage() {
   const [splitCollected, setSplitCollected] = useState(0);
   const [invoiceNumber, setInvoiceNumber] = useState<string>("");
   const [deliveryId, setDeliveryId] = useState<string | null>(null);
+  const [splitPeople, setSplitPeople] = useState<DisplayPerson[] | null>(null);
 
   // Los domicilios se cobraban "a ojo" como venta directa: no había forma de
   // traer la cuenta del pedido ni de dejarlo marcado como cobrado.
@@ -142,13 +143,14 @@ export default function CheckoutPage() {
       discount: effectiveDiscount,
       total,
       collected: splitCollected,
+      split: splitPeople ?? undefined,
       table,
       origin: delivery ? `Domicilio ${delivery.code}` : st.label,
       waiter: waiter.trim(),
     });
   // Solo lo que se muestra; `taxes` se recalcula en cada render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines, subtotal, tip, effectiveDiscount, total, splitCollected, table, delivery?.code, st.label, waiter, JSON.stringify(taxes)]);
+  }, [lines, subtotal, tip, effectiveDiscount, total, splitCollected, splitPeople, table, delivery?.code, st.label, waiter, JSON.stringify(taxes)]);
 
   const breakdown: PaymentBreakdown = {
     subtotal,
@@ -184,9 +186,12 @@ export default function CheckoutPage() {
       });
       setInvoiceNumber(saved.invoiceNumber ?? "");
       setPayOpen(true);
-    } catch {
-      setInvoiceNumber("");
-      setPayOpen(true);
+    } catch (err) {
+      // Antes se abría el diálogo de pago sin factura y sin decir por qué; el
+      // cajero cerraba la venta creyendo que se había registrado.
+      toast.error("No se pudo registrar la venta", {
+        description: err instanceof Error ? err.message.slice(0, 140) : undefined,
+      });
     }
   };
 
@@ -590,6 +595,7 @@ export default function CheckoutPage() {
         breakdown={{ subtotal, tax, tip, discount: effectiveDiscount, total }}
         onPayPerson={payPerson}
         onComplete={completeSale}
+        onSplitChange={setSplitPeople}
       />
 
       <PaymentDialog

@@ -19,8 +19,18 @@ export interface DisplayLine {
   notes?: string;
 }
 
+/** Un comensal en la cuenta dividida, tal como lo ve el cliente. */
+export interface DisplayPerson {
+  index: number;
+  total: number;
+  paid: boolean;
+  method?: string;
+}
+
 export interface DisplayState {
   phase: DisplayPhase;
+  /** Presente mientras la caja está dividiendo la cuenta. */
+  split?: DisplayPerson[];
   lines: DisplayLine[];
   subtotal: number;
   taxes: { name: string; amount: number }[];
