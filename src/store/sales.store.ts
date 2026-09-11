@@ -20,6 +20,12 @@ export interface SaleRecord {
   customer?: string;
   observations?: string;
   invoiceNumber?: string;
+  /** Pedidos que cobró (para anularla y devolver el inventario). Solo al crear. */
+  orderIds?: string[];
+  /** Venta directa sin pedido: líneas que descontó al cobrar. Solo al crear. */
+  consumedLines?: { productId: string; quantity: number }[];
+  /** Lo devuelve el servidor: códigos de los pedidos cobrados. */
+  orderCodes?: string[];
   ts: number;
 }
 
@@ -27,6 +33,8 @@ interface SalesState {
   records: SaleRecord[];
   load: () => Promise<void>;
   record: (s: Omit<SaleRecord, "id" | "ts">) => Promise<SaleRecord>;
+  /** Anula una venta. Lanza si el servidor la rechaza (p. ej. sin permiso). */
+  remove: (id: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -53,6 +61,11 @@ export const useSalesStore = create<SalesState>()((set) => ({
       }
     }
     return entry;
+  },
+
+  remove: async (id) => {
+    await salesService.remove(id);
+    set((st) => ({ records: st.records.filter((r) => String(r.id) !== String(id)) }));
   },
 
   reset: () => set({ records: [] }),

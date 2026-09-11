@@ -236,9 +236,17 @@ export function OrderPanel() {
                   try {
                     const ticket = await sendToKitchen("dine_in");
                     occupyTable(tableNumber, total);
-                    auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} - ${count} productos - ${formatCurrency(total)} - Mesa ${tableNumber}`, user: "Sistema", module: "ventas" });
-                    toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos - ${formatCurrency(total)}` });
-                    router.push("/kitchen");
+                    if (needsKitchen) {
+                      auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} - ${count} productos - ${formatCurrency(total)} - Mesa ${tableNumber}`, user: "Sistema", module: "ventas" });
+                      toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos - ${formatCurrency(total)}` });
+                      router.push("/kitchen");
+                    } else {
+                      // Nada que preparar: el pedido ya está listo. Mandar al
+                      // mesero al KDS era mandarlo a mirar una pantalla vacía.
+                      auditLog({ action: "Pedido listo sin cocina", details: `${ticket.code} - ${count} productos - ${formatCurrency(total)} - Mesa ${tableNumber}`, user: "Sistema", module: "ventas" });
+                      toast.success(`Pedido ${ticket.code} listo para entregar`, { description: `Mesa ${tableNumber} · ${count} productos · sin paso por cocina` });
+                      router.push("/salon");
+                    }
                   } catch (err) {
                     const msg = err instanceof Error ? err.message : "Error desconocido";
                     console.error("[sendToKitchen] error:", err);

@@ -109,14 +109,14 @@ export function ConsumptionView() {
         rows.push([d.name, d.sold, it.name, it.qty, it.unit, it.cost]);
       });
     });
-    exportCsv("salida-insumos-por-plato-axis", ["Plato", "Uds vendidas", "Insumo", "Cantidad", "Unidad", "Costo"], rows);
+    exportCsv("salida-insumos-por-producto-axis", ["Producto", "Uds vendidas", "Insumo", "Cantidad", "Unidad", "Costo"], rows);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="font-semibold">Salida de insumos por plato</p>
+          <p className="font-semibold">Salida de insumos por producto</p>
           <p className="text-sm text-muted-foreground">
             Consumo teórico de materia prima según recetas y unidades vendidas · {describeRange(range)}.
           </p>

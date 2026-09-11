@@ -48,12 +48,12 @@ export const saasService = {
   async getUsers(tenantId: string): Promise<TenantUser[]> {
     return USE_API ? request<TenantUser[]>(`/admin/tenants/${tenantId}/users/`) : mockRequest([], 300);
   },
-  async createUser(tenantId: string, data: { username: string; email: string; password: string; role: string }): Promise<TenantUser> {
+  async createUser(tenantId: string, data: { username: string; email: string; password: string; role: string; roles?: string[] }): Promise<TenantUser> {
     return USE_API
       ? request<TenantUser>(`/admin/tenants/${tenantId}/users/`, { method: "POST", body: JSON.stringify(data) })
       : mockRequest({ id: Date.now(), ...data, is_active: true } as unknown as TenantUser, 300);
   },
-  async updateUser(tenantId: string, userId: number, data: { username?: string; email?: string; password?: string; role?: string }): Promise<TenantUser> {
+  async updateUser(tenantId: string, userId: number, data: { username?: string; email?: string; password?: string; role?: string; roles?: string[] }): Promise<TenantUser> {
     return USE_API
       ? request<TenantUser>(`/admin/tenants/${tenantId}/users/${userId}/`, { method: "PATCH", body: JSON.stringify(data) })
       : mockRequest({ id: userId, ...data } as unknown as TenantUser, 200);

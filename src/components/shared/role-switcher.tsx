@@ -25,8 +25,19 @@ const DOT: Record<string, string> = {
 
 export function RoleSwitcher() {
   const router = useRouter();
-  const { role, setRole } = useAppStore();
+  const { role, setRole, userRoles } = useAppStore();
   const current = ROLES[role];
+  // Solo las vistas de los roles que el usuario tiene. Antes cualquiera podía
+  // ponerse la vista de administrador desde aquí.
+  const options = userRoles ? ROLE_LIST.filter((r) => userRoles.includes(r.id)) : ROLE_LIST;
+  if (options.length <= 1) {
+    return (
+      <span className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm font-medium shadow-sm">
+        <span className={cn("h-2 w-2 rounded-full", DOT[current.color])} />
+        <span className="hidden sm:inline">{current.label}</span>
+      </span>
+    );
+  }
 
   return (
     <DropdownMenu>
@@ -40,7 +51,7 @@ export function RoleSwitcher() {
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>Cambiar vista por rol</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {ROLE_LIST.map((r) => (
+        {options.map((r) => (
           <DropdownMenuItem
             key={r.id}
             onClick={() => {

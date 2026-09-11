@@ -196,6 +196,7 @@ export default function CheckoutPage() {
         total, subtotal: breakdown.subtotal, tax: breakdown.tax, discount: breakdown.discount,
         items: orderSelectors.count(lines), method, saleType: st.label, table, tip,
         waiter: waiter.trim() || "Sin asignar",
+        ...saleOrigin(),
       });
       setInvoiceNumber(saved.invoiceNumber ?? "");
       setPayOpen(true);
@@ -230,6 +231,7 @@ export default function CheckoutPage() {
       tip: share.tip,
       waiter: waiter.trim(),
       observations: `Cuenta dividida · persona ${share.index + 1}`,
+      ...saleOrigin(),
     });
     setSplitCollected((prev) => Math.min(prev + share.total, total));
     auditLog({
@@ -239,6 +241,19 @@ export default function CheckoutPage() {
       module: "ventas",
     });
     return saved.invoiceNumber;
+  };
+
+  /**
+   * De dónde sale el inventario de esta venta, para poder anularla después:
+   * los pedidos de la mesa, o —venta directa— las líneas que va a descontar.
+   */
+  const saleOrigin = () => {
+    const orderIds = useOrderStore.getState().activeOrderIds;
+    if (orderIds.length > 0) return { orderIds };
+    const direct = !table && saleType !== "takeaway";
+    return direct
+      ? { consumedLines: lines.map((l) => ({ productId: String(l.product.id), quantity: l.quantity })) }
+      : {};
   };
 
   const completeSale = async () => {

@@ -16,4 +16,8 @@ export const salesService = {
     const saved = await request<SaleRecord>("/sales/", { method: "POST", body: JSON.stringify(s) });
     return normalizeSale(saved);
   },
+  /** Anula la venta; el servidor devuelve al inventario lo que descontó. */
+  async remove(id: string): Promise<void> {
+    if (USE_API) await request<void>(`/sales/${id}/`, { method: "DELETE" });
+  },
 };

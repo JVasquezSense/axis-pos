@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { PaymentMethod } from "@/types";
 import { USE_API } from "@/services/http";
+import { useSalesStore } from "./sales.store";
 import { salesService } from "@/services/sales.service";
 import { shiftsService } from "@/services/shifts.service";
 
@@ -39,6 +40,8 @@ interface HistoryState {
   /** Trae todas las ventas reales del backend y las fusiona con las locales. */
   load: () => Promise<void>;
   archiveSales: (records: ArchivedSale[]) => void;
+  /** Anula una venta en el servidor (devuelve el inventario) y la quita de aquí. */
+  removeSale: (id: string) => Promise<void>;
   closeShift: (shift: Omit<ShiftClose, "id" | "ts">) => void;
 }
 
@@ -73,6 +76,13 @@ export const useHistoryStore = create<HistoryState>()(
 
       archiveSales: (records) =>
         set((s) => ({ sales: [...records, ...s.sales].slice(0, 2000) })),
+
+      removeSale: async (id) => {
+        await salesService.remove(id);
+        set((s) => ({ sales: s.sales.filter((x) => String(x.id) !== String(id)) }));
+        // La caja también tiene su lista del día.
+        useSalesStore.setState((st) => ({ records: st.records.filter((r) => String(r.id) !== String(id)) }));
+      },
 
       closeShift: (shift) => {
         const entry: ShiftClose = {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, Pencil, Trash2, UserCog, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,7 @@ import {
 const ROLES: EmployeeRole[] = ["mesero", "cocinero", "cajero", "admin", "almacen"];
 
 function emptyEmployee(): Omit<Employee, "id"> {
-  return { name: "", role: "mesero", active: true, phone: "", email: "" };
+  return { name: "", role: "mesero", roles: ["mesero"], active: true, phone: "", email: "" };
 }
 
 export default function EmployeesPage() {
@@ -50,7 +51,7 @@ export default function EmployeesPage() {
       e.name.toLowerCase().includes(search.toLowerCase()) ||
       e.phone.includes(search) ||
       e.email.toLowerCase().includes(search.toLowerCase());
-    const matchRole = roleFilter === "all" || e.role === roleFilter;
+    const matchRole = roleFilter === "all" || (e.roles?.length ? e.roles : [e.role]).includes(roleFilter);
     return matchSearch && matchRole;
   });
 
@@ -62,7 +63,7 @@ export default function EmployeesPage() {
 
   const openEdit = (e: Employee) => {
     setEditing(e);
-    setForm({ name: e.name, role: e.role, active: e.active, phone: e.phone, email: e.email });
+    setForm({ name: e.name, role: e.role, roles: e.roles?.length ? e.roles : [e.role], active: e.active, phone: e.phone, email: e.email });
     setOpen(true);
   };
 
@@ -142,7 +143,7 @@ export default function EmployeesPage() {
                       variant="outline"
                       className={`mt-1 text-xs ${EMPLOYEE_ROLE_COLORS[emp.role]}`}
                     >
-                      {EMPLOYEE_ROLE_LABELS[emp.role]}
+                      {(emp.roles?.length ? emp.roles : [emp.role]).map((r) => EMPLOYEE_ROLE_LABELS[r]).join(" · ")}
                     </Badge>
                   </div>
                   <Badge variant={emp.active ? "default" : "secondary"} className="shrink-0 text-xs">
@@ -201,18 +202,39 @@ export default function EmployeesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />
             </div>
+            {/* Varios roles: en un restaurante pequeño la misma persona es
+                cajera y mesera. El primero elegido es el principal. */}
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Rol *</label>
-              <Select value={form.role} onValueChange={(v) => setForm((f) => ({ ...f, role: v as EmployeeRole }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>{EMPLOYEE_ROLE_LABELS[r]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <label className="mb-1.5 block text-sm font-medium">Roles *</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ROLES.map((r) => {
+                  const selected = (form.roles ?? [form.role]).includes(r);
+                  return (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => {
+                          const cur = f.roles?.length ? f.roles : [f.role];
+                          const next = selected ? cur.filter((x) => x !== r) : [...cur, r];
+                          if (next.length === 0) return f; // siempre al menos uno
+                          return { ...f, roles: next, role: next[0] };
+                        })
+                      }
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                        selected ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted"
+                      )}
+                    >
+                      {EMPLOYEE_ROLE_LABELS[r]}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Principal: <span className="font-medium text-foreground">{EMPLOYEE_ROLE_LABELS[(form.roles ?? [form.role])[0]]}</span>
+                {(form.roles?.length ?? 1) > 1 && ` · ${(form.roles?.length ?? 1) - 1} más`}
+              </p>
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Teléfono</label>

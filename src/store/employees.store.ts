@@ -8,7 +8,10 @@ export type EmployeeRole = "mesero" | "cocinero" | "cajero" | "admin" | "almacen
 export interface Employee {
   id: string;
   name: string;
+  /** Rol principal (el primero de `roles`); se conserva por compatibilidad. */
   role: EmployeeRole;
+  /** Todos sus roles: la misma persona puede ser cajera y mesera. */
+  roles?: EmployeeRole[];
   active: boolean;
   phone: string;
   email: string;

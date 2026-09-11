@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { History, Search, CalendarDays, Loader2 } from "lucide-react";
+import { History, Search, CalendarDays, Loader2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useAppStore } from "@/store/app.store";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { ApiError } from "@/services/http";
 import { useHistoryStore, type ArchivedSale } from "@/store/history.store";
 import { USE_API } from "@/services/http";
 import { PageHeader } from "@/components/shared/page-header";
@@ -58,6 +65,25 @@ function fmtTime(ts: number) {
 }
 
 export default function HistoryPage() {
+  const isAdmin = useAppStore((st) => st.role) === "admin";
+  const removeSale = useHistoryStore((st) => st.removeSale);
+  const [toVoid, setToVoid] = useState<ArchivedSale | null>(null);
+  const [voiding, setVoiding] = useState(false);
+
+  const confirmVoid = async () => {
+    if (!toVoid) return;
+    setVoiding(true);
+    try {
+      await removeSale(String(toVoid.id));
+      toast.success(`Venta ${toVoid.invoiceNumber || ""} anulada`, { description: "El inventario volvió al kardex." });
+      setToVoid(null);
+    } catch (err) {
+      toast.error("No se pudo anular", { description: err instanceof ApiError ? err.message.slice(0, 140) : undefined });
+    } finally {
+      setVoiding(false);
+    }
+  };
+
   const sales = useHistoryStore((s) => s.sales);
   const loading = useHistoryStore((s) => s.loading);
   const load = useHistoryStore((s) => s.load);
@@ -192,6 +218,7 @@ export default function HistoryPage() {
                     <th className="px-4 py-2.5 font-medium">Método</th>
                     <th className="px-4 py-2.5 font-medium">Propina</th>
                     <th className="px-4 py-2.5 font-medium text-right">Total</th>
+                    {isAdmin && <th className="px-2 py-2.5" />}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -224,6 +251,18 @@ export default function HistoryPage() {
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right font-semibold">{formatCurrency(s.total)}</td>
+                      {isAdmin && (
+                        <td className="px-2 py-2.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setToVoid(s)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            title="Anular venta"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -232,6 +271,34 @@ export default function HistoryPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Anular es irreversible y mueve inventario: se confirma con el detalle
+          a la vista. */}
+      <Dialog open={!!toVoid} onOpenChange={(v) => !v && setToVoid(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Anular venta {toVoid?.invoiceNumber || ""}</DialogTitle>
+            <DialogDescription>
+              Se elimina del historial y del cierre de turno, y el inventario que descontó vuelve al kardex
+              como entrada. No se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          {toVoid && (
+            <div className="rounded-xl border border-border p-3 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Total</span><span className="font-semibold">{formatCurrency(toVoid.total)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Método</span><span>{PAYMENT_LABEL[toVoid.method] ?? toVoid.method}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Tipo</span><span>{toVoid.saleType}{toVoid.table ? ` · Mesa ${toVoid.table}` : ""}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Fecha</span><span>{fmtDate(toVoid.ts)} {fmtTime(toVoid.ts)}</span></div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setToVoid(null)} disabled={voiding}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmVoid} disabled={voiding}>
+              {voiding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Anular venta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

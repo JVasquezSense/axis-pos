@@ -16,6 +16,7 @@ import { useDeliveryStore } from "@/store/delivery.store";
 import { useTaxesStore } from "@/store/taxes.store";
 import { useAppStore } from "@/store/app.store";
 import { meService } from "@/services/me.service";
+import type { Role } from "@/types";
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const loaded = useRef(false);
@@ -37,6 +38,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const tenantId = useAuthStore((s) => s.tenantId);
   const updateRestaurant = useAppStore((s) => s.updateRestaurant);
   const setFeatures = useAppStore((s) => s.setFeatures);
+  const setUserRoles = useAppStore((s) => s.setUserRoles);
 
   useEffect(() => {
     if (loaded.current || !USE_API) return;
@@ -71,6 +73,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updateRestaurant(patch);
         // Features del plan: restringen la barra lateral y los módulos.
         setFeatures(me.tenantFeatures ?? null, me.tenantMaxUsers ?? undefined);
+        // Roles reales del usuario: el superadmin conserva todas las vistas.
+        setUserRoles(me.isSuperuser ? null : ((me.roles ?? (me.role ? [me.role] : [])) as Role[]));
       })
       .catch(() => { /* sin sesión válida: se conserva lo que haya */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps

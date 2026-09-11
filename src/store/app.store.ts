@@ -20,7 +20,10 @@ export interface Restaurant {
 export type Features = Record<string, boolean | number>;
 
 interface AppState {
+  /** Vista activa. */
   role: Role;
+  /** Roles que el servidor le asignó al usuario; null = sin resolver (todos). */
+  userRoles: Role[] | null;
   sidebarCollapsed: boolean;
   commandOpen: boolean;
   restaurant: Restaurant;
@@ -28,6 +31,8 @@ interface AppState {
   features: Features | null;
   maxUsers: number;
   setRole: (role: Role) => void;
+  /** Fija los roles del usuario y deja como vista activa uno de ellos. */
+  setUserRoles: (roles: Role[] | null) => void;
   toggleSidebar: () => void;
   setSidebar: (v: boolean) => void;
   setCommandOpen: (v: boolean) => void;
@@ -39,12 +44,21 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       role: "admin",
+      userRoles: null,
       sidebarCollapsed: false,
       commandOpen: false,
       restaurant: { name: "Demo Burger", slug: "demo-burger", plan: "Growth", logo: "🍔", banner: "" },
       features: null,
       maxUsers: 2,
       setRole: (role) => set({ role }),
+      setUserRoles: (roles) =>
+        set((s) => {
+          if (!roles || roles.length === 0) return { userRoles: null };
+          // La vista activa tiene que ser uno de los roles propios: un mesero
+          // no puede quedarse en la vista de administrador.
+          const role = roles.includes(s.role) ? s.role : roles[0];
+          return { userRoles: roles, role };
+        }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebar: (v) => set({ sidebarCollapsed: v }),
       setCommandOpen: (v) => set({ commandOpen: v }),
@@ -54,7 +68,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "axis-app-store",
-      partialize: (s) => ({ restaurant: s.restaurant, features: s.features, maxUsers: s.maxUsers }),
+      partialize: (s) => ({ restaurant: s.restaurant, features: s.features, maxUsers: s.maxUsers, role: s.role, userRoles: s.userRoles }),
     }
   )
 );

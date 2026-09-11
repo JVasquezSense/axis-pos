@@ -10,6 +10,7 @@ export interface Me {
   isSuperuser: boolean;
   hasProfile: boolean;
   role: string | null;
+  roles?: string[] | null;
   tenantId: string | null;
   tenantName: string | null;
   tenantSlug: string | null;

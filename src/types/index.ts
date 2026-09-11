@@ -409,6 +409,8 @@ export interface TenantUser {
   username: string;
   email: string;
   role: string;
+  /** Todos sus roles; `role` es el principal. */
+  roles?: string[];
   is_active: boolean;
 }
 

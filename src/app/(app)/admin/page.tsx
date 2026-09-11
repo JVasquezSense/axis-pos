@@ -27,7 +27,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { DonutChart } from "@/components/reports/charts-lazy";
 import { SalesByHourChart } from "@/components/dashboard/charts-lazy";
 import { TENANT_STATUS, PLAN_LABEL } from "@/lib/status";
-import { formatCurrency, formatNumber, slugify } from "@/lib/utils";
+import { cn, formatCurrency, formatNumber, slugify } from "@/lib/utils";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -581,7 +581,9 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("cashier");
+  // Varios roles por usuario; el primero es el principal.
+  const [roles, setRoles] = useState<string[]>(["cashier"]);
+  const role = roles[0] ?? "cashier";
 
   const isEdit = !!editingUser;
 
@@ -593,7 +595,7 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
   }
 
   const resetForm = () => {
-    setUsername(""); setEmail(""); setPassword(""); setRole("cashier");
+    setUsername(""); setEmail(""); setPassword(""); setRoles(["cashier"]);
     setEditingUser(null); setShowPass(false);
   };
 
@@ -602,7 +604,7 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
     setUsername(u.username);
     setEmail(u.email);
     setPassword("");
-    setRole(u.role);
+    setRoles(u.roles?.length ? u.roles : [u.role]);
   };
 
   const apiError = (err: unknown, fallback: string) => {
@@ -617,13 +619,13 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
     setSaving(true);
     try {
       if (isEdit && editingUser) {
-        const payload: Record<string, string> = { username: username.trim(), email: email.trim(), role };
+        const payload: Record<string, string | string[]> = { username: username.trim(), email: email.trim(), role, roles };
         if (password) payload.password = password;
         const updated = await saasService.updateUser(tenant.id, editingUser.id, payload);
         setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
         toast.success("Usuario actualizado", { description: updated.email });
       } else {
-        const created = await saasService.createUser(tenant.id, { username: username.trim(), email: email.trim(), password, role });
+        const created = await saasService.createUser(tenant.id, { username: username.trim(), email: email.trim(), password, role, roles });
         setUsers((prev) => [...prev, created]);
         toast.success("Usuario creado", { description: created.email });
       }
@@ -748,16 +750,31 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
                 </button>
               </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Rol</label>
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(ROLE_LABELS).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>{l}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Roles (el primero es el principal)</label>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(ROLE_LABELS).map(([v, l]) => {
+                  const selected = roles.includes(v);
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() =>
+                        setRoles((cur) => {
+                          const next = selected ? cur.filter((x) => x !== v) : [...cur, v];
+                          return next.length === 0 ? cur : next;
+                        })
+                      }
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                        selected ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted"
+                      )}
+                    >
+                      {l}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
           <Button size="sm" className="w-full" disabled={!canSave || saving} onClick={handleSave}>
