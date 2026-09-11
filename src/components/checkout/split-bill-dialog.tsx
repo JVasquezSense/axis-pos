@@ -87,6 +87,8 @@ export function SplitBillDialog({
   const [payments, setPayments] = useState<Record<number, Payment>>({});
   const [method, setMethod] = useState<Record<number, PaymentMethod>>({});
   const [paying, setPaying] = useState<number | null>(null);
+  // Persona a la que se le van dando las unidades al tocar los productos.
+  const [active, setActive] = useState(0);
 
   // Estado limpio cuando cambia la cuenta, no al reabrir: cerrar con "Seguir
   // luego" y volver tiene que encontrar los cobros ya hechos, pero una mesa
@@ -100,6 +102,7 @@ export function SplitBillDialog({
     setPayments({});
     setMethod({});
     setPaying(null);
+    setActive(0);
   }, [signature]);
 
   const anyPaid = Object.keys(payments).length > 0;
@@ -108,6 +111,7 @@ export function SplitBillDialog({
     if (anyPaid) return; // con cobros hechos ya no se puede cambiar el reparto
     const next = Math.min(Math.max(n, 2), 8);
     setPeople(next);
+    setActive((a) => Math.min(a, next - 1));
     setUnits((prev) => {
       const out: Record<string, number[]> = {};
       for (const k in prev) out[k] = Array.from({ length: next }, (_, i) => prev[k][i] ?? 0);
@@ -129,6 +133,40 @@ export function SplitBillDialog({
       if (value < 0) return prev;
       if (delta > 0 && assigned >= line.quantity) return prev;
       next[person] = value;
+      return { ...prev, [line.id]: next };
+    });
+  };
+
+  /** Dueño de cada unidad de la línea (null = libre), en orden de persona. */
+  const owners = (line: OrderLine): (number | null)[] => {
+    const out: (number | null)[] = [];
+    countsFor(line).forEach((n, i) => { for (let k = 0; k < n; k++) out.push(i); });
+    while (out.length < line.quantity) out.push(null);
+    return out;
+  };
+
+  /**
+   * Un toque en el producto le da una unidad a la persona activa. Si ya no
+   * quedan libres, se le quita una a quien más tenga y pasa a la activa: así
+   * corregir un error es tocar otra vez, no buscar un botón de menos.
+   */
+  const giveToActive = (line: OrderLine) => {
+    if (anyPaid) return;
+    const counts = countsFor(line);
+    const free = line.quantity - counts.reduce((s, n) => s + n, 0);
+    if (free > 0) { bump(line, active, +1); return; }
+    // Todo asignado: si la activa ya lo tiene entero, un toque más lo libera.
+    if (counts[active] === line.quantity) {
+      setUnits((prev) => ({ ...prev, [line.id]: counts.map(() => 0) }));
+      return;
+    }
+    let from = -1;
+    counts.forEach((n, i) => { if (i !== active && n > 0 && (from < 0 || n > counts[from])) from = i; });
+    if (from < 0) return;
+    setUnits((prev) => {
+      const next = [...(prev[line.id] ?? counts)];
+      next[from] -= 1;
+      next[active] += 1;
       return { ...prev, [line.id]: next };
     });
   };
@@ -224,56 +262,78 @@ export function SplitBillDialog({
             </TabsList>
 
             <TabsContent value="items">
-              <p className="mb-2 text-xs text-muted-foreground">
-                Toca el número de la persona para darle una unidad. Lo que nadie reclame se reparte entre todos.
-              </p>
-              <div className="space-y-2">
-                {lines.map((line) => {
-                  const counts = countsFor(line);
-                  const free = line.quantity - assignedOf(line);
+              {/* Primero la persona, luego lo que consumió. Los numeritos por
+                  producto obligaban a pensar en dos dimensiones a la vez. */}
+              <div className="mb-3 flex flex-wrap gap-2">
+                {shares.map((share) => {
+                  const isActive = share.index === active;
                   return (
-                    <div key={line.id} className="rounded-xl border border-border p-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="flex min-w-0 items-center gap-2 text-sm">
-                          <ProductImage emoji={line.product.image} category={line.product.category} size="sm" className="h-8 w-8 shrink-0" />
-                          <span className="truncate font-medium">{line.quantity}× {line.product.name}</span>
+                    <button
+                      key={share.index}
+                      onClick={() => setActive(share.index)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 transition-all",
+                        isActive ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:bg-muted"
+                      )}
+                    >
+                      <span className={cn("flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white", PERSON_COLORS[share.index % PERSON_COLORS.length])}>
+                        {share.index + 1}
+                      </span>
+                      <span className="text-left leading-tight">
+                        <span className={cn("block text-[11px]", isActive ? "font-semibold text-primary" : "text-muted-foreground")}>
+                          Persona {share.index + 1}
                         </span>
-                        <span className="shrink-0 text-sm font-semibold">{formatCurrency(lineUnitPrice(line) * line.quantity)}</span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        {counts.map((n, i) => (
-                          <span key={i} className="inline-flex items-center overflow-hidden rounded-full border border-border">
-                            {n > 0 && (
-                              <button
-                                onClick={() => bump(line, i, -1)}
-                                className="flex h-7 w-6 items-center justify-center text-muted-foreground hover:bg-muted"
-                                title="Quitar una"
-                              >
-                                <Minus className="h-3 w-3" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => bump(line, i, +1)}
-                              disabled={free === 0}
-                              className={cn(
-                                "flex h-7 min-w-7 items-center justify-center gap-1 px-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed",
-                                n > 0 ? cn(PERSON_COLORS[i % PERSON_COLORS.length], "text-white") : "text-muted-foreground hover:bg-muted"
-                              )}
-                              title={`Persona ${i + 1}`}
-                            >
-                              {i + 1}{n > 0 && <span className="font-normal">×{n}</span>}
-                            </button>
-                          </span>
-                        ))}
-                        <span className="ml-1 text-[11px] text-muted-foreground">
-                          {free === line.quantity
+                        <span className="block text-xs font-semibold">{formatCurrency(share.total)}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Con <span className="font-semibold text-foreground">Persona {active + 1}</span> elegida, toca cada producto que consumió. Lo que nadie reclame se reparte entre todos.
+              </p>
+
+              <div className="space-y-1.5">
+                {lines.map((line) => {
+                  const who = owners(line);
+                  const mine = countsFor(line)[active] ?? 0;
+                  return (
+                    <button
+                      key={line.id}
+                      onClick={() => giveToActive(line)}
+                      disabled={anyPaid}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-colors disabled:cursor-not-allowed",
+                        mine > 0 ? "border-primary/50 bg-primary/[0.03]" : "border-border hover:bg-muted"
+                      )}
+                    >
+                      <ProductImage emoji={line.product.image} category={line.product.category} size="sm" className="h-9 w-9 shrink-0" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{line.quantity}× {line.product.name}</span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {who.every((o) => o === null)
                             ? "Compartido por todos"
-                            : free > 0
-                              ? `${free} sin asignar · se reparte`
+                            : who.some((o) => o === null)
+                              ? `${who.filter((o) => o === null).length} sin asignar · se reparte`
                               : "Asignado"}
                         </span>
-                      </div>
-                    </div>
+                      </span>
+                      {/* Un punto por unidad, del color de quien la tiene. */}
+                      <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                        {who.map((o, k) => (
+                          <span
+                            key={k}
+                            className={cn(
+                              "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                              o === null ? "border border-dashed border-border text-muted-foreground" : cn(PERSON_COLORS[o % PERSON_COLORS.length], "text-white")
+                            )}
+                          >
+                            {o === null ? "" : o + 1}
+                          </span>
+                        ))}
+                      </span>
+                      <span className="w-20 shrink-0 text-right text-sm font-semibold">{formatCurrency(lineUnitPrice(line) * line.quantity)}</span>
+                    </button>
                   );
                 })}
               </div>
