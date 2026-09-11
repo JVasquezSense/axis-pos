@@ -19,11 +19,11 @@ export function ProductImage({ emoji, category, className, size = "md" }: Produc
   if (isImageUrl(emoji)) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={emoji}
-        alt=""
-        className={cn("rounded-xl object-cover", className)}
-      />
+      // contain sobre un fondo suave: con cover, una lata o una botella vertical
+      // quedaba recortada por arriba y por abajo y no se veía qué era.
+      <span className={cn("flex items-center justify-center overflow-hidden rounded-xl bg-muted", className)}>
+        <img src={emoji} alt="" className="h-full w-full object-contain" />
+      </span>
     );
   }
   return (

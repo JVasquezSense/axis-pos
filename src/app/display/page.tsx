@@ -257,7 +257,7 @@ function LineRow({ line }: { line: DisplayLine }) {
       <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-muted text-4xl">
         {isImageUrl(image) ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="" className="h-full w-full rounded-2xl object-cover" />
+          <img src={image} alt="" className="h-full w-full rounded-2xl object-contain" />
         ) : (
           image || "🍽️"
         )}

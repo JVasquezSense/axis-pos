@@ -167,7 +167,7 @@ export function ProductFormDialog({
                 >
                   {isImageUrl(draft.image) ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={draft.image} alt="" className="h-full w-full object-cover" />
+                    <img src={draft.image} alt="" className="h-full w-full object-contain" />
                   ) : (
                     <div className="flex h-full w-full flex-col items-center justify-center gap-1">
                       <span className="text-2xl leading-none">{draft.image || "🍽️"}</span>
