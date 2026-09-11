@@ -21,6 +21,7 @@ import {
 import { useInventoryStore } from "@/store/inventory.store";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useWebStore } from "@/store/web.store";
+import { ROLES } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth.store";
 import { useOnboardingStore } from "@/store/onboarding.store";
 import { useAppStore } from "@/store/app.store";
@@ -44,7 +45,11 @@ export function Header() {
   const items = useInventoryStore((s) => s.items);
   const tickets = useKitchenStore((s) => s.tickets);
   const liveOrders = useWebStore((s) => s.liveOrders);
-  const userName = useAuthStore((s) => s.name);
+  const loginName = useAuthStore((s) => s.name);
+  const profileName = useAppStore((s) => s.userName);
+  // El nombre real del perfil manda; el del login es el correo "bonito".
+  const userName = profileName || loginName;
+  const role = useAppStore((s) => s.role);
   const logout = useAuthStore((s) => s.logout);
   const restaurant = useAppStore((s) => s.restaurant);
 
@@ -136,7 +141,7 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2.5 py-2">
               <p className="text-sm font-semibold">{userName}</p>
-              <p className="text-xs text-muted-foreground">Propietario · {restaurant.name}</p>
+              <p className="text-xs text-muted-foreground">{ROLES[role]?.label ?? "Usuario"} · {restaurant.name}</p>
             </div>
             <DropdownMenuSeparator />
             {/* Antes: "Mi perfil" mostraba un aviso y los otros dos llevaban a

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { NAV_ITEMS, NAV_GROUPS, navLabel } from "@/lib/nav";
 import { useFeatures } from "@/lib/features";
-import { ROLE_NAV } from "@/lib/roles";
+import { navKeysFor } from "@/lib/roles";
 import { useAppStore } from "@/store/app.store";
 import { useAuthStore } from "@/store/auth.store";
 import { Icon } from "@/components/shared/icon";
@@ -17,7 +17,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar, role } = useAppStore();
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
-  const allowed = ROLE_NAV[role] ?? ROLE_NAV["admin"];
+  const userRoles = useAppStore((s) => s.userRoles);
+  const allowed = navKeysFor(role, userRoles);
   const { has } = useFeatures();
   // Visible si el rol lo permite Y el plan del restaurante incluye la sección.
   const items = NAV_ITEMS.filter(

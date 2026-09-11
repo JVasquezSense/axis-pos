@@ -23,6 +23,7 @@ import { useKitchenStore } from "@/store/kitchen.store";
 import { useTablesStore } from "@/store/tables.store";
 import { useSalesStore, applyLiveKpis } from "@/store/sales.store";
 import { useAsync } from "@/hooks/use-async";
+import { useAppStore } from "@/store/app.store";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { QuickActions, type QuickAction } from "@/components/dashboard/quick-actions";
@@ -61,7 +62,13 @@ function StatCard({
 // ===========================================================================
 // MESERO
 // ===========================================================================
+/** "jueves 11 de septiembre" — la fecha real, no una de ejemplo. */
+function todayLabel() {
+  return new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+}
+
 export function WaiterDashboard() {
+  const userName = useAppStore((s) => s.userName);
   const tables = useTablesStore((s) => s.tables);
   const tickets = useKitchenStore((s) => s.tickets);
 
@@ -83,7 +90,11 @@ export function WaiterDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Hola, Camila 👋" description="Tu turno en el salón · Sábado 15 de junio" icon={<Armchair className="h-5 w-5" />} />
+      <PageHeader
+        title={`Hola${userName ? `, ${userName}` : ""} 👋`}
+        description={`Tu turno en el salón · ${todayLabel()}`}
+        icon={<Armchair className="h-5 w-5" />}
+      />
       <QuickActions actions={actions} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -154,6 +165,7 @@ export function WaiterDashboard() {
 // CAJERO
 // ===========================================================================
 export function CashierDashboard() {
+  const userName = useAppStore((s) => s.userName);
   const { data, loading } = useAsync(() => dashboardService.getSummary());
   const records = useSalesStore((s) => s.records);
   const tables = useTablesStore((s) => s.tables);
@@ -170,7 +182,7 @@ export function CashierDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Caja · Turno tarde" description="Resumen de cobros del día" icon={<CreditCard className="h-5 w-5" />} />
+      <PageHeader title={`Caja${userName ? ` · ${userName}` : ""}`} description={`Resumen de cobros · ${todayLabel()}`} icon={<CreditCard className="h-5 w-5" />} />
       <QuickActions actions={actions} />
 
       {loading || !data ? (

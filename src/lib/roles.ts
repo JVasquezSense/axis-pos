@@ -60,3 +60,17 @@ export const ROLE_NAV: Record<Role, string[]> = {
   warehouse: ["dashboard", "inventory", "suppliers", "menu"],
   delivery: ["delivery"],
 };
+
+/**
+ * Secciones a las que puede entrar el usuario: la unión de todos sus roles.
+ *
+ * La vista activa (`role`) solo cambia el tablero de inicio; quien es cajero y
+ * mesero tiene que ver las secciones de los dos sin cambiar de vista. Sin roles
+ * resueltos (superadmin o modo demo) manda la vista activa.
+ */
+export function navKeysFor(role: Role, userRoles: Role[] | null | undefined): string[] {
+  const roles = userRoles && userRoles.length > 0 ? userRoles : [role];
+  const keys = new Set<string>();
+  for (const r of roles) for (const k of ROLE_NAV[r] ?? []) keys.add(k);
+  return [...keys];
+}

@@ -24,6 +24,8 @@ interface AppState {
   role: Role;
   /** Roles que el servidor le asignó al usuario; null = sin resolver (todos). */
   userRoles: Role[] | null;
+  /** Nombre de pila del usuario, para saludarlo. */
+  userName: string;
   sidebarCollapsed: boolean;
   commandOpen: boolean;
   restaurant: Restaurant;
@@ -33,6 +35,7 @@ interface AppState {
   setRole: (role: Role) => void;
   /** Fija los roles del usuario y deja como vista activa uno de ellos. */
   setUserRoles: (roles: Role[] | null) => void;
+  setUserName: (name: string) => void;
   toggleSidebar: () => void;
   setSidebar: (v: boolean) => void;
   setCommandOpen: (v: boolean) => void;
@@ -45,12 +48,14 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       role: "admin",
       userRoles: null,
+      userName: "",
       sidebarCollapsed: false,
       commandOpen: false,
       restaurant: { name: "Demo Burger", slug: "demo-burger", plan: "Growth", logo: "🍔", banner: "" },
       features: null,
       maxUsers: 2,
       setRole: (role) => set({ role }),
+      setUserName: (userName) => set({ userName }),
       setUserRoles: (roles) =>
         set((s) => {
           if (!roles || roles.length === 0) return { userRoles: null };
@@ -68,7 +73,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "axis-app-store",
-      partialize: (s) => ({ restaurant: s.restaurant, features: s.features, maxUsers: s.maxUsers, role: s.role, userRoles: s.userRoles }),
+      partialize: (s) => ({ restaurant: s.restaurant, features: s.features, maxUsers: s.maxUsers, role: s.role, userRoles: s.userRoles, userName: s.userName }),
     }
   )
 );

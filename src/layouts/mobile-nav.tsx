@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import { NAV_ITEMS, NAV_GROUPS, navLabel } from "@/lib/nav";
-import { ROLE_NAV } from "@/lib/roles";
+import { navKeysFor } from "@/lib/roles";
 import { useFeatures } from "@/lib/features";
 import { useAppStore } from "@/store/app.store";
 import { useAuthStore } from "@/store/auth.store";
@@ -19,11 +19,13 @@ export function MobileNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const role = useAppStore((s) => s.role);
+  const userRoles = useAppStore((s) => s.userRoles);
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
   const { has } = useFeatures();
+  const allowed = navKeysFor(role, userRoles);
   const items = NAV_ITEMS.filter(
     (i) =>
-      ROLE_NAV[role].includes(i.key) &&
+      allowed.includes(i.key) &&
       (i.key !== "admin" || isSuperAdmin) &&
       (i.key === "admin" || has(i.key))
   );

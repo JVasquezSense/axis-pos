@@ -39,6 +39,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateRestaurant = useAppStore((s) => s.updateRestaurant);
   const setFeatures = useAppStore((s) => s.setFeatures);
   const setUserRoles = useAppStore((s) => s.setUserRoles);
+  const setUserName = useAppStore((s) => s.setUserName);
 
   useEffect(() => {
     if (loaded.current || !USE_API) return;
@@ -75,6 +76,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         setFeatures(me.tenantFeatures ?? null, me.tenantMaxUsers ?? undefined);
         // Roles reales del usuario: el superadmin conserva todas las vistas.
         setUserRoles(me.isSuperuser ? null : ((me.roles ?? (me.role ? [me.role] : [])) as Role[]));
+        // El saludo llevaba un nombre de ejemplo fijo ("Camila") para todos.
+        setUserName((me.firstName || me.username || "").split(" ")[0]);
       })
       .catch(() => { /* sin sesión válida: se conserva lo que haya */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps

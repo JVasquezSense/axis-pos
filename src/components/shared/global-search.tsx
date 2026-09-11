@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, CornerDownLeft } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
 import { useFeatures } from "@/lib/features";
-import { ROLE_NAV } from "@/lib/roles";
+import { navKeysFor } from "@/lib/roles";
 import { PRODUCTS } from "@/mock/menu";
 import { useAppStore } from "@/store/app.store";
 import { Icon } from "@/components/shared/icon";
@@ -15,6 +15,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 export function GlobalSearch() {
   const router = useRouter();
   const role = useAppStore((s) => s.role);
+  const userRoles = useAppStore((s) => s.userRoles);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -28,7 +29,7 @@ export function GlobalSearch() {
   }, []);
 
   const ql = q.trim().toLowerCase();
-  const allowed = ROLE_NAV[role];
+  const allowed = navKeysFor(role, userRoles);
   const { has } = useFeatures();
   const pages = ql ? NAV_ITEMS.filter((n) => allowed.includes(n.key) && has(n.key) && n.label.toLowerCase().includes(ql)) : [];
   const products = ql ? PRODUCTS.filter((p) => p.name.toLowerCase().includes(ql)).slice(0, 5) : [];
