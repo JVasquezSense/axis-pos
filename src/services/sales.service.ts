@@ -2,7 +2,21 @@ import type { SaleRecord } from "@/store/sales.store";
 import { USE_API, request, mockRequest } from "./http";
 
 function normalizeSale(r: SaleRecord): SaleRecord {
-  return { ...r, id: String(r.id), total: Number(r.total), tip: Number(r.tip ?? 0) };
+  // `ts` llega como fecha ISO; el filtro de periodo compara números y con un
+  // string la comparación daba NaN: ningún rango filtraba nada.
+  const ts = typeof r.ts === "number" ? r.ts : new Date(r.ts as unknown as string).getTime();
+  return {
+    ...r,
+    id: String(r.id),
+    total: Number(r.total),
+    subtotal: r.subtotal != null ? Number(r.subtotal) : undefined,
+    tax: r.tax != null ? Number(r.tax) : undefined,
+    discount: r.discount != null ? Number(r.discount) : undefined,
+    tip: Number(r.tip ?? 0),
+    ts: Number.isFinite(ts) ? ts : Date.now(),
+    lines: (r.lines ?? []).map((l) => ({ ...l, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice), total: Number(l.total) })),
+    taxes: (r.taxes ?? []).map((t) => ({ ...t, amount: Number(t.amount) })),
+  };
 }
 
 export const salesService = {

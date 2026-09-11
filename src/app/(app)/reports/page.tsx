@@ -22,14 +22,15 @@ const DATE_RANGES = [
 ];
 
 export default function ReportsPage() {
-  const { data, loading } = useAsync(() => reportsService.getExecutive());
   const [range, setRange] = useState("month");
+  // El selector existía pero no llegaba al servidor: siempre eran 30 días.
+  const { data, loading } = useAsync(() => reportsService.getExecutive(range), [range]);
 
   return (
     <div className="space-y-6 print-area">
       <PageHeader
         title="Reportes ejecutivos"
-        description="Análisis de rentabilidad · Junio 2026"
+        description={`Análisis de rentabilidad · ${new Date().toLocaleDateString("es-CO", { month: "long", year: "numeric" })}`}
         icon={<BarChart3 className="h-5 w-5" />}
         actions={
           <div className="print-hidden flex items-center gap-2">

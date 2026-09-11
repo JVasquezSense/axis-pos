@@ -9,14 +9,22 @@ import { shiftsService } from "@/services/shifts.service";
 export interface ArchivedSale {
   id: string;
   total: number;
+  subtotal?: number;
+  tax?: number;
+  discount?: number;
   items: number;
   method: PaymentMethod;
   saleType: string;
   table: number | null;
   tip: number;
   waiter: string;
+  customer?: string;
+  observations?: string;
   ts: number;
   invoiceNumber?: string;
+  orderCodes?: string[];
+  lines?: { name: string; quantity: number; unitPrice: number; total: number; notes?: string }[];
+  taxes?: { name: string; amount: number }[];
 }
 
 export interface ShiftClose {
@@ -63,11 +71,10 @@ export const useHistoryStore = create<HistoryState>()(
           .catch(() => { /* sin conexión: se conserva lo local */ });
         try {
           const remote = await salesService.getAll();
-          // Fusiona: las ventas del backend son la fuente de verdad; conserva las
-          // archivadas localmente cuyo id no esté ya en el backend.
-          const remoteIds = new Set(remote.map((r) => r.id));
-          const localOnly = get().sales.filter((s) => !remoteIds.has(s.id));
-          const merged = [...remote, ...localOnly].sort((a, b) => b.ts - a.ts).slice(0, 2000);
+          // El backend es la única fuente de verdad. Antes se conservaban las
+          // ventas locales que "no estaban en el backend", así que una venta
+          // borrada en el servidor seguía apareciendo aquí para siempre.
+          const merged = [...remote].sort((a, b) => b.ts - a.ts).slice(0, 2000);
           set({ sales: merged, loading: false, loaded: true });
         } catch {
           set({ loading: false, loaded: true });

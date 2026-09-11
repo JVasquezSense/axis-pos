@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { TenantLogo, isLogoImage } from "@/components/shared/tenant-logo";
 import Link from "next/link";
 import { Globe, ExternalLink, Wifi, QrCode, ImagePlus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
@@ -73,13 +74,21 @@ export default function WebsitePage() {
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Logo (emoji)</label>
-              <Input
-                value={restaurant.logo}
-                onChange={(e) => updateRestaurant({ logo: e.target.value })}
-                placeholder="🍔"
-                className="w-20 text-center text-xl"
-              />
+              <label className="mb-1.5 block text-sm font-medium">Logo</label>
+              {/* Con foto, la cadena base64 no cabe en una casilla de dos letras. */}
+              {isLogoImage(restaurant.logo) ? (
+                <div className="flex items-center gap-2">
+                  <TenantLogo src={restaurant.logo} className="h-10 w-10 rounded-lg" />
+                  <p className="text-xs text-muted-foreground">Foto cargada. Se cambia en Configuración.</p>
+                </div>
+              ) : (
+                <Input
+                  value={restaurant.logo}
+                  onChange={(e) => updateRestaurant({ logo: e.target.value.slice(0, 2) })}
+                  placeholder="🍔"
+                  className="w-20 text-center text-xl"
+                />
+              )}
             </div>
           </div>
 
@@ -132,7 +141,7 @@ export default function WebsitePage() {
               </div>
               <div className="relative bg-gradient-to-br from-primary/15 via-orange-500/10 to-transparent p-8">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-2xl">{restaurant.logo}</div>
+                  <TenantLogo src={restaurant.logo} className="h-12 w-12 rounded-2xl bg-primary text-2xl" />
                   <div>
                     <p className="text-lg font-black">{restaurant.name}</p>
                     <p className="text-xs text-muted-foreground">Pedidos en línea · 4.8 ★</p>

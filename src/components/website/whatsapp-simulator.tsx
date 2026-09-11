@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import { TenantLogo } from "@/components/shared/tenant-logo";
 import { Send, Bot, User, Loader2, RotateCcw, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -120,9 +121,7 @@ export function WhatsAppSimulator() {
     <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-background">
       {/* Header estilo WhatsApp */}
       <div className="flex items-center gap-3 bg-emerald-600 px-4 py-3 text-white dark:bg-emerald-700">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-lg">
-          {restaurant.logo}
-        </div>
+        <TenantLogo src={restaurant.logo} className="h-9 w-9 rounded-full bg-white/20 text-lg" />
         <div className="flex-1">
           <p className="text-sm font-semibold">{restaurant.name}</p>
           <p className="text-xs text-white/70">Bot WhatsApp · Simulador</p>

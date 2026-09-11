@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { TenantLogo } from "@/components/shared/tenant-logo";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import { toast } from "sonner";
@@ -259,7 +260,7 @@ function TenantRow({
     <TableRow>
       <TableCell>
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-lg">{tenant.logo}</div>
+          <TenantLogo src={tenant.logo} className="h-9 w-9 rounded-lg bg-muted text-lg" />
           <div>
             <p className="font-medium">{tenant.name}</p>
             <p className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -529,7 +530,7 @@ function FeaturesDialog({
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span className="text-xl">{tenant?.logo}</span>
+            <TenantLogo src={tenant?.logo} className="h-7 w-7 rounded-md text-xl" />
             {tenant?.name} · Funcionalidades
           </DialogTitle>
           <DialogDescription>
@@ -661,7 +662,7 @@ function UsersDialog({ tenant, onClose }: { tenant: Tenant | null; onClose: () =
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span className="text-xl">{tenant?.logo}</span>
+            <TenantLogo src={tenant?.logo} className="h-7 w-7 rounded-md text-xl" />
             {tenant?.name} · Usuarios
           </DialogTitle>
           <DialogDescription>Gestiona los usuarios de este restaurante.</DialogDescription>

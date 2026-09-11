@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TenantLogo } from "@/components/shared/tenant-logo";
 import { toast } from "sonner";
 import { UserCircle, KeyRound, Loader2, Save } from "lucide-react";
 import { meService, type Me } from "@/services/me.service";
@@ -106,7 +107,9 @@ export default function ProfilePage() {
                 <p className="truncate text-sm text-muted-foreground">{me?.username}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {me?.role && <Badge variant="secondary">{ROLE_LABEL[me.role] ?? me.role}</Badge>}
-                  <Badge variant="outline">{restaurant.logo} {me?.tenantName ?? restaurant.name}</Badge>
+                  <Badge variant="outline" className="gap-1.5">
+                    <TenantLogo src={restaurant.logo} className="h-4 w-4 rounded-sm text-xs" /> {me?.tenantName ?? restaurant.name}
+                  </Badge>
                   {me?.tenantPlan && <Badge variant="outline">Plan {PLAN_LABEL[me.tenantPlan] ?? me.tenantPlan}</Badge>}
                 </div>
               </div>

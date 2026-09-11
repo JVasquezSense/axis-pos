@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useMemo, useState, Suspense } from "react";
+import { TenantLogo } from "@/components/shared/tenant-logo";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -180,9 +181,7 @@ function RestaurantSiteInner({
       {/* Top bar */}
       <header className="z-20 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background px-4 lg:px-6">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-orange-500 text-lg shadow">
-            {tenant.logo}
-          </div>
+          <TenantLogo src={tenant.logo} className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-orange-500 text-lg shadow" />
           <p className="text-base font-black uppercase tracking-tight">{tenant.name}</p>
         </div>
 
@@ -239,9 +238,7 @@ function RestaurantSiteInner({
           <img src={bannerUrl} alt={`${tenant.name} banner`} className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
           <div className="absolute bottom-3 left-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-background/90 text-2xl shadow-lg backdrop-blur">
-              {tenant.logo}
-            </div>
+            <TenantLogo src={tenant.logo} className="h-12 w-12 rounded-2xl bg-background/90 text-2xl shadow-lg backdrop-blur" />
             <div>
               <p className="text-lg font-black text-white drop-shadow-lg">{tenant.name}</p>
               <p className="text-xs text-white/80 drop-shadow">Pedidos en línea</p>

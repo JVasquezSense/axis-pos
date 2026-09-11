@@ -249,11 +249,22 @@ export default function CheckoutPage() {
    */
   const saleOrigin = () => {
     const orderIds = useOrderStore.getState().activeOrderIds;
-    if (orderIds.length > 0) return { orderIds };
+    // Lo que sale en el ticket, para que el historial sepa qué se vendió.
+    const detail = {
+      lines: lines.map((l) => ({
+        name: l.product.name,
+        quantity: l.quantity,
+        unitPrice: lineUnitPrice(l),
+        total: lineUnitPrice(l) * l.quantity,
+        notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
+      })),
+      taxes,
+    };
+    if (orderIds.length > 0) return { orderIds, ...detail };
     const direct = !table && saleType !== "takeaway";
     return direct
-      ? { consumedLines: lines.map((l) => ({ productId: String(l.product.id), quantity: l.quantity })) }
-      : {};
+      ? { consumedLines: lines.map((l) => ({ productId: String(l.product.id), quantity: l.quantity })), ...detail }
+      : detail;
   };
 
   const completeSale = async () => {

@@ -35,8 +35,10 @@ function startOf(range: Range): number {
       return d.getTime();
     }
     case "week": {
+      // Desde el lunes: getDay() da 0 el domingo y la semana arrancaba ahí.
       const d = new Date(now);
-      d.setDate(d.getDate() - d.getDay());
+      const dow = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - dow);
       d.setHours(0, 0, 0, 0);
       return d.getTime();
     }
@@ -68,6 +70,7 @@ export default function HistoryPage() {
   const isAdmin = useAppStore((st) => st.role) === "admin";
   const removeSale = useHistoryStore((st) => st.removeSale);
   const [toVoid, setToVoid] = useState<ArchivedSale | null>(null);
+  const [detail, setDetail] = useState<ArchivedSale | null>(null);
   const [voiding, setVoiding] = useState(false);
 
   const confirmVoid = async () => {
@@ -223,7 +226,11 @@ export default function HistoryPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filtered.map((s) => (
-                    <tr key={s.id} className="hover:bg-muted/40 transition-colors">
+                    <tr
+                      key={s.id}
+                      onClick={() => setDetail(s)}
+                      className="cursor-pointer transition-colors hover:bg-muted/40"
+                    >
                       <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                         {s.invoiceNumber || s.id.slice(-6).toUpperCase()}
                       </td>
@@ -255,7 +262,7 @@ export default function HistoryPage() {
                         <td className="px-2 py-2.5 text-right">
                           <button
                             type="button"
-                            onClick={() => setToVoid(s)}
+                            onClick={(e) => { e.stopPropagation(); setToVoid(s); }}
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                             title="Anular venta"
                           >
@@ -271,6 +278,76 @@ export default function HistoryPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Detalle: qué se vendió, quién atendió y cómo se pagó. */}
+      <Dialog open={!!detail} onOpenChange={(v) => !v && setDetail(null)}>
+        <DialogContent className="flex max-h-[88vh] max-w-lg flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Venta {detail?.invoiceNumber || detail?.id.slice(-6).toUpperCase()}
+              {detail && <Badge variant="outline" className="text-[10px]">{PAYMENT_LABEL[detail.method] ?? detail.method}</Badge>}
+            </DialogTitle>
+            <DialogDescription>
+              {detail && `${fmtDate(detail.ts)} · ${fmtTime(detail.ts)}`}
+            </DialogDescription>
+          </DialogHeader>
+          {detail && (
+            <div className="-mr-2 flex-1 space-y-4 overflow-y-auto pr-2">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+                <Info label="Tipo" value={detail.saleType} />
+                <Info label="Mesa" value={detail.table ? `Mesa ${detail.table}` : "—"} />
+                <Info label="Atendió" value={detail.waiter && detail.waiter !== "Sin asignar" ? detail.waiter : "—"} />
+                {detail.customer && <Info label="Cliente" value={detail.customer} />}
+                {detail.orderCodes && detail.orderCodes.length > 0 && <Info label="Pedido" value={detail.orderCodes.join(", ")} />}
+                {detail.observations && <Info label="Nota" value={detail.observations} className="col-span-2 sm:col-span-3" />}
+              </dl>
+
+              <div>
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Productos</p>
+                {detail.lines && detail.lines.length > 0 ? (
+                  <ul className="divide-y divide-border rounded-xl border border-border">
+                    {detail.lines.map((l, i) => (
+                      <li key={i} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                        <span className="min-w-0">
+                          <span className="font-medium">{l.quantity}× {l.name}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {formatCurrency(l.unitPrice)} c/u{l.notes ? ` · ${l.notes}` : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-semibold tabular-nums">{formatCurrency(l.total)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                    Esta venta se registró antes de que el historial guardara el detalle: solo se conoce el total ({detail.items} ítem{detail.items === 1 ? "" : "s"}).
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1 rounded-xl bg-muted/40 p-3 text-sm">
+                {detail.subtotal != null && <Line label="Subtotal" value={formatCurrency(detail.subtotal)} />}
+                {(detail.discount ?? 0) > 0 && <Line label="Descuento" value={`- ${formatCurrency(detail.discount!)}`} />}
+                {detail.taxes && detail.taxes.length > 0
+                  ? detail.taxes.map((t) => <Line key={t.name} label={t.name} value={formatCurrency(t.amount)} muted />)
+                  : (detail.tax ?? 0) > 0 && <Line label="Impuestos" value={formatCurrency(detail.tax!)} muted />}
+                {detail.tip > 0 && <Line label="Propina" value={formatCurrency(detail.tip)} muted />}
+                <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold">
+                  <span>Total</span><span className="tabular-nums">{formatCurrency(detail.total)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            {isAdmin && detail && (
+              <Button variant="outline" className="text-destructive" onClick={() => { setToVoid(detail); setDetail(null); }}>
+                <Trash2 className="h-4 w-4" /> Anular
+              </Button>
+            )}
+            <Button onClick={() => setDetail(null)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Anular es irreversible y mueve inventario: se confirma con el detalle
           a la vista. */}
@@ -299,6 +376,23 @@ export default function HistoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function Info({ label, value, className }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={className}>
+      <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="font-medium">{value}</dd>
+    </div>
+  );
+}
+
+function Line({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div className={cn("flex items-center justify-between", muted && "text-muted-foreground")}>
+      <span>{label}</span><span className="tabular-nums">{value}</span>
     </div>
   );
 }

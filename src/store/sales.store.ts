@@ -26,6 +26,10 @@ export interface SaleRecord {
   consumedLines?: { productId: string; quantity: number }[];
   /** Lo devuelve el servidor: códigos de los pedidos cobrados. */
   orderCodes?: string[];
+  /** Lo que se cobró, tal cual salió en el ticket. */
+  lines?: { name: string; quantity: number; unitPrice: number; total: number; notes?: string }[];
+  /** Desglose de impuestos del ticket. */
+  taxes?: { name: string; amount: number }[];
   ts: number;
 }
 

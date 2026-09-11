@@ -44,10 +44,11 @@ const ADMIN_ACTIONS: QuickAction[] = [
 ];
 
 function AdminDashboard() {
-  const { data, loading } = useAsync(() => dashboardService.getSummary());
-  const { data: rep } = useAsync(() => reportsService.getExecutive());
-  const records = useSalesStore((s) => s.records);
   const [range, setRange] = useState<DateRangeId>("today");
+  // El selector existía pero no llegaba al servidor: los KPI eran siempre de hoy.
+  const { data, loading } = useAsync(() => dashboardService.getSummary(range), [range]);
+  const { data: rep } = useAsync(() => reportsService.getExecutive(range));
+  const records = useSalesStore((s) => s.records);
 
   const exportSummary = () => {
     if (!data) return;
@@ -68,7 +69,7 @@ function AdminDashboard() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Resumen operativo · Sábado 15 de junio, 2026"
+        description={`Resumen operativo · ${new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}
         icon={<LayoutDashboard className="h-5 w-5" />}
         actions={
           <>
