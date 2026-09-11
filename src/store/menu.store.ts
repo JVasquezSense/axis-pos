@@ -32,6 +32,7 @@ interface MenuState {
   products: Product[];
   load: () => Promise<void>;
   addCategory: (c: Category) => void;
+  updateCategory: (c: Category) => void;
   removeCategory: (id: string) => void;
   addProduct: (p: Product) => void;
   /** Inserta un producto YA persistido en el backend (no vuelve a hacer POST). */
@@ -74,6 +75,13 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
       set((s) => ({ categories: s.categories.map((x) => (x.id === c.id ? saved : x)) }));
       saveCache(get);
     }).catch(apiErrorHandler("categoría"));
+  },
+
+  updateCategory: (c) => {
+    set((s) => ({ categories: s.categories.map((x) => (String(x.id) === String(c.id) ? { ...x, ...c } : x)) }));
+    useAuditStore.getState().log({ action: "Categoría actualizada", details: c.name, user: "Sistema", module: "menu" });
+    saveCache(get);
+    if (USE_API) menuService.updateCategory(c).catch(apiErrorHandler("categoría"));
   },
 
   removeCategory: (id) => {

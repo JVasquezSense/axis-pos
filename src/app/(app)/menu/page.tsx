@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   UtensilsCrossed, Plus, Search, MoreVertical, Pencil, Trash2, Tag, BookOpen,
@@ -82,7 +82,7 @@ function TabBtn({ active, onClick, label, icon }: { active: boolean; onClick: ()
 /* ─── TAB: CARTA ─────────────────────────────────────────────────────────── */
 
 function CartaTab() {
-  const { categories, products, addCategory, removeCategory, addProduct, addProductLocal, updateProduct, removeProduct, syncRecipePrice } = useMenuStore();
+  const { categories, products, addCategory, updateCategory, removeCategory, addProduct, addProductLocal, updateProduct, removeProduct, syncRecipePrice } = useMenuStore();
   const recipes = useRecipesStore((s) => s.recipes);
   const invRaw = useInventoryStore((s) => s.items);
   const invItems = inventoryOrDemo(invRaw);
@@ -91,6 +91,7 @@ function CartaTab() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
+  const [catEditing, setCatEditing] = useState<Category | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [comboOpen, setComboOpen] = useState(false);
   const [comboEditing, setComboEditing] = useState<Product | null>(null);
@@ -143,7 +144,7 @@ function CartaTab() {
   const renderCard = (p: Product) => (
     <Card key={p.id} className={cn("group flex flex-col overflow-hidden", !p.available && "opacity-60")}>
               <div className="relative">
-                <ProductImage emoji={p.image} category={p.category} className="h-24 w-full rounded-b-none" />
+                <ProductImage emoji={p.image} category={p.category} className="aspect-square w-full rounded-b-none" />
                 {p.isCombo && <Badge variant="secondary" className="absolute left-2 top-2 gap-1"><Package className="h-3 w-3" /> Combo</Badge>}
                 {p.popular && !p.isCombo && <Badge variant="warning" className="absolute left-2 top-2">★ Destacado</Badge>}
                 <DropdownMenu>
@@ -337,6 +338,7 @@ function CartaTab() {
             label={c.name}
             count={counts[c.id] ?? 0}
             icon={c.icon}
+            onEdit={() => { setCatEditing(c); setCatOpen(true); }}
             onDelete={() => {
               removeCategory(c.id);
               if (activeCat === c.id) setActiveCat("all");
@@ -364,7 +366,7 @@ function CartaTab() {
               Productos <span className="text-muted-foreground/70">({sueltos.length})</span>
             </p>
           )}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {sueltos.map(renderCard)}
           </div>
         </section>
@@ -375,7 +377,7 @@ function CartaTab() {
           <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <Package className="h-3.5 w-3.5" /> Combos <span className="text-muted-foreground/70">({combos.length})</span>
           </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {combos.map(renderCard)}
           </div>
         </section>
@@ -408,7 +410,13 @@ function CartaTab() {
         }}
       />
       <RecipeEditor recipe={recipeEditing} isNew={recipeIsNew} open={recipeOpen} onOpenChange={setRecipeOpen} />
-      <AddCategoryDialog open={catOpen} onOpenChange={setCatOpen} onCreate={(c) => { addCategory(c); toast.success(`Categoría "${c.name}" creada`); }} />
+      <AddCategoryDialog
+        open={catOpen}
+        onOpenChange={(v) => { setCatOpen(v); if (!v) setCatEditing(null); }}
+        initial={catEditing}
+        onCreate={(c) => { addCategory(c); toast.success(`Categoría "${c.name}" creada`); }}
+        onUpdate={(c) => { updateCategory(c); toast.success(`Categoría "${c.name}" actualizada`); }}
+      />
       <MenuScanDialog
         open={scanOpen}
         onOpenChange={setScanOpen}
@@ -562,8 +570,8 @@ function RecetasTab() {
 
 /* ─── SHARED ─────────────────────────────────────────────────────────────── */
 
-function CatChip({ active, onClick, label, count, icon, onDelete }: {
-  active: boolean; onClick: () => void; label: string; count: number; icon?: string; onDelete?: () => void;
+function CatChip({ active, onClick, label, count, icon, onDelete, onEdit }: {
+  active: boolean; onClick: () => void; label: string; count: number; icon?: string; onDelete?: () => void; onEdit?: () => void;
 }) {
   return (
     <div className={cn("group inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors", active ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}>
@@ -572,8 +580,15 @@ function CatChip({ active, onClick, label, count, icon, onDelete }: {
         {label}
         <span className={cn("rounded-full px-1.5 text-xs", active ? "bg-primary-foreground/20" : "bg-muted-foreground/15")}>{count}</span>
       </button>
+      {/* Solo se podía borrar: cambiar el nombre o el icono obligaba a
+          eliminarla con todos sus productos y crearla de nuevo. */}
+      {onEdit && (
+        <button onClick={onEdit} title="Editar categoría" className={cn("ml-0.5 opacity-0 transition-opacity group-hover:opacity-100", active ? "text-primary-foreground/70 hover:text-primary-foreground" : "text-muted-foreground hover:text-primary")}>
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      )}
       {onDelete && (
-        <button onClick={onDelete} className={cn("ml-0.5 opacity-0 transition-opacity group-hover:opacity-100", active ? "text-primary-foreground/70 hover:text-primary-foreground" : "text-muted-foreground hover:text-destructive")}>
+        <button onClick={onDelete} title="Eliminar categoría" className={cn("opacity-0 transition-opacity group-hover:opacity-100", active ? "text-primary-foreground/70 hover:text-primary-foreground" : "text-muted-foreground hover:text-destructive")}>
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
@@ -581,24 +596,34 @@ function CatChip({ active, onClick, label, count, icon, onDelete }: {
   );
 }
 
-function AddCategoryDialog({ open, onOpenChange, onCreate }: {
+function AddCategoryDialog({ open, onOpenChange, onCreate, onUpdate, initial }: {
   open: boolean; onOpenChange: (v: boolean) => void; onCreate: (c: Category) => void;
+  onUpdate?: (c: Category) => void; initial?: Category | null;
 }) {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState(CATEGORY_ICONS[0].name);
   const [iconQuery, setIconQuery] = useState("");
   const matches = searchCategoryIcons(iconQuery);
+  const isEdit = Boolean(initial);
+  // Al abrir en edición se cargan nombre e icono; al crear, se limpia.
+  useEffect(() => {
+    if (!open) return;
+    setName(initial?.name ?? "");
+    setIcon(initial?.icon ?? CATEGORY_ICONS[0].name);
+    setIconQuery("");
+  }, [open, initial]);
   const submit = () => {
     if (!name.trim()) return;
-    onCreate({ id: uid("cat"), name: name.trim(), icon, count: 0 });
+    if (initial && onUpdate) onUpdate({ ...initial, name: name.trim(), icon });
+    else onCreate({ id: uid("cat"), name: name.trim(), icon, count: 0 });
     setName(""); setIcon(CATEGORY_ICONS[0].name); setIconQuery(""); onOpenChange(false);
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nueva categoría</DialogTitle>
-          <DialogDescription>Agrupa los productos de tu carta (ej. Entradas, Bebidas).</DialogDescription>
+          <DialogTitle>{isEdit ? "Editar categoría" : "Nueva categoría"}</DialogTitle>
+          <DialogDescription>{isEdit ? "Cambia el nombre o el icono; los productos se quedan donde están." : "Agrupa los productos de tu carta (ej. Entradas, Bebidas)."}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -647,7 +672,7 @@ function AddCategoryDialog({ open, onOpenChange, onCreate }: {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={submit} disabled={!name.trim()}>Crear categoría</Button>
+          <Button onClick={submit} disabled={!name.trim()}>{isEdit ? "Guardar" : "Crear categoría"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

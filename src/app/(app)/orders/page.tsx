@@ -140,7 +140,9 @@ export default function OrdersPage() {
             />
           </div>
         </div>
-        <div className="scrollbar-thin grid flex-1 grid-cols-2 content-start gap-3 overflow-y-auto p-3 pb-28 sm:grid-cols-3 lg:pb-3 xl:grid-cols-4">
+        {/* Foto cuadrada y una columna más por ancho: la tarjeta queda más
+            angosta y más alta, y la foto del producto se ve entera. */}
+        <div className="scrollbar-thin grid flex-1 grid-cols-2 content-start gap-3 overflow-y-auto p-3 pb-28 sm:grid-cols-3 md:grid-cols-4 lg:pb-3 xl:grid-cols-5 2xl:grid-cols-6">
           {loading
             ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-xl" />)
             : visible.map((p, i) => (
@@ -163,7 +165,7 @@ export default function OrdersPage() {
                   {/* shrink-0: dentro de una columna flex la imagen se encogía
                       cuando la tarjeta se quedaba sin alto, y el nombre y el
                       precio quedaban cortados a media línea. */}
-                  <ProductImage emoji={p.image} category={p.category} className="h-24 w-full shrink-0 rounded-b-none rounded-t-xl" />
+                  <ProductImage emoji={p.image} category={p.category} className="aspect-square w-full shrink-0 rounded-b-none rounded-t-xl" />
                   {p.popular && (
                     <Badge className="absolute left-2 top-2" variant="warning">
                       ★ Popular
