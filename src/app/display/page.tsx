@@ -254,7 +254,7 @@ function LineRow({ line }: { line: DisplayLine }) {
       transition={{ type: "spring", stiffness: 300, damping: 26 }}
       className="flex items-center gap-5 rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur"
     >
-      <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-muted text-4xl">
+      <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white text-4xl">
         {isImageUrl(image) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image} alt="" className="h-full w-full rounded-2xl object-contain" />

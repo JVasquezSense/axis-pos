@@ -19,9 +19,10 @@ export function ProductImage({ emoji, category, className, size = "md" }: Produc
   if (isImageUrl(emoji)) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      // contain sobre un fondo suave: con cover, una lata o una botella vertical
-      // quedaba recortada por arriba y por abajo y no se veía qué era.
-      <span className={cn("flex items-center justify-center overflow-hidden rounded-xl bg-muted", className)}>
+      // contain sobre fondo blanco: con cover, una lata o una botella vertical
+      // quedaba recortada; y sobre gris se notaba el corte de la foto, porque
+      // las fotos de producto casi siempre vienen con fondo blanco.
+      <span className={cn("flex items-center justify-center overflow-hidden rounded-xl bg-white", className)}>
         <img src={emoji} alt="" className="h-full w-full object-contain" />
       </span>
     );
