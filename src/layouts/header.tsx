@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Bell, AlertTriangle, ChefHat, Globe, CheckCheck, Compass } from "lucide-react";
+import { Bell, AlertTriangle, ChefHat, Globe, CheckCheck, Compass, UserCircle, Settings, FileText } from "lucide-react";
 import { MobileNav } from "./mobile-nav";
 import { GlobalSearch } from "@/components/shared/global-search";
 import { RoleSwitcher } from "@/components/shared/role-switcher";
@@ -139,9 +139,18 @@ export function Header() {
               <p className="text-xs text-muted-foreground">Propietario · {restaurant.name}</p>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => toast.info("Perfil de usuario")}>Mi perfil</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push("/admin")}>Configuración</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push("/admin")}>Facturación</DropdownMenuItem>
+            {/* Antes: "Mi perfil" mostraba un aviso y los otros dos llevaban a
+                /admin, la pantalla del superadmin, que un restaurante no puede
+                abrir. Parecía que el menú no hacía nada. */}
+            <DropdownMenuItem onClick={() => router.push("/profile")}>
+              <UserCircle className="h-4 w-4" /> Mi perfil
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/settings")}>
+              <Settings className="h-4 w-4" /> Configuración
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/billing")}>
+              <FileText className="h-4 w-4" /> Facturación
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => { router.push("/dashboard"); useOnboardingStore.getState().start(); }}>
               <Compass className="h-4 w-4" />
               Ver recorrido guiado
