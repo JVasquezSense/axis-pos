@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Minus, Plus, Check, Users, UtensilsCrossed, Receipt, Loader2 } from "lucide-react";
 import type { OrderLine, PaymentMethod } from "@/types";
@@ -218,19 +218,26 @@ export function SplitBillDialog({
 
   // La pantalla del cliente muestra el reparto mientras el diálogo esté
   // abierto: cuánto paga cada quien y quién ya pagó.
+  // Se compara por contenido, no por referencia: `shares` es un arreglo nuevo
+  // en cada render y avisar siempre hacía que la caja re-renderizara, el
+  // diálogo volviera a calcular y así hasta que React cortaba con el error 185.
+  const splitSnapshot = open
+    ? JSON.stringify(
+        shares.map((sh) => ({
+          index: sh.index,
+          total: sh.total,
+          paid: Boolean(payments[sh.index]),
+          method: payments[sh.index] ? PAYMENT_LABEL[payments[sh.index].method] : undefined,
+        }))
+      )
+    : null;
+  const lastSnapshot = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (!onSplitChange) return;
-    if (!open) { onSplitChange(null); return; }
-    onSplitChange(
-      shares.map((sh) => ({
-        index: sh.index,
-        total: sh.total,
-        paid: Boolean(payments[sh.index]),
-        method: payments[sh.index] ? PAYMENT_LABEL[payments[sh.index].method] : undefined,
-      }))
-    );
+    if (!onSplitChange || lastSnapshot.current === splitSnapshot) return;
+    lastSnapshot.current = splitSnapshot;
+    onSplitChange(splitSnapshot === null ? null : JSON.parse(splitSnapshot));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, shares, payments]);
+  }, [splitSnapshot]);
 
   const pending = shares.filter((s) => s.total > 0 && !payments[s.index]);
   const collected = Object.values(payments).reduce((s, p) => s + p.amount, 0);

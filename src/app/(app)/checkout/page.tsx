@@ -152,6 +152,13 @@ export default function CheckoutPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, subtotal, tip, effectiveDiscount, total, splitCollected, splitPeople, table, delivery?.code, st.label, waiter, JSON.stringify(taxes)]);
 
+  // Memorizado: como prop del diálogo de división, un objeto nuevo en cada
+  // render lo hacía recalcular el reparto sin parar.
+  const splitBreakdown = useMemo(
+    () => ({ subtotal, tax, tip, discount: effectiveDiscount, total }),
+    [subtotal, tax, tip, effectiveDiscount, total]
+  );
+
   const breakdown: PaymentBreakdown = {
     subtotal,
     tax,
@@ -592,7 +599,7 @@ export default function CheckoutPage() {
         open={splitOpen}
         onOpenChange={setSplitOpen}
         lines={lines}
-        breakdown={{ subtotal, tax, tip, discount: effectiveDiscount, total }}
+        breakdown={splitBreakdown}
         onPayPerson={payPerson}
         onComplete={completeSale}
         onSplitChange={setSplitPeople}
