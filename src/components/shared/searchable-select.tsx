@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, alphabetical } from "@/lib/utils";
 
 export interface SearchableOption {
   value: string;
@@ -51,11 +51,13 @@ export function SearchableSelect({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = options.find((o) => o.value === String(value ?? ""));
+  // Siempre alfabético: una lista larga sin orden obliga a leerla entera.
+  const sorted = useMemo(() => alphabetical(options, (o) => o.label), [options]);
   const filtered = useMemo(() => {
     const q = fold(query.trim());
-    if (!q) return options;
-    return options.filter((o) => fold(o.label).includes(q) || (o.hint ? fold(o.hint).includes(q) : false));
-  }, [options, query]);
+    if (!q) return sorted;
+    return sorted.filter((o) => fold(o.label).includes(q) || (o.hint ? fold(o.hint).includes(q) : false));
+  }, [sorted, query]);
 
   useEffect(() => {
     if (!open) return;

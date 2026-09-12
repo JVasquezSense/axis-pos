@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, alphabetical } from "@/lib/utils";
 
 const CATEGORIES = ["Carnes", "Lácteos", "Verduras", "Frutas", "Panadería", "Abarrotes", "Bebidas", "Pescados", "Congelados"];
 
@@ -158,7 +158,7 @@ function SupplierFormDialog({ supplier, open, onOpenChange, onSave }: { supplier
               <label className="mb-1.5 block text-sm font-medium">Categoría</label>
               <Select value={draft.category} onValueChange={(v) => set({ category: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                <SelectContent>{alphabetical(CATEGORIES).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>

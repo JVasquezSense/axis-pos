@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportCsv } from "@/lib/export";
 import { DateRangeFilter, inRange, describeRange, ALL_TIME, type DateRange } from "@/components/shared/date-range-filter";
-import { cn, formatCurrency, formatDateTime, formatQty } from "@/lib/utils";
+import { cn, formatCurrency, formatDateTime, formatQty, alphabetical } from "@/lib/utils";
 
 const TYPE_BADGE: Record<InventoryMovement["type"], { label: string; variant: "success" | "warning" | "secondary" | "destructive" }> = {
   inicial: { label: "Inicial", variant: "secondary" },
@@ -214,7 +214,7 @@ function ItemCombobox({ items, value, onChange }: { items: InventoryItem[]; valu
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  const filtered = items.filter((i) => i.name.toLowerCase().includes(query.toLowerCase()));
+  const filtered = alphabetical(items.filter((i) => i.name.toLowerCase().includes(query.toLowerCase())), (i) => i.name);
 
   return (
     <div ref={ref} className="relative w-full sm:w-64">

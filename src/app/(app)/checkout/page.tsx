@@ -33,7 +33,7 @@ import { inventoryService } from "@/services/inventory.service";
 import { useAuditStore } from "@/store/audit.store";
 import { useAppStore } from "@/store/app.store";
 import { USE_API } from "@/services/http";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, alphabetical } from "@/lib/utils";
 
 const TIP_OPTIONS = [0, 0.05, 0.1, 0.15];
 
@@ -55,7 +55,7 @@ export default function CheckoutPage() {
   const auditLog = useAuditStore((s) => s.log);
   const allEmployees = useEmployeesStore((s) => s.employees);
   const role = useAppStore((s) => s.role);
-  const waiters = useMemo(() => allEmployees.filter((e) => e.active), [allEmployees]);
+  const waiters = useMemo(() => alphabetical(allEmployees.filter((e) => e.active), (e) => e.name), [allEmployees]);
 
   const lines = storeLines;
   const [table, setTableLocal] = useState<number | null>(storeTable ?? null);

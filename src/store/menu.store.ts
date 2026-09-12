@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { alphabetical } from "@/lib/utils";
 import type { Category, Product } from "@/types";
 import { CATEGORIES, PRODUCTS } from "@/mock/menu";
 import { USE_API, apiErrorHandler } from "@/services/http";
@@ -62,13 +63,13 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
         menuService.getCategories(),
         menuService.getProducts(),
       ]);
-      set({ categories, products });
+      set({ categories: alphabetical(categories, (c) => c.name), products });
       saveCache(get);
     } catch { /* offline: se conserva lo cacheado */ }
   },
 
   addCategory: (c) => {
-    set((s) => ({ categories: [...s.categories, c] }));
+    set((s) => ({ categories: alphabetical([...s.categories, c], (x) => x.name) }));
     useAuditStore.getState().log({ action: "Categoría creada", details: c.name, user: "Sistema", module: "menu" });
     saveCache(get);
     if (USE_API) menuService.createCategory(c).then((saved) => {
@@ -78,7 +79,7 @@ export const useMenuStore = create<MenuState>()((set, get) => ({
   },
 
   updateCategory: (c) => {
-    set((s) => ({ categories: s.categories.map((x) => (String(x.id) === String(c.id) ? { ...x, ...c } : x)) }));
+    set((s) => ({ categories: alphabetical(s.categories.map((x) => (String(x.id) === String(c.id) ? { ...x, ...c } : x)), (x) => x.name) }));
     useAuditStore.getState().log({ action: "Categoría actualizada", details: c.name, user: "Sistema", module: "menu" });
     saveCache(get);
     if (USE_API) menuService.updateCategory(c).catch(apiErrorHandler("categoría"));

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, alphabetical } from "@/lib/utils";
 
 const EMOJIS = ["🍱", "🍔", "🍟", "🥤", "🍕", "🌮", "🍗", "🍰", "🎉", "💥"];
 
@@ -43,7 +43,7 @@ export function ComboFormDialog({
   const [picker, setPicker] = useState("");
 
   // Solo productos reales: un combo no puede contener otro combo.
-  const selectable = useMemo(() => products.filter((p) => !p.isCombo), [products]);
+  const selectable = useMemo(() => alphabetical(products.filter((p) => !p.isCombo), (p) => p.name), [products]);
 
   useEffect(() => {
     if (!open) return;

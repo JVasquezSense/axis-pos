@@ -42,7 +42,7 @@ import { PhysicalCountView } from "@/components/inventory/physical-count-view";
 import { ConsumptionView } from "@/components/inventory/consumption-view";
 import { STOCK_STATUS } from "@/lib/status";
 import { exportCsv } from "@/lib/export";
-import { cn, formatCurrency, formatDateTime } from "@/lib/utils";
+import { cn, formatCurrency, formatDateTime, alphabetical } from "@/lib/utils";
 
 type SortKey = "name" | "category" | "stock" | "cost" | "value" | "status";
 const STATUS_RANK: Record<StockStatus, number> = { critical: 0, low: 1, normal: 2 };
@@ -66,7 +66,7 @@ export default function InventoryPage() {
 
   useEffect(() => setMounted(true), []);
 
-  const categories = useMemo(() => Array.from(new Set(items.map((i) => i.category))), [items]);
+  const categories = useMemo(() => alphabetical(Array.from(new Set(items.map((i) => i.category)))), [items]);
 
   const filtered = useMemo(() => {
     const out = items.filter(

@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/shared/searchable-select";
 import { IngredientEditor } from "./ingredient-editor";
 import { useRecipesStore, emptyVariation, uid } from "@/store/recipes.store";
 import { alignToItemUnit, computeRecipeCost, STATION, ALLERGENS, foodCostTone, TARGET_FOOD_COST } from "@/lib/recipes";
@@ -498,15 +499,14 @@ export function RecipeEditor({
                     <Field label="Producto del menú">
                       {/* productId llega como number desde la API y los SelectItem
                           usan String(id): hay que coercionar para que preseleccione. */}
-                      <Select value={draft.productId != null ? String(draft.productId) : "none"} onValueChange={(v) => set({ productId: v === "none" ? undefined : v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Sin vincular</SelectItem>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        value={draft.productId != null ? String(draft.productId) : ""}
+                        onChange={(v) => set({ productId: v || undefined })}
+                        placeholder="Sin vincular"
+                        searchPlaceholder="Escribe el producto…"
+                        allowClear
+                        options={products.map((p) => ({ value: String(p.id), label: p.name }))}
+                      />
                     </Field>
                   )}
                 </div>

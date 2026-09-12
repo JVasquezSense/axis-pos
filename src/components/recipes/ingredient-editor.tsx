@@ -4,7 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import type { RecipeIngredient } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/shared/searchable-select";
 import { emptyIngredient } from "@/store/recipes.store";
 import { useInventoryStore, inventoryOrDemo } from "@/store/inventory.store";
 import { ingredientCost } from "@/lib/recipes";
@@ -60,18 +60,14 @@ export function IngredientEditor({
             {/* inventoryId llega como number desde la API; los SelectItem usan
                 String(id). Sin coercionar, al editar una receta existente el
                 insumo aparece sin seleccionar. */}
-            <Select value={ing.inventoryId ? String(ing.inventoryId) : ""} onValueChange={(v) => pickItem(ing.id, v)}>
-              <SelectTrigger className="h-9 flex-1">
-                <SelectValue placeholder="Selecciona el insumo del inventario" />
-              </SelectTrigger>
-              <SelectContent>
-                {items.map((i) => (
-                  <SelectItem key={i.id} value={String(i.id)}>
-                    {i.name} <span className="text-muted-foreground">· {i.unit}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={ing.inventoryId ? String(ing.inventoryId) : ""}
+              onChange={(v) => pickItem(ing.id, v)}
+              placeholder="Selecciona el insumo del inventario"
+              searchPlaceholder="Escribe el insumo…"
+              className="flex-1"
+              options={items.map((i) => ({ value: String(i.id), label: i.name, hint: i.unit }))}
+            />
             <button
               onClick={() => onChange(value.filter((i) => i.id !== ing.id))}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"

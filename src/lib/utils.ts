@@ -125,3 +125,8 @@ export function formatQty(value: number | string | null | undefined): string {
   if (!Number.isFinite(n)) return "0";
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(n);
 }
+
+/** Orden alfabético en español (sin distinguir tildes ni mayúsculas). */
+export function alphabetical<T>(list: readonly T[], key: (item: T) => string = (x) => String(x)): T[] {
+  return [...list].sort((a, b) => key(a).localeCompare(key(b), "es", { sensitivity: "base" }));
+}
