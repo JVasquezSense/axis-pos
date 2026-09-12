@@ -8,6 +8,19 @@ import { USE_API, request, mockRequest } from "./http";
  * al store, la aritmetica se rompe silenciosamente: `stock + qty` concatena y
  * `stock < min` compara lexicograficamente. Normalizar en el borde.
  */
+/**
+ * Los decimales llegan como string ("5.000") y sumarlos concatenaba texto:
+ * "0" + "5.000" + "3.000" = "05.0003.000", que en el kardex salía como NaN.
+ */
+export function normalizeMovement(m: InventoryMovement): InventoryMovement {
+  return {
+    ...m,
+    quantity: Number(m.quantity),
+    balance: Number(m.balance),
+    unitCost: Number(m.unitCost ?? 0),
+  };
+}
+
 function normalizeItem(i: InventoryItem): InventoryItem {
   return {
     ...i,
@@ -47,7 +60,8 @@ export const inventoryService = {
     return items.map(normalizeItem);
   },
   async getMovements(): Promise<InventoryMovement[]> {
-    return USE_API ? request<InventoryMovement[]>("/inventory/movements/") : mockRequest(MOVEMENTS, 500);
+    if (!USE_API) return mockRequest(MOVEMENTS, 500);
+    return (await request<InventoryMovement[]>("/inventory/movements/")).map(normalizeMovement);
   },
   /** Salida por Plato (backlog #2): consumo de insumos por plato, filtrado por tenant. */
   async getDishConsumption(

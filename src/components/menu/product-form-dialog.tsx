@@ -18,13 +18,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ProductImage } from "@/components/shared/product-image";
 import { describeTax } from "@/lib/taxes";
 import { useTaxesStore } from "@/store/taxes.store";
+import { SearchableSelect } from "@/components/shared/searchable-select";
 import { KINDS } from "@/components/menu/product-kind-dialog";
 import { shrinkImageFile } from "@/lib/image";
 import { useInventoryStore } from "@/store/inventory.store";
 import { useFeatures } from "@/lib/features";
 import { cn, formatCurrency } from "@/lib/utils";
-
-const NO_SUPPLY = "none";
 
 /** "Cada venta descuenta 1 Und de Cerveza Poker." */
 const SUPPLY_HINT = (qty: number, unit: string, name: string) =>
@@ -300,18 +299,17 @@ export function ProductFormDialog({
                 Descuenta del inventario <span className="text-muted-foreground">(opcional)</span>
               </label>
               <div className="flex gap-2">
-                <Select
-                  value={draft.inventoryId ? String(draft.inventoryId) : NO_SUPPLY}
-                  onValueChange={(v) => set({ inventoryId: v === NO_SUPPLY ? null : v, inventoryQty: draft.inventoryQty ?? 1 })}
-                >
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Sin descuento directo" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_SUPPLY}>Sin descuento directo</SelectItem>
-                    {supplies.map((i) => (
-                      <SelectItem key={i.id} value={String(i.id)}>{i.name} ({i.unit})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={draft.inventoryId ? String(draft.inventoryId) : ""}
+                  onChange={(v) => set({ inventoryId: v || null, inventoryQty: draft.inventoryQty ?? 1 })}
+                  placeholder="Sin descuento directo"
+                  searchPlaceholder="Escribe el insumo…"
+                  allowClear
+                  className="flex-1"
+                  options={[...supplies]
+                    .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
+                    .map((i) => ({ value: String(i.id), label: i.name, hint: i.unit }))}
+                />
                 {draft.inventoryId && (
                   <div className="w-32">
                     <Input

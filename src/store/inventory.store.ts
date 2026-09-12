@@ -5,7 +5,7 @@ import { MOVEMENTS } from "@/mock/kardex";
 import { consumptionInItemUnit } from "@/lib/recipes";
 import { useRecipesStore } from "./recipes.store";
 import { USE_API, apiErrorHandler } from "@/services/http";
-import { inventoryService } from "@/services/inventory.service";
+import { inventoryService, normalizeMovement } from "@/services/inventory.service";
 import { useAuditStore } from "./audit.store";
 
 const r = (n: number) => Math.round(n * 100) / 100;
@@ -294,7 +294,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
             minStock: Number(i.minStock),
             cost: Number(i.cost),
           }));
-          const moves: InventoryMovement[] = data.movements ?? [];
+          const moves: InventoryMovement[] = (data.movements ?? []).map(normalizeMovement);
           const byId = new Map(incoming.map((i) => [String(i.id), i]));
           set((s) => {
             const known = new Set(s.items.map((i) => String(i.id)));

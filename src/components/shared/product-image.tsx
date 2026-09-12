@@ -23,6 +23,7 @@ export function ProductImage({ emoji, category, className, size = "md" }: Produc
       // quedaba recortada; y sobre gris se notaba el corte de la foto, porque
       // las fotos de producto casi siempre vienen con fondo blanco.
       <span className={cn("flex items-center justify-center overflow-hidden rounded-xl bg-white", className)}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={emoji} alt="" className="h-full w-full object-contain" />
       </span>
     );

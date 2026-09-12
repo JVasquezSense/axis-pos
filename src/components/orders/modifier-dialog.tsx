@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { Product, ModifierOption, ProductVariation } from "@/types";
 import {
@@ -31,6 +32,8 @@ export function ModifierDialog({
   const [selected, setSelected] = useState<Record<string, ModifierOption[]>>({});
   const [variation, setVariation] = useState<ProductVariation | null>(null);
   const [notes, setNotes] = useState("");
+  // Cuántas: cinco cervezas eran cinco toques en la tarjeta y cinco diálogos.
+  const [qty, setQty] = useState(1);
 
   if (!product) return null;
 
@@ -56,12 +59,13 @@ export function ModifierDialog({
   };
 
   const confirm = () => {
-    addProduct(product, chosen, notes || undefined);
-    toast.success(`${product.name}${variation ? ` · ${variation.name}` : ""} agregado al pedido`);
+    for (let i = 0; i < qty; i++) addProduct(product, chosen, notes || undefined);
+    toast.success(`${qty > 1 ? `${qty}× ` : ""}${product.name}${variation ? ` · ${variation.name}` : ""} agregado al pedido`);
     onOpenChange(false);
     setSelected({});
     setVariation(null);
     setNotes("");
+    setQty(1);
   };
 
   return (
@@ -169,9 +173,18 @@ export function ModifierDialog({
           </div>
         </div>
 
-        <DialogFooter className="border-t border-border p-4">
-          <Button className="w-full" size="lg" onClick={confirm}>
-            Agregar · {formatCurrency(product.price + extra)}
+        <DialogFooter className="flex-row items-center gap-3 border-t border-border p-4 sm:justify-between">
+          <div className="flex items-center rounded-lg border border-border">
+            <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="flex h-11 w-11 items-center justify-center rounded-l-lg hover:bg-muted" aria-label="Menos">
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="w-10 text-center text-lg font-bold tabular-nums">{qty}</span>
+            <button type="button" onClick={() => setQty((q) => Math.min(99, q + 1))} className="flex h-11 w-11 items-center justify-center rounded-r-lg hover:bg-muted" aria-label="Más">
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+          <Button className="flex-1" size="lg" onClick={confirm}>
+            Agregar {qty > 1 ? `${qty} ` : ""}· {formatCurrency((product.price + extra) * qty)}
           </Button>
         </DialogFooter>
       </DialogContent>

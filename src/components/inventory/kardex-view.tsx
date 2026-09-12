@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportCsv } from "@/lib/export";
 import { DateRangeFilter, inRange, describeRange, ALL_TIME, type DateRange } from "@/components/shared/date-range-filter";
-import { cn, formatCurrency, formatDateTime } from "@/lib/utils";
+import { cn, formatCurrency, formatDateTime, formatQty } from "@/lib/utils";
 
 const TYPE_BADGE: Record<InventoryMovement["type"], { label: string; variant: "success" | "warning" | "secondary" | "destructive" }> = {
   inicial: { label: "Inicial", variant: "secondary" },
@@ -132,10 +132,10 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
                     <p className="font-medium">{s.item.name}</p>
                     <p className="text-xs text-muted-foreground">{s.item.category}</p>
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">{s.inicial} {s.item.unit}</TableCell>
-                  <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">+{s.entradas} {s.item.unit}</TableCell>
-                  <TableCell className="text-right font-medium text-destructive">−{s.salidas} {s.item.unit}</TableCell>
-                  <TableCell className="text-right font-semibold">{s.final} {s.item.unit}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">{formatQty(s.inicial)} {s.item.unit}</TableCell>
+                  <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">+{formatQty(s.entradas)} {s.item.unit}</TableCell>
+                  <TableCell className="text-right font-medium text-destructive">−{formatQty(s.salidas)} {s.item.unit}</TableCell>
+                  <TableCell className="text-right font-semibold">{formatQty(s.final)} {s.item.unit}</TableCell>
                   <TableCell className="text-right">{formatCurrency(s.value)}</TableCell>
                 </TableRow>
               ))}
@@ -148,7 +148,7 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
             <div>
               <p className="font-semibold">{detailItem?.name}</p>
               <p className="text-xs text-muted-foreground">
-                {describeRange(range)} · saldo final {filtered ? (detail.at(-1)?.balance ?? detailItem?.stock) : detailItem?.stock} {detailItem?.unit}
+                {describeRange(range)} · saldo final {formatQty(filtered ? (detail.at(-1)?.balance ?? detailItem?.stock) : detailItem?.stock)} {detailItem?.unit}
               </p>
             </div>
             <Badge variant="secondary">{detail.length} mov.</Badge>
@@ -177,12 +177,12 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
                   <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(m.date)}</TableCell>
                   <TableCell><Badge variant={TYPE_BADGE[m.type].variant}>{TYPE_BADGE[m.type].label}</Badge></TableCell>
                   <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">
-                    {m.quantity > 0 ? <span className="inline-flex items-center gap-1"><ArrowDownToLine className="h-3 w-3" />{m.quantity}</span> : "—"}
+                    {m.quantity > 0 ? <span className="inline-flex items-center gap-1"><ArrowDownToLine className="h-3 w-3" />{formatQty(m.quantity)}</span> : "—"}
                   </TableCell>
                   <TableCell className="text-right font-medium text-destructive">
-                    {m.quantity < 0 ? <span className="inline-flex items-center gap-1"><ArrowUpFromLine className="h-3 w-3" />{Math.abs(m.quantity)}</span> : "—"}
+                    {m.quantity < 0 ? <span className="inline-flex items-center gap-1"><ArrowUpFromLine className="h-3 w-3" />{formatQty(Math.abs(m.quantity))}</span> : "—"}
                   </TableCell>
-                  <TableCell className="text-right font-semibold">{m.balance}</TableCell>
+                  <TableCell className="text-right font-semibold">{formatQty(m.balance)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{m.reason}</TableCell>
                 </TableRow>
               ))}

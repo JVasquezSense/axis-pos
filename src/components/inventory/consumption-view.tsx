@@ -7,13 +7,14 @@ import { RECIPE_SALES } from "@/mock/kardex";
 import { effectiveQty, getInventoryItem } from "@/lib/recipes";
 import { inventoryService, type DishConsumptionReport } from "@/services/inventory.service";
 import { USE_API } from "@/services/http";
+import { ProductImage } from "@/components/shared/product-image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportCsv } from "@/lib/export";
 import { DateRangeFilter, describeRange, lastDays, type DateRange } from "@/components/shared/date-range-filter";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatQty } from "@/lib/utils";
 
 interface Consumed {
   name: string;
@@ -148,7 +149,7 @@ export function ConsumptionView() {
             <Card key={d.id}>
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <span className="text-xl">{d.emoji}</span> {d.name}
+                  <ProductImage emoji={d.emoji} size="sm" className="h-9 w-9 shrink-0 rounded-lg text-xl" /> {d.name}
                 </CardTitle>
                 <Badge variant="secondary" className="gap-1">
                   <Utensils className="h-3 w-3" /> {d.sold} vendidos
@@ -163,7 +164,7 @@ export function ConsumptionView() {
                     <div key={i} className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">{it.name}</span>
                       <span className="flex items-center gap-3">
-                        <span className="tabular-nums">{it.qty} {it.unit}</span>
+                        <span className="tabular-nums">{formatQty(it.qty)} {it.unit}</span>
                         <span className="w-20 text-right font-medium">{formatCurrency(it.cost)}</span>
                       </span>
                     </div>

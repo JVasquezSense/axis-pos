@@ -115,3 +115,13 @@ export function todayLocal(date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
+
+/**
+ * Cantidad de inventario legible: "133" y no "133.000"; "0.25" cuando hay
+ * fracción. Hasta tres decimales, sin ceros de relleno.
+ */
+export function formatQty(value: number | string | null | undefined): string {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return "0";
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(n);
+}

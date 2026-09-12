@@ -103,7 +103,14 @@ function CartaTab() {
   const [taxesOpen, setTaxesOpen] = useState(false);
 
   const hasRecipes = useFeatures().has("recipes");
-  const recipeFor = (pid: string | number) => recipes.find((r) => String(r.productId) === String(pid));
+  // Si por un enlace viejo un producto tuviera dos fichas, manda la que se
+  // llama como él; el servidor ya no deja crear una segunda.
+  const recipeFor = (pid: string | number) => {
+    const mine = recipes.filter((r) => String(r.productId) === String(pid));
+    if (mine.length <= 1) return mine[0];
+    const product = products.find((p) => String(p.id) === String(pid));
+    return mine.find((r) => product && r.name.trim().toLowerCase() === product.name.trim().toLowerCase()) ?? mine[0];
+  };
 
   const openRecipe = (p: Product) => {
     const existing = recipeFor(p.id);

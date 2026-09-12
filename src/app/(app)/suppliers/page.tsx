@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Truck, Plus, ShoppingCart, Pencil, Trash2, Phone, Mail, Package, Minus, ImagePlus, X, ZoomIn } from "lucide-react";
 import type { Supplier, PurchaseLine } from "@/types";
 import { useSuppliersStore, emptySupplier, type InvoiceData } from "@/store/suppliers.store";
+import { SearchableSelect } from "@/components/shared/searchable-select";
 import { shrinkImageFile, dataUrlBytes } from "@/lib/image";
 import { useInventoryStore } from "@/store/inventory.store";
 import { PageHeader } from "@/components/shared/page-header";
@@ -192,6 +193,12 @@ function PurchaseDialog({
   onRegister: (s: Supplier, lines: PurchaseLine[], invoicePhoto?: string, invoice?: InvoiceData) => void;
 }) {
   const inventory = useInventoryStore((s) => s.items);
+  const inventoryOptions = useMemo(
+    () => [...inventory]
+      .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
+      .map((it) => ({ value: String(it.id), label: it.name, hint: it.unit })),
+    [inventory]
+  );
   const [supplierId, setSupplierId] = useState("");
   const [lines, setLines] = useState<PurchaseLine[]>([]);
   const [invoicePhoto, setInvoicePhoto] = useState<string | undefined>(undefined);
@@ -255,24 +262,17 @@ function PurchaseDialog({
                 Primero vincula un proveedor en la pestaña &quot;Proveedores&quot;
               </p>
             ) : (
-              <Select value={supplierId} onValueChange={setSupplierId}>
-                <SelectTrigger className={!supplierId ? "border-destructive/50" : ""}>
-                  <SelectValue placeholder="Selecciona el proveedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.filter((s) => s.active).map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name} · {s.category}</SelectItem>
-                  ))}
-                  {suppliers.some((s) => !s.active) && (
-                    <>
-                      <div className="px-2 py-1 text-[11px] text-muted-foreground">Inactivos</div>
-                      {suppliers.filter((s) => !s.active).map((s) => (
-                        <SelectItem key={s.id} value={String(s.id)} className="opacity-60">{s.name}</SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={supplierId}
+                onChange={setSupplierId}
+                placeholder="Selecciona el proveedor"
+                searchPlaceholder="Buscar proveedor…"
+                className={!supplierId ? "[&>button]:border-destructive/50" : ""}
+                options={[
+                  ...suppliers.filter((s) => s.active).map((s) => ({ value: String(s.id), label: s.name, hint: s.category })),
+                  ...suppliers.filter((s) => !s.active).map((s) => ({ value: String(s.id), label: s.name, hint: "inactivo" })),
+                ]}
+              />
             )}
           </div>
 
@@ -286,12 +286,16 @@ function PurchaseDialog({
             {lines.map((l, i) => (
               <div key={i} className="space-y-2 rounded-xl border border-border p-2.5">
                 <div className="flex items-center gap-2">
-                  <Select value={l.inventoryId ? String(l.inventoryId) : ""} onValueChange={(v) => pickItem(i, v)}>
-                    <SelectTrigger className="h-9 flex-1"><SelectValue placeholder="Insumo" /></SelectTrigger>
-                    <SelectContent>
-                      {inventory.map((it) => <SelectItem key={it.id} value={String(it.id)}>{it.name} · {it.unit}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  {/* Con buscador: escribes "queso" y aparece, en vez de recorrer
+                      cuarenta insumos con el ratón. */}
+                  <SearchableSelect
+                    value={l.inventoryId ? String(l.inventoryId) : ""}
+                    onChange={(v) => pickItem(i, v)}
+                    placeholder="Insumo"
+                    searchPlaceholder="Escribe el insumo…"
+                    className="flex-1"
+                    options={inventoryOptions}
+                  />
                   <button
                     onClick={() => setLines((ls) => ls.filter((_, idx) => idx !== i))}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
