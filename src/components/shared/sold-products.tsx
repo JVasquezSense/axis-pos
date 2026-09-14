@@ -39,7 +39,7 @@ export function SoldProducts({ sales, compact = false }: { sales: SaleLike[]; co
   const max = rows[0]?.quantity ?? 1;
 
   if (rows.length === 0) {
-    return <p className="py-4 text-center text-xs text-muted-foreground">Sin detalle de productos en estas ventas.</p>;
+    return <p className="py-4 text-center text-xs text-muted-foreground">Sin detalle de productos: estas ventas se cobraron antes de que se guardara el ticket línea por línea.</p>;
   }
 
   return (
