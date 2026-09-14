@@ -28,11 +28,15 @@ export default function ShiftPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [since, setSince] = useState<number | null>(null);
+  const [nextNumber, setNextNumber] = useState<number | null>(null);
 
   // Al entrar, refresca el turno abierto y averigua desde cuándo corre.
   useEffect(() => {
     reload().catch(() => {});
-    shiftsService.list().then((list) => setSince(list[0]?.ts ?? null)).catch(() => {});
+    shiftsService.list().then((list) => {
+      setSince(list[0]?.ts ?? null);
+      setNextNumber((list[0]?.number ?? 0) + 1);
+    }).catch(() => {});
   }, [reload]);
 
   const stats = useMemo(() => {
@@ -81,6 +85,7 @@ export default function ShiftPage() {
     auditLog({ action: "Turno cerrado", details: `${records.length} ventas · ${formatCurrency(stats.sales)}`, user: userName || "Sistema", module: "ventas" });
     reset();
     setSince(Date.now());
+    setNextNumber((n) => (n ?? 0) + 1);
     // Vuelve a pedir el turno abierto: debe venir vacío, salvo ventas que
     // otro dispositivo haya cobrado en este mismo instante.
     reload().catch(() => {});
@@ -92,7 +97,7 @@ export default function ShiftPage() {
   return (
     <div className="space-y-6 print-area">
       <PageHeader
-        title="Cierre de turno"
+        title={nextNumber ? `Cierre de turno · Turno #${nextNumber}` : "Cierre de turno"}
         description={since
           ? `Ventas desde el último cierre · ${new Date(since).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`
           : "Cuadre de caja, propinas por mesero y cierre de sesión"}

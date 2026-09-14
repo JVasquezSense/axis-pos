@@ -8,6 +8,8 @@ function normalize(s: ShiftClose): ShiftClose {
     sales: Number(s.sales),
     avg: Number(s.avg ?? 0),
     totalTips: Number(s.totalTips ?? 0),
+    number: s.number != null ? Number(s.number) : undefined,
+    startedAt: s.startedAt != null ? Number(s.startedAt) : null,
   };
 }
 

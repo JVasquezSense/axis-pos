@@ -24,7 +24,7 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { useWebStore, cartLineKey, cartLinePrice } from "@/store/web.store";
+import { useWebStore, useQrTable, cartLineKey, cartLinePrice } from "@/store/web.store";
 import { useAppStore } from "@/store/app.store";
 import { MyOrdersSheet } from "@/components/website/my-orders-sheet";
 import { useAsync } from "@/hooks/use-async";
@@ -50,8 +50,9 @@ function RestaurantSiteInner({
   const slug = resolvedParams.slug;
   const searchParams = useSearchParams();
   // Backlog #8: QR por mesa — el parámetro ?table=N indica la mesa escaneada.
-  const tableFromQR = searchParams.get("table");
-  const tableNumber = tableFromQR ? Number(tableFromQR) : null;
+  // La mesa se recuerda en el dispositivo: volver del detalle de un producto
+  // o recargar no la pierde.
+  const tableNumber = useQrTable(slug, searchParams.get("table"));
   // "Ver carrito" desde el detalle del producto vuelve con ?cart=1 para abrir el Sheet.
   const openCartOnLoad = searchParams.get("cart") === "1";
 
@@ -348,6 +349,7 @@ function RestaurantSiteInner({
                   qty={qtyOf(p.id)}
                   index={i}
                   slug={slug}
+                  tableNumber={tableNumber}
                   onAdd={() => {
                     // Con variaciones el cliente debe elegir cuál antes de añadir.
                     if ((p.variations?.length ?? 0) > 0) {
@@ -469,6 +471,7 @@ function MenuCard({
   qty,
   index,
   slug,
+  tableNumber,
   onAdd,
   onInc,
   onDec,
@@ -477,10 +480,12 @@ function MenuCard({
   qty: number;
   index: number;
   slug: string;
+  tableNumber?: number | null;
   onAdd: () => void;
   onInc: () => void;
   onDec: () => void;
 }) {
+  const detailHref = `/restaurant/${slug}/product/${p.id}${tableNumber ? `?table=${tableNumber}` : ""}`;
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -493,7 +498,7 @@ function MenuCard({
       )}
     >
       {/* Imagen + info — clickeable abre el detalle del producto */}
-      <Link href={`/restaurant/${slug}/product/${p.id}`} className="block">
+      <Link href={detailHref} className="block">
         <div className="relative h-36 w-full overflow-hidden sm:h-40">
           <ProductImage emoji={p.image} category={p.category} size="lg" className="h-full w-full rounded-none" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />

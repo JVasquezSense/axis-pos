@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/shared/product-image";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { useWebStore } from "@/store/web.store";
+import { useWebStore, useQrTable } from "@/store/web.store";
 import { publicService } from "@/services/public.service";
 import { formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types";
@@ -25,8 +25,8 @@ function ProductDetailInner({ params }: { params: Promise<{ slug: string; id: st
   const { slug, id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tableFromQR = searchParams.get("table");
-  const tableNumber = tableFromQR ? Number(tableFromQR) : null;
+  const tableNumber = useQrTable(slug, searchParams.get("table"));
+  const tableQuery = tableNumber ? `?table=${tableNumber}` : "";
   const { cart, add, increment, decrement } = useWebStore();
   const [product, setProduct] = useState<Product | null>(null);
   const [categoryName, setCategoryName] = useState<string>("");
@@ -69,12 +69,11 @@ function ProductDetailInner({ params }: { params: Promise<{ slug: string; id: st
   const qty = cartItem?.quantity ?? 0;
   const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
 
-  const back = () => router.push(`/restaurant/${slug}`);
-  // "Ver carrito" vuelve a la carta y abre el Sheet del carrito (?cart=1),
-  // conservando la mesa del QR si la hay.
+  // Volver conserva la mesa del QR: antes se perdía y el pedido salía sin mesa.
+  const back = () => router.push(`/restaurant/${slug}${tableQuery}`);
+  // "Ver carrito" vuelve a la carta y abre el Sheet del carrito (?cart=1).
   const viewCart = () => {
-    const params = tableFromQR ? `?table=${tableNumber}&cart=1` : "?cart=1";
-    router.push(`/restaurant/${slug}${params}`);
+    router.push(`/restaurant/${slug}${tableQuery ? `${tableQuery}&cart=1` : "?cart=1"}`);
   };
 
   if (loading) {

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Product, PaymentMethod, ProductVariation } from "@/types";
@@ -51,6 +52,13 @@ interface WebState {
   liveOrders: LiveWebOrder[];
   /** IDs de pedidos web enviados desde este dispositivo (persistido). */
   myOrderIds: string[];
+  /**
+   * Mesa escaneada por QR. Se recuerda por restaurante para que al entrar al
+   * detalle de un producto y volver (o recargar) el pedido siga yendo a esa
+   * mesa: antes `?table=` se perdía en el primer clic.
+   */
+  qrTable: { slug: string; table: number; at: number } | null;
+  setQrTable: (slug: string, table: number) => void;
   add: (product: Product, variation?: ProductVariation) => void;
   /** Reciben la clave de línea (producto+variación), no el id del producto. */
   increment: (key: string) => void;
@@ -75,6 +83,8 @@ export const useWebStore = create<WebState>()(
   cart: [],
   liveOrders: [],
   myOrderIds: [],
+  qrTable: null,
+  setQrTable: (slug, table) => set({ qrTable: { slug, table, at: Date.now() } }),
   add: (product, variation) =>
     set((s) => {
       const key = cartLineKey({ product, variation });
@@ -156,6 +166,7 @@ export const useWebStore = create<WebState>()(
         cart: s.cart,
         liveOrders: s.liveOrders.map((o) => ({ ...o, receipt: undefined })),
         myOrderIds: s.myOrderIds,
+        qrTable: s.qrTable,
       }),
     }
   )
@@ -171,3 +182,22 @@ export const WEB_ORDER_STATUS: Record<
   dispatched: { label: "Despachado", variant: "success" },
   rejected: { label: "Rechazado", variant: "destructive" },
 };
+
+/** Una mesa escaneada vale por una visita; a las 4 horas se olvida. */
+const QR_TABLE_TTL = 4 * 60 * 60 * 1000;
+
+/**
+ * Mesa del QR para esta carta: la de la URL si viene, si no la recordada.
+ * Guarda la de la URL para que sobreviva a la navegación interna.
+ */
+export function useQrTable(slug: string, fromUrl: string | null): number | null {
+  const stored = useWebStore((s) => s.qrTable);
+  const setQrTable = useWebStore((s) => s.setQrTable);
+  const urlTable = fromUrl && Number.isFinite(Number(fromUrl)) && Number(fromUrl) > 0 ? Number(fromUrl) : null;
+  useEffect(() => {
+    if (urlTable && (stored?.slug !== slug || stored.table !== urlTable)) setQrTable(slug, urlTable);
+  }, [urlTable, slug, stored, setQrTable]);
+  if (urlTable) return urlTable;
+  if (stored && stored.slug === slug && Date.now() - stored.at < QR_TABLE_TTL) return stored.table;
+  return null;
+}

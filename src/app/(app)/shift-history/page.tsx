@@ -20,6 +20,14 @@ function fmtDate(ts: number) {
   });
 }
 
+/** Hora de inicio; si el turno arrancó otro día, con su fecha corta. */
+function fmtWhen(start: number, end: number) {
+  const sameDay = new Date(start).toDateString() === new Date(end).toDateString();
+  return sameDay
+    ? fmtTime(start)
+    : `${new Date(start).toLocaleDateString("es-CO", { day: "numeric", month: "short" })} ${fmtTime(start)}`;
+}
+
 function fmtTime(ts: number) {
   return new Date(ts).toLocaleTimeString("es-CO", {
     hour: "numeric",
@@ -41,8 +49,15 @@ function ShiftCard({ shift }: { shift: ShiftClose }) {
             <Clock className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold">{fmtDate(shift.ts)}</p>
-            <p className="text-xs text-muted-foreground">Cerrado a las {fmtTime(shift.ts)} por {shift.closedBy}</p>
+            <p className="text-sm font-semibold">
+              {shift.number ? <span className="mr-2 rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">Turno #{shift.number}</span> : null}
+              {fmtDate(shift.ts)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {shift.startedAt
+                ? <>Inicio {fmtWhen(shift.startedAt, shift.ts)} · Cierre {fmtTime(shift.ts)} · {shift.closedBy}</>
+                : <>Cerrado a las {fmtTime(shift.ts)} por {shift.closedBy}</>}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-4">

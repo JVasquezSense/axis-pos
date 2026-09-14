@@ -29,6 +29,11 @@ export interface ArchivedSale {
 
 export interface ShiftClose {
   id: string;
+  /** Correlativo por restaurante: "Turno #12". Lo asigna el servidor. */
+  number?: number;
+  /** Cuándo arrancó el turno (cierre anterior o primera venta). */
+  startedAt?: number | null;
+  /** Cuándo se cerró. */
   ts: number;
   sales: number;
   orders: number;
