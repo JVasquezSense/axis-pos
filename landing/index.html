@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Axis POS — El sistema operativo de tu restaurante</title>
+  <meta name="description" content="Axis POS: salón, pedidos, cocina en tiempo real, caja, inventario con kardex, recetas con costeo, domicilios y carta web. Todo en una sola plataforma en la nube." />
+  <meta property="og:title" content="Axis POS — El sistema operativo de tu restaurante" />
+  <meta property="og:description" content="Una plataforma. Visibilidad total de tu restaurante: salón, cocina, caja, inventario y ventas en tiempo real." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+
+  <!-- ░░ NAV — píldora flotante ░░ -->
+  <header class="nav" id="nav">
+    <a class="nav__brand" href="#top" aria-label="Axis POS">
+      <span class="nav__mark"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 3 29 27H3L16 3Z" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><circle cx="16" cy="19" r="3.2" fill="currentColor"/></svg></span>
+      <span>Axis <b>POS</b></span>
+    </a>
+    <nav class="nav__links" id="navLinks">
+      <a href="#plataforma">Plataforma</a>
+      <a href="#roles">Roles</a>
+      <a href="#capacidades">Capacidades</a>
+      <a href="#planes">Planes</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav__actions">
+      <a class="btn btn--ghost" data-link="app" href="#">Iniciar sesión</a>
+      <a class="btn btn--primary" data-link="demo" href="#contacto">Solicitar demo</a>
+      <button class="nav__burger" id="navBurger" aria-label="Menú" aria-expanded="false"><span></span><span></span></button>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- ░░ HERO ░░ -->
+    <section class="hero">
+      <div class="hero__bg" aria-hidden="true">
+        <div class="hero__grid"></div>
+        <div class="hero__glow hero__glow--a"></div>
+        <div class="hero__glow hero__glow--b"></div>
+      </div>
+
+      <div class="container hero__inner">
+        <div class="hero__copy reveal">
+          <p class="eyebrow">POS · KDS · INVENTARIO · IA</p>
+          <h1 class="hero__title">Una plataforma. <br>Visibilidad total <br>de tu <em>restaurante</em>.</h1>
+          <p class="hero__lead">Salón, pedidos, cocina en tiempo real, caja, inventario con kardex, recetas con costeo y domicilios. Todo sincronizado, en la nube, desde cualquier dispositivo.</p>
+          <div class="hero__cta">
+            <a class="btn btn--primary btn--lg" data-link="demo" href="#contacto">Solicitar demo <span class="btn__arrow">↗</span></a>
+            <a class="btn btn--outline btn--lg" href="#plataforma">Ver la plataforma</a>
+          </div>
+          <ul class="hero__proof">
+            <li><b>&lt; 1 s</b> del pedido a cocina</li>
+            <li><b>100 %</b> en la nube</li>
+            <li><b>0</b> instalaciones</li>
+          </ul>
+        </div>
+
+        <!-- Mockup del dashboard real -->
+        <div class="hero__mock reveal" data-delay="150">
+          <div class="device">
+            <div class="device__bar"><span></span><span></span><span></span><i>app.axispos.co/dashboard</i></div>
+            <div class="dash">
+              <aside class="dash__side">
+                <span class="is-on"></span><span></span><span></span><span></span><span></span><span></span>
+              </aside>
+              <div class="dash__main">
+                <div class="dash__head">
+                  <div><small>Buenas noches</small><strong>Teriyaki Sur · Hoy</strong></div>
+                  <div class="dash__pill">Turno abierto</div>
+                </div>
+                <div class="dash__kpis">
+                  <div class="kpi"><small>Ventas del día</small><strong data-count="4862300" data-prefix="$">$0</strong><em class="up">▲ 12,4 %</em></div>
+                  <div class="kpi"><small>Ticket promedio</small><strong data-count="48200" data-prefix="$">$0</strong><em class="up">▲ 3,1 %</em></div>
+                  <div class="kpi"><small>Mesas ocupadas</small><strong data-count="14" data-suffix="/22">0</strong><em>64 %</em></div>
+                  <div class="kpi"><small>Costo de insumos</small><strong data-count="31" data-suffix=" %">0</strong><em class="down">▼ 1,8 pt</em></div>
+                </div>
+                <div class="dash__row">
+                  <div class="panel panel--chart">
+                    <small>Ventas por hora</small>
+                    <div class="bars" id="bars"></div>
+                  </div>
+                  <div class="panel panel--donut">
+                    <small>Canales</small>
+                    <div class="donut"><div><b>68 %</b><span>Salón</span></div></div>
+                    <ul class="legend"><li><i class="c1"></i>Salón</li><li><i class="c2"></i>Domicilio</li><li><i class="c3"></i>Web</li></ul>
+                  </div>
+                </div>
+                <div class="dash__row">
+                  <div class="panel panel--list">
+                    <small>Cocina · en preparación</small>
+                    <div class="tick"><span>#0142 · Mesa 3</span><b class="t-warn">08:12</b></div>
+                    <div class="tick"><span>#0143 · Domicilio</span><b>03:40</b></div>
+                    <div class="tick"><span>#0144 · Mesa 9</span><b>01:05</b></div>
+                  </div>
+                  <div class="panel panel--list">
+                    <small>Alertas de inventario</small>
+                    <div class="tick"><span>Salmón</span><b class="t-warn">2,1 kg</b></div>
+                    <div class="tick"><span>Coca Cola 350 ml</span><b>48 und</b></div>
+                    <div class="tick"><span>Queso mozzarella</span><b class="t-warn">0,8 kg</b></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="device__shadow" aria-hidden="true"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░ FRANJA ░░ -->
+    <section class="strip">
+      <div class="container strip__inner">
+        <p class="eyebrow">DISEÑADO PARA LA OPERACIÓN REAL</p>
+        <div class="strip__items marquee" aria-hidden="true">
+          <div class="marquee__track">
+            <span>Restaurantes</span><span>Cafés</span><span>Bares</span><span>Pizzerías</span><span>Comida rápida</span><span>Dark kitchens</span><span>Food trucks</span><span>Franquicias</span>
+            <span>Restaurantes</span><span>Cafés</span><span>Bares</span><span>Pizzerías</span><span>Comida rápida</span><span>Dark kitchens</span><span>Food trucks</span><span>Franquicias</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░ PLATAFORMA — hoja blanca con scroll sincronizado ░░ -->
+    <section class="sheet" id="plataforma">
+      <div class="container">
+        <div class="sheet__head reveal">
+          <p class="eyebrow eyebrow--dark">POR QUÉ AXIS</p>
+          <h2 class="h2">Todo el restaurante, <br><em>una sola pantalla</em>.</h2>
+          <p class="lead">Cada módulo habla con el resto. Un pedido en salón descuenta inventario, llega a cocina, se cobra en caja y aparece en tus reportes. Sin dobles digitaciones.</p>
+        </div>
+
+        <div class="sync">
+          <aside class="sync__list" id="syncList">
+            <a href="#f-salon" data-target="f-salon" class="is-active">Salón y mesas</a>
+            <a href="#f-kds" data-target="f-kds">Cocina en tiempo real</a>
+            <a href="#f-caja" data-target="f-caja">Caja y cuentas divididas</a>
+            <a href="#f-inv" data-target="f-inv">Inventario y kardex</a>
+            <a href="#f-rec" data-target="f-rec">Recetas y costeo</a>
+            <a href="#f-rep" data-target="f-rep">Reportes ejecutivos</a>
+          </aside>
+
+          <div class="sync__cards">
+            <article class="feature reveal" id="f-salon">
+              <div class="feature__visual v-salon">
+                <div class="tables">
+                  <span class="tb is-busy">3<i>00:42</i></span><span class="tb">4</span><span class="tb is-busy">5<i>01:10</i></span><span class="tb is-res">6</span>
+                  <span class="tb">7</span><span class="tb is-busy">8<i>00:08</i></span><span class="tb">9</span><span class="tb is-bill">10</span>
+                </div>
+              </div>
+              <h3>Salón y mesas</h3>
+              <p>Mapa por zonas, tiempo de espera por mesa, reservas del día y estados en vivo: libre, ocupada, pidiendo cuenta. Edita el layout arrastrando.</p>
+            </article>
+
+            <article class="feature reveal" id="f-kds">
+              <div class="feature__visual v-kds">
+                <div class="kds">
+                  <div class="kds__card"><header>#0142 · Mesa 3<b>08:12</b></header><ul><li>2× Bombastic roll</li><li>1× Poke salmón <em>sin cebolla</em></li></ul></div>
+                  <div class="kds__card kds__card--new"><header>#0145 · Web<b>00:20</b></header><ul><li>1× Ramen tonkotsu</li><li>2× Gyozas</li></ul></div>
+                </div>
+              </div>
+              <h3>Cocina en tiempo real</h3>
+              <p>El pedido aparece en la pantalla de cocina en menos de un segundo por WebSocket. Los productos sin preparación saltan el KDS y pasan directo a listos.</p>
+            </article>
+
+            <article class="feature reveal" id="f-caja">
+              <div class="feature__visual v-caja">
+                <div class="split">
+                  <div class="split__p"><b>Ana</b><span>$62.400</span><i>Nequi</i></div>
+                  <div class="split__p"><b>Luis</b><span>$41.000</span><i>Tarjeta</i></div>
+                  <div class="split__p"><b>Sofía</b><span>$38.600</span><i>Efectivo</i></div>
+                </div>
+              </div>
+              <h3>Caja y cuentas divididas</h3>
+              <p>Divide en partes iguales o asigna cada producto a cada persona y cobra por separado con su propio método. Impuestos configurables por restaurante y pantalla para el cliente.</p>
+            </article>
+
+            <article class="feature reveal" id="f-inv">
+              <div class="feature__visual v-inv">
+                <table class="kardex">
+                  <tr><th>Fecha</th><th>Insumo</th><th>Entrada</th><th>Salida</th><th>Saldo</th></tr>
+                  <tr><td>14 sep</td><td>Salmón</td><td>+5 kg</td><td>—</td><td>9,27 kg</td></tr>
+                  <tr><td>14 sep</td><td>Arroz sushi</td><td>—</td><td>−1,2 kg</td><td>18,4 kg</td></tr>
+                  <tr><td>13 sep</td><td>Coca Cola</td><td>+48 und</td><td>−12 und</td><td>96 und</td></tr>
+                </table>
+              </div>
+              <h3>Inventario y kardex</h3>
+              <p>Cada venta descuenta insumos automáticamente con conversión de unidades y merma. Compras con foto de factura, conteos físicos, alertas de stock y salidas por producto.</p>
+            </article>
+
+            <article class="feature reveal" id="f-rec">
+              <div class="feature__visual v-rec">
+                <div class="cost">
+                  <div><span>Salmón · 120 g</span><b>$9.600</b></div>
+                  <div><span>Arroz · 150 g</span><b>$900</b></div>
+                  <div><span>Aguacate · 40 g</span><b>$700</b></div>
+                  <div class="cost__total"><span>Costo · Margen</span><b>$11.200 · 68 %</b></div>
+                </div>
+              </div>
+              <h3>Recetas y costeo</h3>
+              <p>Fichas técnicas con porciones, variaciones y costo por plato en vivo. Productos simples sin receta descuentan su propio insumo. Sabes cuánto ganas en cada plato.</p>
+            </article>
+
+            <article class="feature reveal" id="f-rep">
+              <div class="feature__visual v-rep">
+                <div class="report">
+                  <div class="report__bars"><i style="--h:40%"></i><i style="--h:65%"></i><i style="--h:52%"></i><i style="--h:80%"></i><i style="--h:71%"></i><i style="--h:95%"></i><i style="--h:60%"></i></div>
+                  <div class="report__meta"><span>Semana</span><b>$31,8 M</b><em>▲ 9,2 % vs anterior</em></div>
+                </div>
+              </div>
+              <h3>Reportes ejecutivos</h3>
+              <p>Ventas por hora, día y canal, top productos, costo real de insumos, cierres de turno y auditoría de acciones. Filtra por hoy, semana, mes o rango.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░ ROLES ░░ -->
+    <section class="dark" id="roles">
+      <div class="container">
+        <div class="sec__head reveal">
+          <p class="eyebrow">PARA CADA ROL</p>
+          <h2 class="h2">Hecho para cada persona <br>que mueve tu operación.</h2>
+        </div>
+        <div class="tabs reveal" id="roleTabs">
+          <div class="tabs__nav" role="tablist">
+            <button role="tab" aria-selected="true" data-tab="owner">Dueño</button>
+            <button role="tab" data-tab="waiter">Mesero</button>
+            <button role="tab" data-tab="kitchen">Cocina</button>
+            <button role="tab" data-tab="cashier">Cajero</button>
+            <button role="tab" data-tab="delivery">Domiciliario</button>
+          </div>
+          <div class="tabs__panels">
+            <div class="tabs__panel is-active" data-panel="owner">
+              <h3>Ve todo sin estar ahí.</h3>
+              <p>Dashboard con KPIs en vivo, comparativas contra la semana anterior, costo real de insumos y alertas. Cierra turnos desde el celular y revisa la bitácora de auditoría de cada acción.</p>
+              <ul class="checks"><li>Ventas y margen en tiempo real</li><li>Multi-sede y multi-rol por usuario</li><li>Axis IA: pregunta en lenguaje natural</li></ul>
+            </div>
+            <div class="tabs__panel" data-panel="waiter">
+              <h3>Toma el pedido en la mesa.</h3>
+              <p>Desde el celular o la tablet: categorías, variaciones, notas para cocina, cantidad y envío directo al KDS. También pedidos por voz y QR para que el cliente pida solo.</p>
+              <ul class="checks"><li>Modificadores y notas por producto</li><li>Tiempo de espera visible por mesa</li><li>Sin instalar nada: abre el navegador</li></ul>
+            </div>
+            <div class="tabs__panel" data-panel="kitchen">
+              <h3>Cero papel, cero gritos.</h3>
+              <p>Pantalla de cocina con comandas ordenadas por tiempo, colores por urgencia y un toque para marcar listo. Lo que no requiere preparación no estorba en el tablero.</p>
+              <ul class="checks"><li>Actualización por WebSocket</li><li>Estaciones y prioridades</li><li>Historial de tiempos de preparación</li></ul>
+            </div>
+            <div class="tabs__panel" data-panel="cashier">
+              <h3>Cobra rápido y sin errores.</h3>
+              <p>Efectivo, tarjeta, Nequi, Daviplata, PSE. Propina, descuentos, impuestos del restaurante y división de cuenta por persona. Pantalla secundaria para que el cliente vea lo que paga.</p>
+              <ul class="checks"><li>Factura numerada por restaurante</li><li>Cuentas divididas por producto</li><li>Arqueo y cierre de turno guiado</li></ul>
+            </div>
+            <div class="tabs__panel" data-panel="delivery">
+              <h3>Tu ruta, en tu bolsillo.</h3>
+              <p>Los pedidos de la carta web y WhatsApp entran al POS. El domiciliario ve su ruta, marca entregado y el cobro queda registrado en caja con su origen.</p>
+              <ul class="checks"><li>Carta web pública sincronizada</li><li>Chatbot de WhatsApp</li><li>Origen del pedido en cada venta</li></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░ CAPACIDADES ░░ -->
+    <section class="dark dark--tint" id="capacidades">
+      <div class="container">
+        <div class="sec__head reveal">
+          <p class="eyebrow">CAPACIDADES</p>
+          <h2 class="h2">Más que un POS.</h2>
+        </div>
+        <div class="grid3">
+          <article class="cap reveal"><span class="cap__ico">✦</span><h3>Axis IA</h3><p>Importa tu carta desde una foto, pregunta "¿qué se vendió más el sábado?" y recibe acciones sobre tu propia data.</p></article>
+          <article class="cap reveal" data-delay="60"><span class="cap__ico">▢</span><h3>QR por mesa</h3><p>El cliente escanea, pide y el pedido cae en cocina. Menos espera, más rotación.</p></article>
+          <article class="cap reveal" data-delay="120"><span class="cap__ico">◎</span><h3>Chatbot WhatsApp</h3><p>Atención y pedidos por WhatsApp que entran directo al flujo del restaurante.</p></article>
+          <article class="cap reveal"><span class="cap__ico">◉</span><h3>Pedidos por voz</h3><p>El mesero dicta el pedido y Axis lo estructura con productos, cantidades y notas.</p></article>
+          <article class="cap reveal" data-delay="60"><span class="cap__ico">⌂</span><h3>Carta web pública</h3><p>Tu propio sitio con la carta actualizada y pedidos que sincronizan con el POS.</p></article>
+          <article class="cap reveal" data-delay="120"><span class="cap__ico">⇄</span><h3>Domicilios</h3><p>Gestión de entregas, ruta del domiciliario y cobro con origen registrado.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░ PLANES — hoja blanca ░░ -->
+    <section class="sheet" id="planes">
+      <div class="container">
+        <div class="sheet__head reveal">
+          <p class="eyebrow eyebrow--dark">PLANES</p>
+          <h2 class="h2">Un plan para cada <br><em>tamaño de cocina</em>.</h2>
+          <p class="lead">Sin contratos largos ni cargos por instalación. Sube o baja de plan cuando lo necesites.</p>
+        </div>
+        <div class="plans">
+          <article class="plan reveal">
+            <h3>Axis Mini</h3>
+            <p class="plan__for">Cafés, food trucks y barras.</p>
+            <div class="plan__price" data-price="mini"><b>—</b><span>/ mes</span></div>
+            <ul class="checks">
+              <li>Salón, pedidos y KDS</li><li>Caja y cierre de turno</li><li>Productos simples con costo</li><li>Inventario básico</li><li>Empleados</li><li>Axis IA (limitado)</li>
+            </ul>
+            <a class="btn btn--outline-dark" data-link="demo" href="#contacto">Empezar</a>
+          </article>
+          <article class="plan reveal" data-delay="60">
+            <h3>Básico</h3>
+            <p class="plan__for">Restaurantes de una sede.</p>
+            <div class="plan__price" data-price="starter"><b>—</b><span>/ mes</span></div>
+            <ul class="checks">
+              <li>Todo lo de Mini</li><li>Recetas y fichas técnicas</li><li>Kardex completo y proveedores</li><li>Historial y devoluciones</li><li>Reservaciones</li><li>Reportes</li>
+            </ul>
+            <a class="btn btn--outline-dark" data-link="demo" href="#contacto">Empezar</a>
+          </article>
+          <article class="plan plan--hot reveal" data-delay="120">
+            <span class="plan__tag">Más elegido</span>
+            <h3>Pro</h3>
+            <p class="plan__for">Operación completa con domicilios.</p>
+            <div class="plan__price" data-price="growth"><b>—</b><span>/ mes</span></div>
+            <ul class="checks">
+              <li>Todo lo de Básico</li><li>Carta web y pedidos online</li><li>Domicilios y ruta</li><li>CRM y fidelización</li><li>QR por mesa y voz</li><li>Axis IA completo</li>
+            </ul>
+            <a class="btn btn--primary" data-link="demo" href="#contacto">Solicitar demo</a>
+          </article>
+          <article class="plan reveal" data-delay="180">
+            <h3>Enterprise</h3>
+            <p class="plan__for">Cadenas y franquicias.</p>
+            <div class="plan__price" data-price="enterprise"><b>A medida</b></div>
+            <ul class="checks">
+              <li>Todo lo de Pro</li><li>Multi-sede</li><li>Chatbot WhatsApp</li><li>Auditoría avanzada</li><li>Integraciones</li><li>Acompañamiento dedicado</li>
+            </ul>
+            <a class="btn btn--outline-dark" data-link="demo" href="#contacto">Hablar con ventas</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░ FAQ ░░ -->
+    <section class="dark" id="faq">
+      <div class="container container--narrow">
+        <div class="sec__head reveal">
+          <p class="eyebrow">PREGUNTAS FRECUENTES</p>
+          <h2 class="h2">Lo que nos preguntan antes de empezar.</h2>
+        </div>
+        <div class="faq reveal" id="faqList">
+          <details open><summary>¿Necesito comprar equipos?</summary><p>No. Axis corre en el navegador: funciona en el computador, tablet o celular que ya tienes. Para cocina basta una pantalla con navegador.</p></details>
+          <details><summary>¿Cuánto tarda la implementación?</summary><p>La mayoría de restaurantes opera el mismo día. Puedes importar tu carta con una foto usando Axis IA y cargar inventario desde una hoja de cálculo.</p></details>
+          <details><summary>¿Qué pasa si se va el internet?</summary><p>El POS guarda los pedidos en el dispositivo y los sincroniza cuando vuelve la conexión. Cocina y caja siguen viendo lo ya enviado.</p></details>
+          <details><summary>¿Puedo tener varios roles en un usuario?</summary><p>Sí. Un usuario puede ser mesero y cajero a la vez, y ve exactamente los paneles que le corresponden.</p></details>
+          <details><summary>¿Manejan impuestos e IVA?</summary><p>Cada restaurante configura sus propios impuestos (porcentaje o fijo) y elige cuáles aplican por producto. No hay impuestos predefinidos.</p></details>
+          <details><summary>¿Mis datos son míos?</summary><p>Sí. Cada restaurante tiene sus datos aislados y puedes exportarlos cuando quieras.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░ CTA / CONTACTO ░░ -->
+    <section class="dark cta" id="contacto">
+      <div class="container">
+        <div class="cta__card reveal">
+          <div class="cta__glow" aria-hidden="true"></div>
+          <p class="eyebrow">EMPIEZA HOY</p>
+          <h2 class="h2">Lleva tu restaurante <br>al siguiente nivel.</h2>
+          <p class="lead">Agenda una demo de 20 minutos y te mostramos Axis con tu propia carta.</p>
+          <form class="cta__form" id="demoForm" novalidate>
+            <input type="text" name="nombre" placeholder="Tu nombre" required />
+            <input type="text" name="restaurante" placeholder="Nombre del restaurante" required />
+            <input type="tel" name="telefono" placeholder="WhatsApp" required />
+            <button class="btn btn--primary btn--lg" type="submit">Solicitar demo <span class="btn__arrow">↗</span></button>
+          </form>
+          <p class="cta__note">Te escribimos por WhatsApp. Sin compromiso.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ░░ FOOTER ░░ -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <a class="nav__brand" href="#top"><span class="nav__mark"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 3 29 27H3L16 3Z" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><circle cx="16" cy="19" r="3.2" fill="currentColor"/></svg></span><span>Axis <b>POS</b></span></a>
+        <p>El sistema operativo de tu restaurante.</p>
+        <div class="footer__social">
+          <a data-link="instagram" href="#" aria-label="Instagram">IG</a>
+          <a data-link="linkedin" href="#" aria-label="LinkedIn">IN</a>
+          <a data-link="whatsapp" href="#" aria-label="WhatsApp">WA</a>
+        </div>
+      </div>
+      <div class="footer__cols">
+        <div><h4>Producto</h4><a href="#plataforma">Plataforma</a><a href="#capacidades">Capacidades</a><a href="#planes">Planes</a><a data-link="app" href="#">Iniciar sesión</a></div>
+        <div><h4>Roles</h4><a href="#roles">Dueño</a><a href="#roles">Mesero</a><a href="#roles">Cocina</a><a href="#roles">Cajero</a></div>
+        <div><h4>Empresa</h4><a href="#faq">FAQ</a><a href="#contacto">Contacto</a><a data-link="privacy" href="#">Privacidad</a><a data-link="terms" href="#">Términos</a></div>
+      </div>
+    </div>
+    <div class="container footer__legal">
+      <span>© <span id="year"></span> Axis POS · Synaptix. Todos los derechos reservados.</span>
+      <span class="mono">HECHO EN COLOMBIA</span>
+    </div>
+  </footer>
+
+  <a class="fab" data-link="whatsapp" href="#" aria-label="Escríbenos por WhatsApp">Hablemos</a>
+
+  <script src="assets/main.js"></script>
+</body>
+</html>
