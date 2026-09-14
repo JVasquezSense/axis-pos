@@ -41,7 +41,6 @@
   intro
     .from("#nav", { y: -24, opacity: 0, duration: 0.8 }, 0)
     .from(".hero__glow", { scale: 0.6, opacity: 0, duration: 1.6, stagger: 0.1, ease: "power2.out" }, 0)
-    .from(".hero .eyebrow", { y: 14, opacity: 0, duration: 0.6 }, 0.25)
     .from(h1Lines, { yPercent: 110, duration: 1, stagger: 0.12, ease: "power4.out" }, 0.35)
     .from(".hero__lead", { y: 20, opacity: 0, duration: 0.8 }, 0.8)
     .from(".hero__cta .btn", { y: 16, opacity: 0, duration: 0.6, stagger: 0.08 }, 0.95)
@@ -91,8 +90,7 @@
     head.classList.remove("reveal");
     const lines = splitLines(head.querySelector(".h2"));
     const tl = gsap.timeline({ scrollTrigger: { trigger: head, start: "top 80%" }, defaults: { ease } });
-    tl.from(head.querySelector(".eyebrow"), { y: 12, opacity: 0, duration: 0.5 })
-      .from(lines, { yPercent: 110, duration: 0.9, stagger: 0.1, ease: "power4.out" }, 0.1);
+    tl.from(lines, { yPercent: 110, duration: 0.9, stagger: 0.1, ease: "power4.out" });
     const lead = head.querySelector(".lead");
     if (lead) tl.from(lead, { y: 16, opacity: 0, duration: 0.7 }, 0.5);
   });
@@ -100,7 +98,7 @@
   /* ── hojas blancas: entran escalando como una tarjeta ────── */
   document.querySelectorAll(".sheet").forEach((sheet) => {
     gsap.from(sheet, {
-      scale: 0.96, borderRadius: 48, opacity: 0.6, ease: "power2.out",
+      scale: 0.96, opacity: 0.6, ease: "power2.out",
       scrollTrigger: { trigger: sheet, start: "top 95%", end: "top 55%", scrub: true },
     });
   });
@@ -159,8 +157,7 @@
   /* ── planes: entran en cascada, el destacado levita ──────── */
   const plans = gsap.utils.toArray(".plan");
   plans.forEach((p) => p.classList.remove("reveal"));
-  gsap.from(plans, { y: 50, opacity: 0, duration: 0.8, stagger: 0.12, ease, scrollTrigger: { trigger: ".plans", start: "top 85%" } });
-  gsap.to(".plan--hot", { y: -8, repeat: -1, yoyo: true, duration: 2.4, ease: "sine.inOut", delay: 1 });
+  gsap.from(plans, { y: 50, opacity: 0, duration: 0.8, stagger: 0.12, ease, clearProps: "transform", scrollTrigger: { trigger: ".plans", start: "top 85%" } });
 
   /* ── FAQ ─────────────────────────────────────────────────── */
   const faq = document.getElementById("faqList");
