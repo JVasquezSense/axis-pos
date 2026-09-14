@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DateRangeFilter, ALL_TIME, tsInRange, describeRange, type DateRange } from "@/components/shared/date-range-filter";
 import { Clock, ChevronDown, ChevronUp, DollarSign, CreditCard, Users, TrendingUp } from "lucide-react";
 import { useHistoryStore, type ShiftClose } from "@/store/history.store";
@@ -145,6 +145,9 @@ function ShiftCard({ shift }: { shift: ShiftClose }) {
 
 export default function ShiftHistoryPage() {
   const shifts = useHistoryStore((s) => s.shifts);
+  const load = useHistoryStore((s) => s.load);
+  // Sin esto se mostraba la copia vieja de localStorage, sin número ni inicio.
+  useEffect(() => { load(); }, [load]);
   const [range, setRange] = useState<DateRange>(ALL_TIME);
   const filtered = useMemo(() => shifts.filter((sh) => tsInRange(sh.ts, range)), [shifts, range]);
   const total = useMemo(() => filtered.reduce((acc, sh) => acc + sh.sales, 0), [filtered]);
