@@ -59,7 +59,10 @@ const onScroll = () => nav.classList.toggle("is-scrolled", window.scrollY > 24);
 window.addEventListener("scroll", onScroll, { passive: true });
 onScroll();
 
-/* ── reveal on scroll ─────────────────────────────────────── */
+/* ── reveal on scroll (fallback sin GSAP) ─────────────────── */
+// Con GSAP cargado, animations.js toma el control de .reveal; esto solo
+// corre si el CDN no responde, para que la página nunca quede en blanco.
+const HAS_GSAP = typeof window.gsap !== "undefined";
 const revealer = new IntersectionObserver((entries) => {
   entries.forEach((en) => {
     if (!en.isIntersecting) return;
@@ -69,14 +72,16 @@ const revealer = new IntersectionObserver((entries) => {
     revealer.unobserve(el);
   });
 }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
-document.querySelectorAll(".reveal").forEach((el) => revealer.observe(el));
-// Lo que ya está en pantalla al cargar se muestra sin esperar al observer.
-window.addEventListener("load", () => {
-  document.querySelectorAll(".reveal:not(.is-in)").forEach((el) => {
-    const r = el.getBoundingClientRect();
-    if (r.top < window.innerHeight && r.bottom > 0) el.classList.add("is-in");
+if (!HAS_GSAP) {
+  document.querySelectorAll(".reveal").forEach((el) => revealer.observe(el));
+  // Lo que ya está en pantalla al cargar se muestra sin esperar al observer.
+  window.addEventListener("load", () => {
+    document.querySelectorAll(".reveal:not(.is-in)").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) el.classList.add("is-in");
+    });
   });
-});
+}
 
 /* ── contadores del mockup ────────────────────────────────── */
 const countUp = (el) => {
@@ -99,12 +104,15 @@ if (mock) {
   const bars = document.getElementById("bars");
   const heights = [18, 26, 22, 40, 62, 55, 48, 70, 88, 96, 74, 58, 44, 66, 82];
   bars.innerHTML = heights.map((h, i) => `<i style="--h:${h}%;--i:${i}"></i>`).join("");
-  const once = new IntersectionObserver((en) => {
-    if (!en[0].isIntersecting) return;
-    mock.querySelectorAll("[data-count]").forEach(countUp);
-    once.disconnect();
-  }, { threshold: 0.3 });
-  once.observe(mock);
+  window.axisCountUp = () => mock.querySelectorAll("[data-count]").forEach(countUp);
+  if (!HAS_GSAP) {
+    const once = new IntersectionObserver((en) => {
+      if (!en[0].isIntersecting) return;
+      window.axisCountUp();
+      once.disconnect();
+    }, { threshold: 0.3 });
+    once.observe(mock);
+  }
 }
 
 /* ── scroll sincronizado (plataforma) ─────────────────────── */
