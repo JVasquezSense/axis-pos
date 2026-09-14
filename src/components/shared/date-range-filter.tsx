@@ -20,6 +20,26 @@ export function lastDays(days: number): DateRange {
   return { from: todayLocal(from), to: todayLocal(to) };
 }
 
+/** Semana en curso, de lunes a hoy. */
+export function thisWeek(): DateRange {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(to.getDate() - ((to.getDay() + 6) % 7));
+  return { from: todayLocal(from), to: todayLocal(to) };
+}
+
+/** Mes en curso, del 1 a hoy. */
+export function thisMonth(): DateRange {
+  const to = new Date();
+  return { from: todayLocal(new Date(to.getFullYear(), to.getMonth(), 1)), to: todayLocal(to) };
+}
+
+/** Igual que `inRange` pero para marcas de tiempo numéricas (ventas, turnos). */
+export function tsInRange(ts: number, range: DateRange): boolean {
+  if (!range.from && !range.to) return true;
+  return inRange(todayLocal(new Date(ts)), range);
+}
+
 /** ¿La fecha del movimiento cae dentro del rango? Rango vacío = todo pasa. */
 export function inRange(date: string | undefined, range: DateRange): boolean {
   if (!range.from && !range.to) return true;
@@ -41,7 +61,8 @@ function dayOf(value?: string): string | null {
 
 const PRESETS: { label: string; range: () => DateRange }[] = [
   { label: "Hoy", range: () => lastDays(1) },
-  { label: "7 días", range: () => lastDays(7) },
+  { label: "Semana", range: () => thisWeek() },
+  { label: "Mes", range: () => thisMonth() },
   { label: "30 días", range: () => lastDays(30) },
   { label: "Todo", range: () => ALL_TIME },
 ];

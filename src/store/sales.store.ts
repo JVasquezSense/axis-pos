@@ -47,7 +47,9 @@ export const useSalesStore = create<SalesState>()((set) => ({
 
   load: async () => {
     if (!USE_API) return;
-    const records = await salesService.getAll();
+    // Solo lo vendido desde el último cierre: antes venía todo el histórico y
+    // el "total del turno" era el total de la vida del restaurante.
+    const records = await salesService.getAll({ shift: "open" });
     set({ records });
   },
 
@@ -84,6 +86,9 @@ export function liveDayTotals(records: SaleRecord[]) {
 }
 
 export function applyLiveKpis(kpis: Kpi[], records: SaleRecord[]): Kpi[] {
+  // Con backend, los KPI ya vienen calculados para el rango elegido; pisarlos
+  // con las ventas del turno dejaba el selector de fechas sin efecto.
+  if (USE_API) return kpis;
   const { sales, orders, avg } = liveDayTotals(records);
   return kpis.map((k) =>
     k.id === "sales" ? { ...k, value: sales } : k.id === "orders" ? { ...k, value: orders } : k.id === "avg" ? { ...k, value: avg } : k

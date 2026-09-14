@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { DateRangeFilter, ALL_TIME, tsInRange, describeRange, type DateRange } from "@/components/shared/date-range-filter";
 import { Clock, ChevronDown, ChevronUp, DollarSign, CreditCard, Users, TrendingUp } from "lucide-react";
 import { useHistoryStore, type ShiftClose } from "@/store/history.store";
 import { PageHeader } from "@/components/shared/page-header";
@@ -129,6 +130,9 @@ function ShiftCard({ shift }: { shift: ShiftClose }) {
 
 export default function ShiftHistoryPage() {
   const shifts = useHistoryStore((s) => s.shifts);
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
+  const filtered = useMemo(() => shifts.filter((sh) => tsInRange(sh.ts, range)), [shifts, range]);
+  const total = useMemo(() => filtered.reduce((acc, sh) => acc + sh.sales, 0), [filtered]);
 
   return (
     <div className="space-y-6">
@@ -138,19 +142,28 @@ export default function ShiftHistoryPage() {
         icon={<Clock className="h-5 w-5" />}
       />
 
-      {shifts.length === 0 ? (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <DateRangeFilter value={range} onChange={setRange} />
+        {filtered.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {filtered.length} {filtered.length === 1 ? "turno" : "turnos"} · {formatCurrency(total)} · {describeRange(range)}
+          </p>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
         <Card className="py-16 text-center">
           <CardContent>
             <Clock className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p className="font-medium text-muted-foreground">Sin turnos cerrados</p>
+            <p className="font-medium text-muted-foreground">{shifts.length ? "Sin turnos en este periodo" : "Sin turnos cerrados"}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Los turnos aparecen aquí al cerrar desde Cierre de turno.
+              {shifts.length ? "Amplía el rango de fechas." : "Los turnos aparecen aquí al cerrar desde Cierre de turno."}
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {shifts.map((shift) => (
+          {filtered.map((shift) => (
             <ShiftCard key={shift.id} shift={shift} />
           ))}
         </div>

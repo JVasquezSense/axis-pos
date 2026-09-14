@@ -17,39 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatCurrency } from "@/lib/utils";
 import { PAYMENT_LABEL } from "@/lib/payments";
-
-type Range = "today" | "week" | "month" | "all";
-
-const RANGES: { key: Range; label: string }[] = [
-  { key: "today", label: "Hoy" },
-  { key: "week", label: "Semana" },
-  { key: "month", label: "Mes" },
-  { key: "all", label: "Todo" },
-];
-
-function startOf(range: Range): number {
-  const now = new Date();
-  switch (range) {
-    case "today": {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      return d.getTime();
-    }
-    case "week": {
-      // Desde el lunes: getDay() da 0 el domingo y la semana arrancaba ahí.
-      const d = new Date(now);
-      const dow = (d.getDay() + 6) % 7;
-      d.setDate(d.getDate() - dow);
-      d.setHours(0, 0, 0, 0);
-      return d.getTime();
-    }
-    case "month": {
-      const d = new Date(now.getFullYear(), now.getMonth(), 1);
-      return d.getTime();
-    }
-    default:
-      return 0;
-  }
-}
+import { DateRangeFilter, ALL_TIME, tsInRange, type DateRange } from "@/components/shared/date-range-filter";
 
 function fmtDate(ts: number) {
   return new Date(ts).toLocaleDateString("es-CO", {
@@ -90,7 +58,8 @@ export default function HistoryPage() {
   const sales = useHistoryStore((s) => s.sales);
   const loading = useHistoryStore((s) => s.loading);
   const load = useHistoryStore((s) => s.load);
-  const [range, setRange] = useState<Range>("all");
+  // Rango libre (desde/hasta) con atajos; antes solo Hoy/Semana/Mes/Todo.
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
   const [search, setSearch] = useState("");
   const [methodFilter, setMethodFilter] = useState<string>("all");
   const [waiterFilter, setWaiterFilter] = useState<string>("all");
@@ -99,10 +68,9 @@ export default function HistoryPage() {
   useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
-    const from = startOf(range);
     const q = search.toLowerCase();
     return sales.filter((s) => {
-      if (s.ts < from) return false;
+      if (!tsInRange(s.ts, range)) return false;
       if (methodFilter !== "all" && s.method !== methodFilter) return false;
       if (waiterFilter !== "all" && s.waiter !== waiterFilter) return false;
       if (q) {
@@ -137,20 +105,7 @@ export default function HistoryPage() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex rounded-lg border border-border p-0.5">
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              onClick={() => setRange(r.key)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                range === r.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
+        <DateRangeFilter value={range} onChange={setRange} />
 
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

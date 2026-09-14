@@ -50,7 +50,8 @@ interface HistoryState {
   archiveSales: (records: ArchivedSale[]) => void;
   /** Anula una venta en el servidor (devuelve el inventario) y la quita de aquí. */
   removeSale: (id: string) => Promise<void>;
-  closeShift: (shift: Omit<ShiftClose, "id" | "ts">) => void;
+  /** Guarda el cierre; con backend, lanza si el servidor lo rechaza. */
+  closeShift: (shift: Omit<ShiftClose, "id" | "ts">) => Promise<void>;
 }
 
 export const useHistoryStore = create<HistoryState>()(
@@ -91,18 +92,16 @@ export const useHistoryStore = create<HistoryState>()(
         useSalesStore.setState((st) => ({ records: st.records.filter((r) => String(r.id) !== String(id)) }));
       },
 
-      closeShift: (shift) => {
-        const entry: ShiftClose = {
-          ...shift,
-          id: `shift-${Date.now().toString(36)}`,
-          ts: Date.now(),
-        };
-        set((s) => ({ shifts: [entry, ...s.shifts].slice(0, 100) }));
-        if (!USE_API) return;
-        // Persiste el cierre para que sobreviva al navegador y cruce dispositivos.
-        shiftsService.create(shift)
-          .then((saved) => set((s) => ({ shifts: s.shifts.map((x) => (x.id === entry.id ? saved : x)) })))
-          .catch(() => { /* queda local */ });
+      closeShift: async (shift) => {
+        if (!USE_API) {
+          const entry: ShiftClose = { ...shift, id: `shift-${Date.now().toString(36)}`, ts: Date.now() };
+          set((s) => ({ shifts: [entry, ...s.shifts].slice(0, 100) }));
+          return;
+        }
+        // El cierre manda en el servidor: desde su fecha arranca el turno
+        // siguiente. Si falla, no se limpia nada en la caja.
+        const saved = await shiftsService.create(shift);
+        set((s) => ({ shifts: [saved, ...s.shifts.filter((x) => x.id !== saved.id)].slice(0, 100) }));
       },
     }),
     { name: "axis-history", partialize: (s) => ({ sales: s.sales, shifts: s.shifts }) }

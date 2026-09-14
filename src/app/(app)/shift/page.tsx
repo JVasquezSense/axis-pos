@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useAppStore } from "@/store/app.store";
+import { shiftsService } from "@/services/shifts.service";
+import { ApiError } from "@/services/http";
 import { toast } from "sonner";
 import { TimerOff, DollarSign, CreditCard, Banknote, Users, TrendingUp, RotateCcw, Printer } from "lucide-react";
 import { useSalesStore, liveDayTotals } from "@/store/sales.store";
@@ -20,7 +23,17 @@ import { useHistoryStore } from "@/store/history.store";
 export default function ShiftPage() {
   const records = useSalesStore((s) => s.records);
   const reset = useSalesStore((s) => s.reset);
+  const reload = useSalesStore((s) => s.load);
+  const userName = useAppStore((s) => s.userName);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [since, setSince] = useState<number | null>(null);
+
+  // Al entrar, refresca el turno abierto y averigua desde cuándo corre.
+  useEffect(() => {
+    reload().catch(() => {});
+    shiftsService.list().then((list) => setSince(list[0]?.ts ?? null)).catch(() => {});
+  }, [reload]);
 
   const stats = useMemo(() => {
     const byMethod: Record<string, number> = {};
@@ -44,20 +57,34 @@ export default function ShiftPage() {
   const archiveSales = useHistoryStore((s) => s.archiveSales);
   const closeShiftHistory = useHistoryStore((s) => s.closeShift);
 
-  const closeShift = () => {
+  const closeShift = async () => {
+    if (closing) return;
+    setClosing(true);
+    try {
+      await closeShiftHistory({
+        sales: stats.sales,
+        orders: records.length,
+        avg: stats.avg,
+        totalTips: stats.totalTips,
+        byMethod: stats.byMethod,
+        byWaiter: stats.byWaiter,
+        closedBy: userName || "Administrador",
+        records,
+      });
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "No se pudo guardar el cierre. Intenta de nuevo.";
+      toast.error("Cierre no guardado", { description: msg });
+      setClosing(false);
+      return;
+    }
     archiveSales(records);
-    closeShiftHistory({
-      sales: stats.sales,
-      orders: records.length,
-      avg: stats.avg,
-      totalTips: stats.totalTips,
-      byMethod: stats.byMethod,
-      byWaiter: stats.byWaiter,
-      closedBy: "Administrador",
-      records,
-    });
-    auditLog({ action: "Turno cerrado", details: `${records.length} ventas · ${formatCurrency(stats.sales)}`, user: "Sistema", module: "ventas" });
+    auditLog({ action: "Turno cerrado", details: `${records.length} ventas · ${formatCurrency(stats.sales)}`, user: userName || "Sistema", module: "ventas" });
     reset();
+    setSince(Date.now());
+    // Vuelve a pedir el turno abierto: debe venir vacío, salvo ventas que
+    // otro dispositivo haya cobrado en este mismo instante.
+    reload().catch(() => {});
+    setClosing(false);
     setConfirmOpen(false);
     toast.success("Turno cerrado", { description: "Turno archivado en historial. Nueva sesión lista." });
   };
@@ -66,7 +93,9 @@ export default function ShiftPage() {
     <div className="space-y-6 print-area">
       <PageHeader
         title="Cierre de turno"
-        description="Cuadre de caja, propinas por mesero y cierre de sesión"
+        description={since
+          ? `Ventas desde el último cierre · ${new Date(since).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`
+          : "Cuadre de caja, propinas por mesero y cierre de sesión"}
         icon={<TimerOff className="h-5 w-5" />}
         actions={
           <div className="flex gap-2 print-hidden">
@@ -184,8 +213,8 @@ export default function ShiftPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={closeShift}>
-              <RotateCcw className="h-4 w-4" /> Confirmar cierre
+            <Button variant="destructive" onClick={closeShift} disabled={closing}>
+              <RotateCcw className={cn("h-4 w-4", closing && "animate-spin")} /> {closing ? "Guardando…" : "Confirmar cierre"}
             </Button>
           </DialogFooter>
         </DialogContent>

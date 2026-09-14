@@ -20,9 +20,18 @@ function normalizeSale(r: SaleRecord): SaleRecord {
 }
 
 export const salesService = {
-  async getAll(): Promise<SaleRecord[]> {
+  /**
+   * `shift: "open"` trae solo las ventas desde el último cierre de turno;
+   * `from`/`to` (YYYY-MM-DD) acotan por fecha. Sin opciones: todo el histórico.
+   */
+  async getAll(opts: { shift?: "open"; from?: string; to?: string } = {}): Promise<SaleRecord[]> {
     if (!USE_API) return mockRequest([], 400);
-    const rows = await request<SaleRecord[]>("/sales/");
+    const qs = new URLSearchParams();
+    if (opts.shift) qs.set("shift", opts.shift);
+    if (opts.from) qs.set("from", opts.from);
+    if (opts.to) qs.set("to", opts.to);
+    const q = qs.toString();
+    const rows = await request<SaleRecord[]>(q ? `/sales/?${q}` : "/sales/");
     return rows.map(normalizeSale);
   },
   async record(s: Omit<SaleRecord, "id" | "ts">): Promise<SaleRecord> {
