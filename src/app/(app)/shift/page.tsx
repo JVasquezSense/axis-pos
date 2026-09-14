@@ -5,7 +5,8 @@ import { useAppStore } from "@/store/app.store";
 import { shiftsService } from "@/services/shifts.service";
 import { ApiError } from "@/services/http";
 import { toast } from "sonner";
-import { TimerOff, DollarSign, CreditCard, Banknote, Users, TrendingUp, RotateCcw, Printer } from "lucide-react";
+import { TimerOff, DollarSign, CreditCard, Banknote, Users, TrendingUp, RotateCcw, Printer, Package } from "lucide-react";
+import { SoldProducts } from "@/components/shared/sold-products";
 import { useSalesStore, liveDayTotals } from "@/store/sales.store";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -182,6 +183,16 @@ export default function ShiftPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Qué se vendió */}
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-4 w-4" /> Productos vendidos en el turno</CardTitle></CardHeader>
+            <CardContent>
+              <div className="max-h-96 overflow-y-auto">
+                <SoldProducts sales={records} />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Detalle de ventas */}
           <Card>

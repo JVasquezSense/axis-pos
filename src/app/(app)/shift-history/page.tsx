@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn, formatCurrency } from "@/lib/utils";
 import { PAYMENT_LABEL } from "@/lib/payments";
+import { SoldProducts } from "@/components/shared/sold-products";
 
 function fmtDate(ts: number) {
   return new Date(ts).toLocaleDateString("es-CO", {
@@ -119,6 +120,16 @@ function ShiftCard({ shift }: { shift: ShiftClose }) {
               )}
             </div>
           </div>
+
+          {/* Qué se vendió */}
+          {shift.records.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Productos vendidos</p>
+              <div className="max-h-64 overflow-y-auto">
+                <SoldProducts sales={shift.records} compact />
+              </div>
+            </div>
+          )}
 
           {/* Detalle de ventas */}
           {shift.records.length > 0 && (
