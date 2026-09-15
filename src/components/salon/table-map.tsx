@@ -36,7 +36,8 @@ function TableNode({
   onReposition: (id: string, x: number, y: number) => void;
 }) {
   const status = TABLE_STATUS[table.status];
-  const elapsed = table.seatedAt ? minutesAgo(new Date(table.seatedAt)) : 0;
+  // Una mesa libre no lleva reloj aunque arrastre un seatedAt viejo.
+  const elapsed = table.seatedAt && table.status !== "available" ? minutesAgo(new Date(table.seatedAt)) : 0;
   const isLong = elapsed > 90;
 
   const handleDragEnd = (_: unknown, info: { offset: { x: number; y: number } }) => {
@@ -93,7 +94,7 @@ function TableNode({
         <span className="mt-0.5 flex items-center gap-0.5 text-[10px] text-muted-foreground">
           <Users className="h-2.5 w-2.5" /> {table.capacity}
         </span>
-        {table.seatedAt && !table.mergedInto && (
+        {table.seatedAt && !table.mergedInto && table.status !== "available" && (
           <span className={cn("mt-0.5 flex items-center gap-0.5 text-[10px] font-medium", isLong ? "text-destructive" : status.text)}>
             <Clock className="h-2.5 w-2.5" /> {formatElapsed(elapsed)}
           </span>
@@ -238,7 +239,7 @@ function TableTile({ table, onClick }: { table: RestaurantTable; onClick: () => 
       <span className="mt-1 flex items-center gap-0.5 text-[10px] text-muted-foreground">
         <Users className="h-2.5 w-2.5" /> {table.capacity}
       </span>
-      {table.seatedAt && !table.mergedInto && (
+      {table.seatedAt && !table.mergedInto && table.status !== "available" && (
         <span className={cn("mt-0.5 flex items-center gap-0.5 text-[10px] font-medium", isLong ? "text-destructive" : status.text)}>
           <Clock className="h-2.5 w-2.5" /> {formatElapsed(elapsed)}
         </span>
