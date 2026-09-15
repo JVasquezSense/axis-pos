@@ -108,7 +108,9 @@ export default function KitchenPage() {
                 {!mounted ? (
                   Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)
                 ) : (
-                  <AnimatePresence mode="popLayout">
+                  // Sin popLayout: con varias salidas a la vez (Limpiar todo) framer
+                  // dejaba las tarjetas congeladas a media animación.
+                  <AnimatePresence initial={false}>
                     {colTickets.map((t) => (
                       <TicketCard
                         key={t.id}

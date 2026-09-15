@@ -44,10 +44,9 @@ export function TicketCard({
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
+      exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
       transition={{ type: "spring", stiffness: 300, damping: 26 }}
       className={cn(
         "rounded-xl border border-t-4 border-border bg-card shadow-sm",
