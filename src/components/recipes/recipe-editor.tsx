@@ -535,7 +535,11 @@ export function RecipeEditor({
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label="Porciones">
+                  {/* "Porciones" se leía como "piezas del plato" (un roll de 9 →
+                      9) y el consumo se dividía entre 9: el salmón salía a 13 g
+                      en vez de 100 g. Es cuántas UNIDADES DE VENTA rinden estas
+                      cantidades. */}
+                  <Field label="Rinde (unidades de venta)" hint="Con estas cantidades, ¿cuántas unidades vendibles salen? Un roll de 9 piezas = 1. Los insumos se dividen entre este número.">
                     <Input type="number" min={1} value={draft.portions} onChange={(e) => set({ portions: Math.max(Number(e.target.value), 1) })} />
                   </Field>
                   <Field label="Prep (min)">
@@ -802,11 +806,12 @@ export function RecipeEditor({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
       <label className="mb-1.5 block text-sm font-medium">{label}</label>
       {children}
+      {hint && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{hint}</p>}
     </div>
   );
 }
