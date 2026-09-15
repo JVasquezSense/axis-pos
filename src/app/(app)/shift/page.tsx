@@ -201,7 +201,7 @@ export default function ShiftPage() {
               <div className="space-y-1.5 max-h-80 overflow-y-auto">
                 {records.map((r) => (
                   <div key={r.id} className={cn("flex items-center gap-4 rounded-lg border border-border px-4 py-2.5 text-sm")}>
-                    <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">{r.id.slice(-6).toUpperCase()}</span>
+                    <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">{String(r.id).slice(-6).toUpperCase()}</span>
                     <span className="flex-1 truncate">{r.saleType}{r.table ? ` · Mesa ${r.table}` : ""}</span>
                     {r.waiter && r.waiter !== "Sin asignar" && (
                       <span className="text-xs text-muted-foreground">{r.waiter}</span>

@@ -138,7 +138,7 @@ function ShiftCard({ shift }: { shift: ShiftClose }) {
               <div className="max-h-48 overflow-y-auto space-y-1">
                 {shift.records.map((r) => (
                   <div key={r.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-1.5 text-xs">
-                    <span className="w-14 shrink-0 font-mono text-muted-foreground">{r.id.slice(-6).toUpperCase()}</span>
+                    <span className="w-14 shrink-0 font-mono text-muted-foreground">{String(r.id).slice(-6).toUpperCase()}</span>
                     <span className="flex-1 truncate">{r.saleType}{r.table ? ` · Mesa ${r.table}` : ""}</span>
                     {r.waiter && r.waiter !== "Sin asignar" && <span className="text-muted-foreground">{r.waiter}</span>}
                     <Badge variant="outline" className="text-[10px]">{PAYMENT_LABEL[r.method] ?? r.method}</Badge>
