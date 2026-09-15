@@ -24,12 +24,14 @@ function delayClass(minutes: number, status: KdsTicket["status"]) {
 export function TicketCard({
   ticket,
   onAdvance,
+  onDismiss,
   onToggleItem,
   onSetItemQty,
   onRemoveItem,
 }: {
   ticket: KdsTicket;
   onAdvance: (id: string) => void;
+  onDismiss?: (id: string) => void;
   onToggleItem: (ticketId: string, index: number) => void;
   onSetItemQty: (ticketId: string, index: number, quantity: number) => void;
   onRemoveItem: (ticketId: string, index: number) => void;
@@ -128,14 +130,22 @@ export function TicketCard({
         ))}
       </div>
 
-      {ticket.status !== "ready" && (
+      {ticket.status !== "ready" ? (
         <div className="p-3 pt-0">
           <Button size="sm" variant={ticket.status === "preparing" ? "success" : "default"} className="w-full" onClick={() => onAdvance(ticket.id)}>
             {ticket.status === "pending" ? "Iniciar preparación" : "Marcar listo"}
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
-      )}
+      ) : onDismiss ? (
+        <div className="p-3 pt-0">
+          {/* Un toque y sale del tablero: la columna "Listo" no se llenaba de
+              pedidos ya entregados. */}
+          <Button size="sm" variant="outline" className="w-full" onClick={() => onDismiss(ticket.id)}>
+            <Check className="h-4 w-4" /> Entregado · quitar
+          </Button>
+        </div>
+      ) : null}
     </motion.div>
   );
 }

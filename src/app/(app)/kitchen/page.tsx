@@ -3,7 +3,8 @@
 import { useEffect, useReducer, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { ChefHat, Radio } from "lucide-react";
+import { ChefHat, Radio, CheckCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { KdsStatus } from "@/types";
 import { useKitchenStore } from "@/store/kitchen.store";
 import { useAuthStore } from "@/store/auth.store";
@@ -23,6 +24,8 @@ export default function KitchenPage() {
   const toggleItem = useKitchenStore((s) => s.toggleItem);
   const setItemQty = useKitchenStore((s) => s.setItemQty);
   const removeItem = useKitchenStore((s) => s.removeItem);
+  const dismiss = useKitchenStore((s) => s.dismiss);
+  const dismissReady = useKitchenStore((s) => s.dismissReady);
   const load = useKitchenStore((s) => s.load);
   const connect = useKitchenStore((s) => s.connect);
   const wsConnected = useKitchenStore((s) => s.wsConnected);
@@ -81,9 +84,25 @@ export default function KitchenPage() {
                   <span className={cn("h-2.5 w-2.5 rounded-full", KDS_STATUS[col].accent.replace("border-t-", "bg-"))} />
                   <h3 className="font-semibold">{KDS_STATUS[col].label}</h3>
                 </div>
-                <span className="rounded-full bg-background px-2 py-0.5 text-xs font-semibold">
-                  {colTickets.length}
-                </span>
+                <div className="flex items-center gap-2">
+                  {col === "ready" && colTickets.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        const n = colTickets.length;
+                        dismissReady();
+                        toast.success(`${n} ${n === 1 ? "pedido entregado" : "pedidos entregados"}`);
+                      }}
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" /> Limpiar todo
+                    </Button>
+                  )}
+                  <span className="rounded-full bg-background px-2 py-0.5 text-xs font-semibold">
+                    {colTickets.length}
+                  </span>
+                </div>
               </div>
               <div className="scrollbar-thin flex-1 space-y-3 overflow-y-auto px-0.5">
                 {!mounted ? (
@@ -95,6 +114,10 @@ export default function KitchenPage() {
                         key={t.id}
                         ticket={t}
                         onAdvance={advance}
+                        onDismiss={(id) => {
+                          dismiss(id);
+                          toast.success(`${t.code} entregado`);
+                        }}
                         onToggleItem={toggleItem}
                         onSetItemQty={(ticketId, idx, qty) => {
                           setItemQty(ticketId, idx, qty);

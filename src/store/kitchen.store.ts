@@ -15,6 +15,10 @@ interface KitchenState {
   addFromOrder: (lines: OrderLine[], table: number | null, channel: OrderChannel) => KdsTicket;
   addWebTicket: (input: { code: string; items: { name: string; quantity: number }[]; customer?: string }) => void;
   advance: (id: string) => void;
+  /** Saca del tablero un pedido ya listo (queda como servido; la mesa sigue abierta). */
+  dismiss: (id: string) => void;
+  /** Limpia toda la columna "Listo". */
+  dismissReady: () => void;
   toggleItem: (id: string, index: number) => void;
   /** Backlog #5: editar cantidad de un item del ticket desde el KDS. */
   setItemQty: (id: string, index: number, quantity: number) => void;
@@ -39,7 +43,12 @@ export const useKitchenStore = create<KitchenState>()((set, get) => ({
       onNew: (ticket) =>
         set((s) => (s.tickets.some((t) => t.id === ticket.id) ? s : { tickets: [ticket, ...s.tickets] })),
       onUpdate: (ticket) =>
-        set((s) => ({ tickets: s.tickets.map((t) => (t.id === ticket.id ? ticket : t)) })),
+        set((s) => ({
+          // Servido/pagado/cancelado ya no es asunto de cocina: sale del tablero.
+          tickets: (["pending", "preparing", "ready"] as string[]).includes(ticket.status)
+            ? s.tickets.map((t) => (t.id === ticket.id ? ticket : t))
+            : s.tickets.filter((t) => t.id !== ticket.id),
+        })),
       onOpen: () => set({ wsConnected: true }),
       onClose: () => set({ wsConnected: false }),
     });
@@ -100,6 +109,23 @@ export const useKitchenStore = create<KitchenState>()((set, get) => ({
     // Los tickets con id numérico vienen de un Order real en el backend.
     if (USE_API && /^\d+$/.test(id)) {
       ordersService.updateStatus(id, next).catch(apiErrorHandler("estado del pedido"));
+    }
+  },
+
+  dismiss: (id) => {
+    set((s) => ({ tickets: s.tickets.filter((t) => t.id !== id) }));
+    if (USE_API && /^\d+$/.test(id)) {
+      ordersService.updateStatus(id, "served").catch(apiErrorHandler("entregar pedido"));
+    }
+  },
+
+  dismissReady: () => {
+    const ready = get().tickets.filter((t) => t.status === "ready");
+    set((s) => ({ tickets: s.tickets.filter((t) => t.status !== "ready") }));
+    if (USE_API) {
+      ready.filter((t) => /^\d+$/.test(t.id)).forEach((t) => {
+        ordersService.updateStatus(t.id, "served").catch(apiErrorHandler("entregar pedido"));
+      });
     }
   },
 
