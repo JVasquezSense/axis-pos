@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Clock, Layers, MoreVertical, Pencil, Copy, Trash2, Package } from "lucide-react";
 import type { Recipe } from "@/types";
+import { ProductImage } from "@/components/shared/product-image";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -42,8 +43,10 @@ export function RecipeCard({
       className="group flex flex-col rounded-2xl border border-border bg-card transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="flex items-start gap-3 p-4">
-        <button onClick={onEdit} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-muted text-3xl">
-          {recipe.emoji}
+        <button onClick={onEdit} className="h-14 w-14 shrink-0">
+          {/* La ficha puede llevar foto (data URL): pintada como texto salía
+              la cadena base64 entera sobre la tarjeta. */}
+          <ProductImage emoji={recipe.emoji} size="md" className="h-14 w-14 rounded-xl text-3xl" />
         </button>
         <div className="min-w-0 flex-1">
           <button onClick={onEdit} className="block text-left">

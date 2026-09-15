@@ -12,42 +12,24 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { RevenueLineChart, ProfitBarChart, DonutChart, LocationBarChart } from "@/components/reports/charts-lazy";
-import { cn, formatCurrency } from "@/lib/utils";
-
-const DATE_RANGES = [
-  { id: "today", label: "Hoy" },
-  { id: "week", label: "Semana" },
-  { id: "month", label: "Mes" },
-  { id: "year", label: "Año" },
-];
+import { formatCurrency } from "@/lib/utils";
+import { DateRangeFilter, thisMonth, describeRange, type DateRange } from "@/components/shared/date-range-filter";
 
 export default function ReportsPage() {
-  const [range, setRange] = useState("month");
-  // El selector existía pero no llegaba al servidor: siempre eran 30 días.
-  const { data, loading } = useAsync(() => reportsService.getExecutive(range), [range]);
+  // Rango libre desde/hasta con atajos; el servidor compara contra el tramo
+  // anterior de igual largo.
+  const [range, setRange] = useState<DateRange>(() => thisMonth());
+  const { data, loading } = useAsync(() => reportsService.getExecutive(range), [range.from, range.to]);
 
   return (
     <div className="space-y-6 print-area">
       <PageHeader
         title="Reportes ejecutivos"
-        description={`Análisis de rentabilidad · ${new Date().toLocaleDateString("es-CO", { month: "long", year: "numeric" })}`}
+        description={`Análisis de rentabilidad · ${describeRange(range)}`}
         icon={<BarChart3 className="h-5 w-5" />}
         actions={
           <div className="print-hidden flex items-center gap-2">
-            <div className="inline-flex rounded-lg border border-border p-0.5">
-              {DATE_RANGES.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => setRange(r.id)}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    range === r.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                  )}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
+            <DateRangeFilter value={range} onChange={setRange} />
             <Button size="sm" onClick={() => window.print()}>
               <Download className="h-4 w-4" /> PDF
             </Button>
@@ -121,7 +103,7 @@ export default function ReportsPage() {
                   <CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Ventas por sucursal</CardTitle>
                   <p className="text-sm text-muted-foreground">Comparadas con el promedio de sedes</p>
                 </div>
-                <Badge variant="secondary">{DATE_RANGES.find((r) => r.id === range)?.label}</Badge>
+                <Badge variant="secondary">{describeRange(range)}</Badge>
               </CardHeader>
               <CardContent>
                 <LocationBarChart data={data.salesByLocation} />

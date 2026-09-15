@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Download, LayoutDashboard } from "lucide-react";
-import { DateRangeFilter, type DateRangeId } from "@/components/shared/date-range";
+import { DateRangeFilter, lastDays, type DateRange } from "@/components/shared/date-range-filter";
 import { dashboardService } from "@/services/dashboard.service";
 import { useAsync } from "@/hooks/use-async";
 import { useAppStore } from "@/store/app.store";
@@ -44,10 +44,10 @@ const ADMIN_ACTIONS: QuickAction[] = [
 ];
 
 function AdminDashboard() {
-  const [range, setRange] = useState<DateRangeId>("today");
-  // El selector existía pero no llegaba al servidor: los KPI eran siempre de hoy.
-  const { data, loading } = useAsync(() => dashboardService.getSummary(range), [range]);
-  const { data: rep } = useAsync(() => reportsService.getExecutive(range));
+  // Rango libre desde/hasta; por defecto hoy.
+  const [range, setRange] = useState<DateRange>(() => lastDays(1));
+  const { data, loading } = useAsync(() => dashboardService.getSummary(range), [range.from, range.to]);
+  const { data: rep } = useAsync(() => reportsService.getExecutive(range), [range.from, range.to]);
   const records = useSalesStore((s) => s.records);
 
   const exportSummary = () => {

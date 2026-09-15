@@ -125,6 +125,17 @@ export function DateRangeFilter({
   );
 }
 
+/**
+ * Parámetros para el backend: `from`/`to` inclusivos. "Todo" manda solo `to`
+ * de hoy y el servidor arranca en la primera venta del restaurante.
+ */
+export function rangeQuery(range: DateRange): string {
+  const qs = new URLSearchParams();
+  if (range.from) qs.set("from", range.from);
+  qs.set("to", range.to || todayLocal());
+  return qs.toString();
+}
+
 /** Texto del periodo para encabezados y exportaciones. */
 export function describeRange(range: DateRange): string {
   if (!range.from && !range.to) return "todo el histórico";
