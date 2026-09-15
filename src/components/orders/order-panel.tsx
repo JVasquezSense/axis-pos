@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { useOrderStore, orderSelectors } from "@/store/order.store";
 import { useTaxesStore } from "@/store/taxes.store";
 import { computeTaxes } from "@/lib/taxes";
+import { useAppStore } from "@/store/app.store";
 import { useTablesStore } from "@/store/tables.store";
 import { VoiceOrder } from "@/components/orders/voice-order";
 import { useAuditStore } from "@/store/audit.store";
@@ -30,6 +31,7 @@ export function OrderPanel() {
   const { lines, tableNumber, increment, decrement, remove, clear, setTable, sendToKitchen, setNotes, activeOrderIds, saveOrderChanges, loadTableOrder } = useOrderStore();
   const allTables = useTablesStore((s) => s.tables);
   const occupyTable = useTablesStore((s) => s.occupy);
+  const userName = useAppStore((s) => s.userName);
   const subtotal = orderSelectors.subtotal(lines);
   // Los impuestos salen del catálogo del restaurante y de los propios de cada
   // producto, no de un porcentaje fijo sobre el total.
@@ -152,11 +154,13 @@ export function OrderPanel() {
                       )}
                       <div className="mt-1 flex items-center gap-1.5">
                         <MessageSquare className="h-3 w-3 shrink-0 text-amber-500" />
+                        {/* El ejemplo "Sin pepinillos, extra queso…" se leía como
+                            una nota puesta de verdad; ahora solo invita a escribir. */}
                         <input
-                          placeholder="Sin pepinillos, extra queso..."
+                          placeholder="Agregar nota para cocina"
                           value={l.notes ?? ""}
                           onChange={(e) => setNotes(l.id, e.target.value)}
-                          className="h-6 w-full rounded border-0 bg-transparent px-0 text-xs italic text-amber-600 placeholder:text-muted-foreground/50 outline-none dark:text-amber-400"
+                          className="h-6 w-full rounded border-0 bg-transparent px-0 text-xs text-amber-600 placeholder:not-italic placeholder:text-muted-foreground/40 outline-none dark:text-amber-400"
                         />
                       </div>
                       <div className="mt-1.5 flex items-center justify-between">
@@ -235,7 +239,7 @@ export function OrderPanel() {
                   setSending(true);
                   try {
                     const ticket = await sendToKitchen("dine_in");
-                    occupyTable(tableNumber, total);
+                    occupyTable(tableNumber, total, userName || undefined);
                     if (needsKitchen) {
                       auditLog({ action: "Pedido enviado a cocina", details: `${ticket.code} - ${count} productos - ${formatCurrency(total)} - Mesa ${tableNumber}`, user: "Sistema", module: "ventas" });
                       toast.success(`Pedido ${ticket.code} enviado a cocina`, { description: `${count} productos - ${formatCurrency(total)}` });

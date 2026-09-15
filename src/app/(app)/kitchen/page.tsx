@@ -70,7 +70,10 @@ export default function KitchenPage() {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-3">
         {COLUMNS.map((col) => {
-          const colTickets = (tickets ?? []).filter((t) => t.status === col);
+          // El más viejo arriba: en "Preparando" es el que más lleva esperando.
+          const colTickets = (tickets ?? [])
+            .filter((t) => t.status === col)
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
           return (
             <div key={col} className="flex min-h-0 flex-col rounded-2xl bg-muted/40 p-3">
               <div className="mb-3 flex items-center justify-between px-1">

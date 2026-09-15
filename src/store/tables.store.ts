@@ -213,7 +213,9 @@ export const useTablesStore = create<TablesState>()((set, get) => ({
     }));
     if (USE_API) {
       const table = get().tables.find((t) => t.number === number);
-      if (table) salonService.updateTable({ id: table.id, status: "occupied", waiter: waiter ?? "" }).catch(apiErrorHandler("ocupar mesa"));
+      // Solo manda encargado si hay uno nuevo: con "" se borraba el que ya tenía.
+      const keep = table?.waiter || waiter;
+      if (table) salonService.updateTable({ id: table.id, status: "occupied", ...(keep ? { waiter: keep } : {}) }).catch(apiErrorHandler("ocupar mesa"));
     }
   },
 
