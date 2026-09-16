@@ -6,6 +6,7 @@ import { Truck, Plus, ShoppingCart, Pencil, Trash2, Phone, Mail, Package, Minus,
 import type { Supplier, PurchaseLine } from "@/types";
 import { useSuppliersStore, emptySupplier, type InvoiceData } from "@/store/suppliers.store";
 import { SearchableSelect } from "@/components/shared/searchable-select";
+import { VoicePurchase } from "@/components/suppliers/voice-purchase";
 import { shrinkImageFile, dataUrlBytes } from "@/lib/image";
 import { useInventoryStore } from "@/store/inventory.store";
 import { PageHeader } from "@/components/shared/page-header";
@@ -277,6 +278,17 @@ function PurchaseDialog({
               />
             )}
           </div>
+
+          {/* Dictado: "treinta Poker a dos mil quinientos con dos de cortesía…" */}
+          <VoicePurchase
+            suppliers={suppliers}
+            inventory={inventory}
+            onApply={({ supplierId: sid, invoiceNumber: inv, lines: heard }) => {
+              if (sid) setSupplierId(sid);
+              if (inv) setInvoiceNumber(inv);
+              setLines((prev) => [...prev, ...heard]);
+            }}
+          />
 
           {/* Insumos */}
           <div className="scrollbar-thin max-h-60 space-y-2 overflow-y-auto">
