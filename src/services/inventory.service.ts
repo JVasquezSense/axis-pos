@@ -77,6 +77,15 @@ export const inventoryService = {
       ? request<DishConsumptionReport>(`/reports/dish-consumption/?${query}`)
       : mockRequest({ period: { from: "", to: "" }, dishes: [], supplies: [] } as DishConsumptionReport, 500);
   },
+  /** Conteo físico: todos los ajustes en una llamada atómica. Devuelve lo aplicado. */
+  async savePhysicalCount(adjustments: { id: string; stock: number }[], reason = "Conteo físico"): Promise<{ applied: number; items: InventoryItem[]; movements: InventoryMovement[] }> {
+    if (!USE_API) return mockRequest({ applied: adjustments.length, items: [], movements: [] }, 300);
+    const res = await request<{ applied: number; items: InventoryItem[]; movements: InventoryMovement[] }>("/inventory/physical-count/", {
+      method: "POST",
+      body: JSON.stringify({ adjustments, reason }),
+    });
+    return { ...res, items: res.items.map(normalizeItem), movements: res.movements.map(normalizeMovement) };
+  },
   async getPhysicalCounts(): Promise<PhysicalCount[]> {
     if (!USE_API) return mockRequest(PHYSICAL_COUNTS, 500);
     return request<PhysicalCount[]>("/inventory/physical-count/").catch(() => []);

@@ -69,7 +69,8 @@ interface InventoryState {
   applySale: (reference: string, lines: SaleLine[]) => Promise<{ affected: number; depletedItemIds: string[] }>;
   connectRealtime: (tenantId: string) => () => void;
   addPurchase: (reference: string, lines: { inventoryId: string; quantity: number; unitCost: number }[]) => void;
-  applyPhysicalCount: (adjustments: { inventoryId: string; physical: number }[]) => number;
+  /** Guarda el conteo en el servidor (una sola transacción) y refresca; lanza si falla. */
+  applyPhysicalCount: (adjustments: { inventoryId: string; physical: number }[]) => Promise<number>;
   reset: () => void;
 }
 
@@ -237,7 +238,21 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     }
   },
 
-  applyPhysicalCount: (adjustments) => {
+  applyPhysicalCount: async (adjustments) => {
+    if (USE_API) {
+      // Antes: un POST por insumo sin esperar respuesta y la tabla actualizada
+      // "por fe". Si uno fallaba, el conteo quedaba a medias y nadie se enteraba.
+      const res = await inventoryService.savePhysicalCount(
+        adjustments.map((a) => ({ id: String(a.inventoryId), stock: r(Math.max(a.physical, 0)) }))
+      );
+      const byId = new Map(res.items.map((i) => [String(i.id), i]));
+      set((s) => ({
+        items: s.items.map((i) => byId.get(String(i.id)) ?? i),
+        movements: [...s.movements, ...res.movements],
+      }));
+      saveCache(get);
+      return res.applied;
+    }
     const items = [...get().items];
     const moves: InventoryMovement[] = [];
     let applied = 0;
@@ -249,18 +264,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       if (diff === 0) return;
       const newStock = r(Math.max(physical, 0));
       items[idx] = { ...it, stock: newStock, status: statusFor(newStock, it.minStock), updatedAt: "Justo ahora" };
-      moves.push({
-        id: `mv-count-${Date.now()}-${idx}`,
-        inventoryId: it.id,
-        date: "Hoy",
-        type: "ajuste",
-        quantity: diff,
-        balance: newStock,
-        unitCost: it.cost,
-        reason: "Conteo físico",
-      });
+      moves.push({ id: `mv-count-${Date.now()}-${idx}`, inventoryId: it.id, date: "Hoy", type: "ajuste", quantity: diff, balance: newStock, unitCost: it.cost, reason: "Conteo físico" });
       applied++;
-      if (USE_API) inventoryService.adjustStock(it.id, newStock, "Conteo físico").catch(apiErrorHandler("ajuste stock"));
     });
     if (moves.length) {
       set({ items, movements: [...get().movements, ...moves] });

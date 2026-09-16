@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, ClipboardCheck, AlertTriangle, Scale } from "lucide-react";
+import { Download, ClipboardCheck, AlertTriangle, Scale, Loader2 } from "lucide-react";
+import { ApiError } from "@/services/http";
 import { toast } from "sonner";
 import type { InventoryItem, PhysicalCount } from "@/types";
 import { Card } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import { useInventoryStore } from "@/store/inventory.store";
 
 export function PhysicalCountView({ items, counts }: { items: InventoryItem[]; counts: PhysicalCount[] }) {
   const applyPhysicalCount = useInventoryStore((s) => s.applyPhysicalCount);
+  const [saving, setSaving] = useState(false);
   // Conteo físico editable
   const [physical, setPhysical] = useState<Record<string, number>>(() =>
     Object.fromEntries(counts.map((c) => [c.inventoryId, c.physical]))
@@ -69,16 +71,27 @@ export function PhysicalCountView({ items, counts }: { items: InventoryItem[]; c
             </Button>
             <Button
               size="sm"
-              disabled={summary.withDiff === 0}
-              onClick={() => {
+              disabled={summary.withDiff === 0 || saving}
+              onClick={async () => {
                 const adjustments = rows
                   .filter((r) => Math.abs(r.diff) > 0.001)
                   .map((r) => ({ inventoryId: r.item.id, physical: r.phys }));
-                const applied = applyPhysicalCount(adjustments);
-                toast.success("Conteo guardado", { description: `${applied} ajustes aplicados al inventario y kardex` });
+                setSaving(true);
+                try {
+                  const applied = await applyPhysicalCount(adjustments);
+                  // Lo contado ya es el teórico: se limpia para que la tabla
+                  // muestre "Cuadra" con el stock fresco del servidor.
+                  setPhysical({});
+                  toast.success("Conteo guardado", { description: `${applied} ${applied === 1 ? "ajuste aplicado" : "ajustes aplicados"} al inventario y kardex` });
+                } catch (e) {
+                  toast.error("No se guardó el conteo", { description: e instanceof ApiError ? e.message : "Revisa la conexión e intenta de nuevo." });
+                } finally {
+                  setSaving(false);
+                }
               }}
             >
-              Guardar conteo
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {saving ? "Guardando…" : "Guardar conteo"}
             </Button>
           </div>
         </div>
