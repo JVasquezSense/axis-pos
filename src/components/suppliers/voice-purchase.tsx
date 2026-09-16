@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Mic, MicOff, Loader2, Check, X, AlertTriangle } from "lucide-react";
 import type { InventoryItem, PurchaseLine, Supplier } from "@/types";
 import type { VoicePurchasePlan } from "@/app/api/ai/voice-purchase/route";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { micHelpText, micPermissionState, requestMicrophone, type MicState } from "@/lib/microphone";
 import { useFeatures } from "@/lib/features";
 import { normalize, parseQuantity } from "@/lib/voice-order";
 import { Button } from "@/components/ui/button";
@@ -89,8 +90,22 @@ export function VoicePurchase({
   onApply: (result: { supplierId?: string; invoiceNumber?: string; lines: PurchaseLine[] }) => void;
 }) {
   const { has } = useFeatures();
-  const { supported, listening, transcript, getTranscript, start, stop, reset } = useSpeechRecognition();
+  const { supported, listening, transcript, error, getTranscript, start, stop, reset } = useSpeechRecognition();
   const [thinking, setThinking] = useState(false);
+  const [mic, setMic] = useState<MicState>("prompt");
+  useEffect(() => { micPermissionState().then(setMic); }, [listening]);
+  // Si el navegador corta el dictado solo (pausa larga), no se pierde lo dicho:
+  // se interpreta igual que si el usuario hubiera tocado "terminar".
+  const stoppedByUser = useRef(false);
+  const wasListening = useRef(false);
+  useEffect(() => {
+    if (wasListening.current && !listening && !stoppedByUser.current && getTranscript().trim()) {
+      setTimeout(() => void interpret(), 300);
+    }
+    wasListening.current = listening;
+    if (listening) stoppedByUser.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listening]);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [supplierId, setSupplierId] = useState<string | undefined>();
   const [invoiceNumber, setInvoiceNumber] = useState<string | undefined>();
@@ -170,22 +185,40 @@ export function VoicePurchase({
 
   return (
     <div className="space-y-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
+      {/* Un toque arranca, otro termina: "mantener pulsado" fallaba en el
+          teléfono (el dedo se movía, saltaba el menú contextual, se soltaba
+          antes de tiempo) y el micrófono parecía no tomar nada. */}
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onPointerDown={(e) => { e.preventDefault(); if (!listening && !thinking) { setDrafts(null); start(); } }}
-          onPointerUp={() => { if (listening) { stop(); setTimeout(interpret, 350); } }}
-          onPointerLeave={() => { if (listening) { stop(); setTimeout(interpret, 350); } }}
+          onClick={() => {
+            if (thinking) return;
+            if (listening) { stoppedByUser.current = true; stop(); setTimeout(interpret, 350); }
+            else { setDrafts(null); reset(); void start(); }
+          }}
+          onContextMenu={(e) => e.preventDefault()}
           disabled={thinking}
           className={cn(
-            "flex h-10 flex-1 select-none items-center justify-center gap-2 rounded-lg border text-sm font-medium transition-colors",
-            listening ? "border-destructive bg-destructive text-destructive-foreground" : "border-primary/40 bg-background hover:bg-muted"
+            "flex h-11 flex-1 select-none items-center justify-center gap-2 rounded-lg border text-sm font-medium transition-colors [touch-action:manipulation]",
+            listening ? "border-destructive bg-destructive text-destructive-foreground animate-pulse" : "border-primary/40 bg-background hover:bg-muted"
           )}
         >
           {thinking ? <Loader2 className="h-4 w-4 animate-spin" /> : listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          {thinking ? "Interpretando…" : listening ? "Suelta para terminar" : "Mantén pulsado y dicta la compra"}
+          {thinking ? "Interpretando…" : listening ? "Escuchando… toca para terminar" : "Toca y dicta la compra"}
         </button>
       </div>
+      {mic === "prompt" && !listening && (
+        <button
+          type="button"
+          onClick={async () => { const ok = await requestMicrophone(); setMic(ok ? "granted" : "denied"); if (ok) toast.success("Micrófono permitido", { description: "El navegador lo recordará para este sitio." }); }}
+          className="text-[11px] font-medium text-primary hover:underline"
+        >
+          Activar micrófono (una sola vez)
+        </button>
+      )}
+      {(mic === "denied" || error) && (
+        <p className="flex items-start gap-1 text-[11px] text-destructive"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {error ?? `Micrófono bloqueado. ${micHelpText()}`}</p>
+      )}
       {(listening || transcript) && !drafts && (
         <p className="text-xs italic text-muted-foreground">“{transcript || "…"}”</p>
       )}

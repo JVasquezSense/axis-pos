@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { micHelpText, micPermissionState, requestMicrophone } from "@/lib/microphone";
 
 /**
  * Dictado con la Web Speech API del navegador (gratis y sin latencia: transcribe
@@ -48,7 +49,7 @@ function getCtor(): RecognitionCtor | null {
 }
 
 const ERROR_MESSAGE: Record<string, string> = {
-  "not-allowed": "Falta permiso del micrófono. Habilítalo en el navegador y vuelve a intentar.",
+  "not-allowed": "Falta permiso del micrófono. Toca el candado junto a la dirección y permítelo para este sitio.",
   "service-not-allowed": "El navegador bloqueó el dictado. Revisa los permisos del sitio.",
   network: "Sin conexión: el dictado necesita internet.",
   "no-speech": "No escuché nada. Vuelve a intentarlo más cerca del micrófono.",
@@ -63,7 +64,7 @@ export interface SpeechRecognitionState {
   error: string | null;
   /** Texto actual leído de una ref: útil justo después de `stop()`. */
   getTranscript: () => string;
-  start: () => void;
+  start: () => Promise<void>;
   stop: () => void;
   reset: () => void;
 }
@@ -88,7 +89,7 @@ export function useSpeechRecognition(lang = "es-CO"): SpeechRecognitionState {
     };
   }, []);
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     const Ctor = getCtor();
     if (!Ctor) {
       setSupported(false);
@@ -97,6 +98,16 @@ export function useSpeechRecognition(lang = "es-CO"): SpeechRecognitionState {
     ref.current?.abort();
     setError(null);
     setInterim("");
+    // La primera vez se pide el micrófono explícitamente: así el navegador
+    // muestra su diálogo (con la opción de recordarlo para este sitio) en vez
+    // de fallar en silencio dentro del reconocimiento.
+    if ((await micPermissionState()) !== "granted") {
+      const ok = await requestMicrophone();
+      if (!ok) {
+        setError(`Falta permiso del micrófono. ${micHelpText()}`);
+        return;
+      }
+    }
 
     const rec = new Ctor();
     rec.lang = lang;
