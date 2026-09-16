@@ -37,8 +37,10 @@ export function MobileNav() {
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-72 bg-sidebar p-0 text-sidebar-foreground">
-        <div className="flex h-16 items-center gap-3 px-4">
+      {/* flex-col + min-h-0: sin eso el menú no podía hacer scroll y en un
+          teléfono las últimas secciones quedaban fuera de la pantalla. */}
+      <SheetContent side="left" className="flex w-72 flex-col bg-sidebar p-0 text-sidebar-foreground">
+        <div className="flex h-16 shrink-0 items-center gap-3 px-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10">
             <LogoMark className="h-6 w-6" />
           </div>
@@ -47,7 +49,7 @@ export function MobileNav() {
             <p className="text-[10px] font-semibold tracking-[0.3em] text-gold">POS SYSTEM</p>
           </div>
         </div>
-        <nav className="scrollbar-thin space-y-5 overflow-y-auto px-3 py-4">
+        <nav className="scrollbar-thin min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]" style={{ WebkitOverflowScrolling: "touch" }}>
           {NAV_GROUPS.map((group) => {
             const groupItems = items.filter((i) => i.group === group);
             if (!groupItems.length) return null;
