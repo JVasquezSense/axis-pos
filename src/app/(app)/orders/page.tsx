@@ -16,6 +16,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useOrderStore, orderSelectors } from "@/store/order.store";
 import { toast } from "sonner";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useFeatures } from "@/lib/features";
+import { needsSupply } from "@/lib/product-supply";
 
 /** Categoría comodín: muestra toda la carta. */
 const ALL = "all";
@@ -24,6 +26,7 @@ export default function OrdersPage() {
   const categories = useMenuStore((s) => s.categories);
   const products = useMenuStore((s) => s.products);
   const addProduct = useOrderStore((s) => s.addProduct);
+  const hasInventory = useFeatures().has("inventory");
 
   const [mounted, setMounted] = useState(false);
   // "Todos" por defecto: el valor anterior era el id de una categoría de
@@ -174,6 +177,11 @@ export default function OrdersPage() {
                   {!p.available && (
                     <span className="absolute right-2 top-2 rounded-md bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                       Agotado
+                    </span>
+                  )}
+                  {p.available && hasInventory && needsSupply(p) && (
+                    <span className="absolute right-2 top-2 rounded-md bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white" title="Se vende pero no descuenta inventario">
+                      Requiere insumo
                     </span>
                   )}
                   {/* grow con base automática: `flex-1` parte de 0 y colapsaba

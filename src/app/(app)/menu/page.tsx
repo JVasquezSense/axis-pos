@@ -35,6 +35,7 @@ import { TaxesDialog } from "@/components/menu/taxes-dialog";
 import { ComboFormDialog } from "@/components/menu/combo-form-dialog";
 import { MenuScanDialog } from "@/components/menu/menu-scan-dialog";
 import { useFeatures } from "@/lib/features";
+import { needsSupply } from "@/lib/product-supply";
 import { menuService } from "@/services/menu.service";
 import { USE_API, apiErrorHandler } from "@/services/http";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -103,6 +104,7 @@ function CartaTab() {
   const [taxesOpen, setTaxesOpen] = useState(false);
 
   const hasRecipes = useFeatures().has("recipes");
+  const hasInventory = useFeatures().has("inventory");
   // Si por un enlace viejo un producto tuviera dos fichas, manda la que se
   // llama como él; el servidor ya no deja crear una segunda.
   const recipeFor = (pid: string | number) => {
@@ -183,6 +185,11 @@ function CartaTab() {
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold leading-tight">{p.name}</p>
                   {!p.available && <span className="shrink-0 text-[10px] font-medium text-muted-foreground">Agotado</span>}
+                  {hasInventory && needsSupply(p) && (
+                    <span className="shrink-0 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600" title="No descuenta inventario: vincúlale un insumo desde Editar">
+                      Requiere insumo
+                    </span>
+                  )}
                 </div>
                 <p className="line-clamp-1 text-xs text-muted-foreground">{p.description}</p>
                 {(() => {
