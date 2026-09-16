@@ -8,7 +8,7 @@ export interface CreateOrderPayload {
   table?: number | null;
   customer?: string;
   phone?: string;
-  lines: { productId: number; quantity: number; unitPrice: number; notes?: string }[];
+  lines: { productId: number; quantity: number; unitPrice: number; notes?: string; variationId?: string }[];
 }
 
 export const ordersService = {
@@ -33,7 +33,7 @@ export const ordersService = {
       : mockRequest({ id, status } as unknown as Order, 200);
   },
   /** Reemplaza las líneas de una orden (ediciones del KDS / Órdenes: backlog #4, #5). */
-  async updateLines(id: string, lines: { productId: number; quantity: number; unitPrice: number; notes?: string }[]): Promise<Order> {
+  async updateLines(id: string, lines: { productId: number; quantity: number; unitPrice: number; notes?: string; variationId?: string }[]): Promise<Order> {
     return USE_API
       ? request<Order>(`/orders/${id}/`, { method: "PATCH", body: JSON.stringify({ lines }) })
       : mockRequest({ id, lines: [] } as unknown as Order, 200);

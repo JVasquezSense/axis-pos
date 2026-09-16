@@ -357,7 +357,8 @@ export function ProductFormDialog({
             ) : (
               <div className="space-y-2">
                 {variations.map((v, i) => (
-                  <div key={v.id} className={cn("flex items-end gap-2", v.inherited && "opacity-60")}>
+                  <div key={v.id} className={cn("space-y-1.5", v.inherited && "opacity-60")}>
+                    <div className="flex items-end gap-2">
                     <div className="flex-1">
                       <label className="mb-1 block text-[11px] text-muted-foreground">Nombre</label>
                       <Input
@@ -387,6 +388,50 @@ export function ProductFormDialog({
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
+                    </div>
+                    {/* Qué descuenta esta variación: el insumo del producto o uno
+                        propio (media botella, otra marca, otra presentación). */}
+                    {draft.kind === "simple" && !v.inherited && (
+                      <div className="ml-1 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-2.5 py-2 text-xs">
+                        <label className="flex items-center gap-1.5">
+                          <input
+                            type="checkbox"
+                            checked={v.useDefaultSupply !== false}
+                            onChange={(e) => updateVariation(i, { useDefaultSupply: e.target.checked, ...(e.target.checked ? { inventoryId: null } : {}) })}
+                            className="h-3.5 w-3.5 accent-primary"
+                          />
+                          Usa el insumo estándar{linkedItem ? ` (${linkedItem.name})` : ""}
+                        </label>
+                        {v.useDefaultSupply === false && (
+                          <>
+                            <SearchableSelect
+                              value={v.inventoryId ? String(v.inventoryId) : ""}
+                              onChange={(val) => updateVariation(i, { inventoryId: val || null, inventoryQty: v.inventoryQty ?? 1 })}
+                              placeholder="No descuenta nada"
+                              searchPlaceholder="Escribe el insumo…"
+                              allowClear
+                              className="min-w-[14rem] flex-1"
+                              options={[...supplies]
+                                .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
+                                .map((it) => ({ value: String(it.id), label: it.name, hint: it.unit }))}
+                            />
+                            {v.inventoryId && (
+                              <span className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.001"
+                                  value={v.inventoryQty ?? 1}
+                                  onChange={(e) => updateVariation(i, { inventoryQty: Math.max(Number(e.target.value), 0) })}
+                                  className="h-8 w-20"
+                                />
+                                <span className="text-muted-foreground">por unidad</span>
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

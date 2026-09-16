@@ -195,6 +195,14 @@ export interface ProductVariation {
   priceDelta: number;
   /** Viene de la ficha técnica, no del producto: se muestra pero no se edita aquí. */
   inherited?: boolean;
+  /**
+   * Producto simple: la variación descuenta el insumo estándar del producto
+   * (true, por defecto) o el suyo propio (false + inventoryId/inventoryQty).
+   * false sin inventoryId = no descuenta nada.
+   */
+  useDefaultSupply?: boolean;
+  inventoryId?: string | number | null;
+  inventoryQty?: number;
 }
 
 export interface ComboItem {
@@ -225,6 +233,8 @@ export interface OrderLine {
   modifiers: ModifierOption[];
   notes?: string;
   unitPrice: number;
+  /** Variación elegida (Product.variations[].id): el servidor descuenta según ella. */
+  variationId?: string;
 }
 
 export type OrderStatus = "draft" | "pending" | "preparing" | "ready" | "served" | "paid";

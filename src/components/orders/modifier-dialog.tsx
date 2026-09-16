@@ -59,7 +59,7 @@ export function ModifierDialog({
   };
 
   const confirm = () => {
-    for (let i = 0; i < qty; i++) addProduct(product, chosen, notes || undefined);
+    for (let i = 0; i < qty; i++) addProduct(product, chosen, notes || undefined, variation?.id ? String(variation.id) : undefined);
     toast.success(`${qty > 1 ? `${qty}× ` : ""}${product.name}${variation ? ` · ${variation.name}` : ""} agregado al pedido`);
     onOpenChange(false);
     setSelected({});

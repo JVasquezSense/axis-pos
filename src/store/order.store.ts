@@ -15,7 +15,7 @@ interface OrderState {
   setTable: (n: number | null) => void;
   /** Carga la cuenta real de una mesa desde el backend (sobrevive recarga y multi-dispositivo). */
   loadTableOrder: (n: number) => Promise<void>;
-  addProduct: (product: Product, modifiers?: ModifierOption[], notes?: string) => void;
+  addProduct: (product: Product, modifiers?: ModifierOption[], notes?: string, variationId?: string) => void;
   increment: (lineId: string) => void;
   decrement: (lineId: string) => void;
   setNotes: (lineId: string, notes: string) => void;
@@ -68,6 +68,9 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
           modifiers: [],
           notes: l.notes,
           unitPrice: l.unitPrice,
+          // Sin esto, al editar la cuenta se perdía la variación y el
+          // servidor descontaba el insumo estándar.
+          variationId: (l as { variationId?: string }).variationId || undefined,
         }))
       );
       set({ tableNumber: n, lines, activeOrderIds: orders.map((o) => String(o.id)) });
@@ -77,11 +80,11 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
     }
   },
 
-  addProduct: (product, modifiers = [], notes) =>
+  addProduct: (product, modifiers = [], notes, variationId) =>
     set((state) => {
-      const sig = `${product.id}-${modifiers.map((m) => m.id).join(",")}-${notes ?? ""}`;
+      const sig = `${product.id}-${modifiers.map((m) => m.id).join(",")}-${notes ?? ""}-${variationId ?? ""}`;
       const existing = state.lines.find(
-        (l) => `${l.product.id}-${l.modifiers.map((m) => m.id).join(",")}-${l.notes ?? ""}` === sig
+        (l) => `${l.product.id}-${l.modifiers.map((m) => m.id).join(",")}-${l.notes ?? ""}-${l.variationId ?? ""}` === sig
       );
       if (existing) {
         return {
@@ -98,6 +101,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
             product,
             quantity: 1,
             modifiers,
+            variationId,
             notes,
             unitPrice: product.price,
           },
@@ -156,6 +160,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
           quantity: l.quantity,
           unitPrice: Number((Number(l.unitPrice) + l.modifiers.reduce((s, m) => s + Number(m.price), 0)).toFixed(2)),
           notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
+          variationId: l.variationId || "",
         })),
       };
       const saved = await ordersService.createOrder(payload);
@@ -187,6 +192,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
       quantity: l.quantity,
       unitPrice: Number((Number(l.unitPrice) + l.modifiers.reduce((s, m) => s + Number(m.price), 0)).toFixed(2)),
       notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
+      variationId: l.variationId || "",
     }));
     await ordersService.updateLines(orderId, payload);
   },
