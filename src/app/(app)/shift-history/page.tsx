@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { DateRangeFilter, ALL_TIME, tsInRange, describeRange, type DateRange } from "@/components/shared/date-range-filter";
-import { Clock, ChevronDown, ChevronUp, DollarSign, CreditCard, Users, TrendingUp } from "lucide-react";
+import { Clock, ChevronDown, ChevronUp, DollarSign, CreditCard, Users, TrendingUp, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { useAppStore } from "@/store/app.store";
+import { exportShiftPdf, exportShiftXlsx } from "@/lib/shift-export";
 import { useHistoryStore, type ShiftClose } from "@/store/history.store";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +42,8 @@ function fmtTime(ts: number) {
 
 function ShiftCard({ shift }: { shift: ShiftClose }) {
   const [expanded, setExpanded] = useState(false);
+  const [busy, setBusy] = useState<"xlsx" | "pdf" | null>(null);
+  const restaurant = useAppStore((s) => s.restaurant.name);
 
   return (
     <Card className="overflow-hidden">
@@ -72,6 +78,35 @@ function ShiftCard({ shift }: { shift: ShiftClose }) {
 
       {expanded && (
         <div className="border-t border-border px-4 pb-4 pt-3 space-y-4">
+          {/* Descargas: el mismo cierre en Excel (una hoja por sección) y en PDF. */}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy !== null}
+              onClick={async () => {
+                setBusy("xlsx");
+                try { await exportShiftXlsx(shift, restaurant); }
+                catch { toast.error("No se pudo generar el Excel"); }
+                finally { setBusy(null); }
+              }}
+            >
+              {busy === "xlsx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy !== null}
+              onClick={async () => {
+                setBusy("pdf");
+                try { await exportShiftPdf(shift, restaurant); }
+                catch { toast.error("No se pudo generar el PDF"); }
+                finally { setBusy(null); }
+              }}
+            >
+              {busy === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} PDF
+            </Button>
+          </div>
           {/* KPIs */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <MiniKpi icon={DollarSign} tone="text-emerald-500" label="Ventas" value={formatCurrency(shift.sales)} />
