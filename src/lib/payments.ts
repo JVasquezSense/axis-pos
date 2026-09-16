@@ -20,4 +20,5 @@ export const PAYMENT_LABEL: Record<PaymentMethod, string> = {
   nequi: "Nequi",
   daviplata: "Daviplata",
   pse: "PSE",
+  courtesy: "Cortesía",
 };

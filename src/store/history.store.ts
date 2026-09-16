@@ -23,7 +23,8 @@ export interface ArchivedSale {
   ts: number;
   invoiceNumber?: string;
   orderCodes?: string[];
-  lines?: { name: string; quantity: number; unitPrice: number; total: number; notes?: string }[];
+  lines?: { name: string; quantity: number; unitPrice: number; total: number; notes?: string; courtesy?: boolean }[];
+  courtesy?: number;
   taxes?: { name: string; amount: number }[];
 }
 

@@ -334,7 +334,7 @@ export interface Customer {
 // ---------------------------------------------------------------------------
 // Pagos
 // ---------------------------------------------------------------------------
-export type PaymentMethod = "cash" | "card" | "nequi" | "daviplata" | "pse";
+export type PaymentMethod = "cash" | "card" | "nequi" | "daviplata" | "pse" | "courtesy";
 
 export interface PaymentBreakdown {
   subtotal: number;
@@ -492,6 +492,10 @@ export interface PurchaseLine {
   quantity: number;
   unitCost: number; // costo unitario antes de IVA
   taxRate?: number; // % de IVA/impuesto aplicado a este insumo (ej: 19)
+  /** Unidades que el proveedor regala ("12 + 1"): entran al stock sin costo. */
+  bonusQty?: number;
+  /** Descuento en pesos sobre esta línea. */
+  discount?: number;
 }
 
 export interface Purchase {

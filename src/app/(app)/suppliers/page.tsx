@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
-import { cn, formatCurrency, formatDate, alphabetical } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, alphabetical, formatQty } from "@/lib/utils";
 
 const CATEGORIES = ["Carnes", "Lácteos", "Verduras", "Frutas", "Panadería", "Abarrotes", "Bebidas", "Pescados", "Congelados"];
 
@@ -230,14 +230,16 @@ function PurchaseDialog({
     setInvoicePhoto(shrunk);
   };
 
-  const addLine = () => setLines((l) => [...l, { inventoryId: "", name: "", unit: "", quantity: 1, unitCost: 0, taxRate: 0 }]);
+  const addLine = () => setLines((l) => [...l, { inventoryId: "", name: "", unit: "", quantity: 1, unitCost: 0, taxRate: 0, bonusQty: 0, discount: 0 }]);
+  // Lo pagado por línea: cantidad × costo − descuento (la cortesía no cuesta).
+  const lineNet = (l: PurchaseLine) => Math.max(l.quantity * l.unitCost - (l.discount ?? 0), 0);
   const update = (i: number, patch: Partial<PurchaseLine>) => setLines((l) => l.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   const pickItem = (i: number, id: string) => {
     const it = inventory.find((x) => String(x.id) === id);
     if (it) update(i, { inventoryId: id, name: it.name, unit: it.unit, unitCost: it.cost });
   };
-  const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
-  const taxTotal = lines.reduce((s, l) => s + l.quantity * l.unitCost * ((l.taxRate ?? 0) / 100), 0);
+  const subtotal = lines.reduce((s, l) => s + lineNet(l), 0);
+  const taxTotal = lines.reduce((s, l) => s + lineNet(l) * ((l.taxRate ?? 0) / 100), 0);
   const total = subtotal + taxTotal;
   const supplier = suppliers.find((s) => String(s.id) === supplierId);
   const valid = supplier && lines.length > 0 && lines.every((l) => l.inventoryId && l.quantity > 0);
@@ -319,9 +321,25 @@ function PurchaseDialog({
                   <div>
                     <label className="mb-1 block text-[11px] text-muted-foreground">Subtotal + IVA</label>
                     <div className="flex h-9 items-center justify-end rounded-lg border border-border bg-muted/40 px-3 text-sm font-semibold">
-                      {formatCurrency(l.quantity * l.unitCost * (1 + (l.taxRate ?? 0) / 100))}
+                      {formatCurrency(lineNet(l) * (1 + (l.taxRate ?? 0) / 100))}
                     </div>
                   </div>
+                </div>
+                {/* Lo que el proveedor regala o rebaja en esta línea. */}
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">Cortesía ({l.unit || "und"})</label>
+                    <Input type="number" min={0} step="0.001" value={l.bonusQty ?? 0} onChange={(e) => update(i, { bonusQty: Math.max(Number(e.target.value), 0) })} className="h-9" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">Descuento ($)</label>
+                    <Input type="number" min={0} value={l.discount ?? 0} onChange={(e) => update(i, { discount: Math.max(Number(e.target.value), 0) })} className="h-9" placeholder="0" />
+                  </div>
+                  {((l.bonusQty ?? 0) > 0 || (l.discount ?? 0) > 0) && (
+                    <p className="col-span-2 self-end pb-2 text-[11px] text-muted-foreground">
+                      Entran {formatQty(l.quantity + (l.bonusQty ?? 0))} {l.unit || "und"} · costo real {formatCurrency(lineNet(l) / Math.max(l.quantity + (l.bonusQty ?? 0), 0.001))} c/u
+                    </p>
+                  )}
                 </div>
               </div>
             ))}

@@ -105,7 +105,7 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
     } else {
       useInventoryStore.getState().addPurchase(
         `${code} · ${supplier.name}`,
-        lines.map((l) => ({ inventoryId: l.inventoryId, quantity: l.quantity, unitCost: l.unitCost }))
+        lines.map((l) => ({ inventoryId: l.inventoryId, quantity: l.quantity + (l.bonusQty ?? 0), unitCost: l.unitCost }))
       );
     }
   },

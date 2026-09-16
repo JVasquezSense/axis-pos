@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Bike, CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User, MonitorSmartphone } from "lucide-react";
+import { Bike, CreditCard, Hash, ShoppingBag, SplitSquareHorizontal, User, MonitorSmartphone, Gift } from "lucide-react";
 import { publishDisplay, openDisplayWindow, type DisplayPerson } from "@/lib/customer-display";
 import { lineUnitPrice } from "@/lib/taxes";
 import { useEmployeesStore } from "@/store/employees.store";
@@ -62,6 +62,15 @@ export default function CheckoutPage() {
   const [saleType, setSaleType] = useState<SaleTypeId>(storeTable ? "dine_in" : "takeaway");
   const [tipRate, setTipRate] = useState(0.1);
   const [discount, setDiscount] = useState(0);
+  // Líneas invitadas por la casa: siguen en el ticket (y descuentan inventario)
+  // pero valen $0 para el cliente.
+  const [courtesyIds, setCourtesyIds] = useState<Set<string>>(() => new Set());
+  const toggleCourtesy = (id: string) => setCourtesyIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  useEffect(() => { setCourtesyIds(new Set()); }, [storeLines]);
   const [method, setMethod] = useState<PaymentMethod>("card");
   const [waiter, setWaiter] = useState(() => {
     if (role === "admin") return "Administrador";
@@ -99,8 +108,12 @@ export default function CheckoutPage() {
   const st = SALE_TYPE_MAP[saleType];
 
   const subtotal = useMemo(() => orderSelectors.subtotal(lines), [lines]);
+  const courtesyAmount = useMemo(
+    () => lines.filter((l) => courtesyIds.has(l.id)).reduce((s, l) => s + orderSelectors.lineTotal(l), 0),
+    [lines, courtesyIds]
+  );
   const autoDiscount = st.full ? subtotal : Math.round(subtotal * (st.discountPct ?? 0));
-  const effectiveDiscount = Math.min(discount + autoDiscount, subtotal);
+  const effectiveDiscount = Math.min(discount + autoDiscount + courtesyAmount, subtotal);
   const taxedBase = Math.max(subtotal - effectiveDiscount, 0);
   // Cada producto puede traer sus propios impuestos (IVA % + consumo fijo); los
   // que no traen ninguno usan el impuesto general del restaurante. El descuento
@@ -190,7 +203,24 @@ export default function CheckoutPage() {
       toast.error("Falta el mesero", { description: "Selecciona quién atendió antes de cobrar." });
       return;
     }
-    if (remaining <= 0) return;
+    // Ticket en $0 (cortesía o baja): se registra con medio "Cortesía" y se
+    // cierra de una, sin pasar por el diálogo de pago. Antes el botón no hacía nada.
+    if (remaining <= 0) {
+      if (total !== 0 || splitCollected > 0) return;
+      try {
+        const saved = await recordSale({
+          total: 0, subtotal: breakdown.subtotal, tax: breakdown.tax, discount: breakdown.discount,
+          items: orderSelectors.count(lines), method: "courtesy", saleType: st.label, table, tip: 0,
+          waiter: waiter.trim() || "Sin asignar",
+          ...saleOrigin(),
+        });
+        setInvoiceNumber(saved.invoiceNumber ?? "");
+        await completeSale("courtesy");
+      } catch (err) {
+        toast.error("No se pudo registrar la cortesía", { description: err instanceof Error ? err.message.slice(0, 140) : undefined });
+      }
+      return;
+    }
     try {
       const saved = await recordSale({
         total, subtotal: breakdown.subtotal, tax: breakdown.tax, discount: breakdown.discount,
@@ -251,14 +281,19 @@ export default function CheckoutPage() {
     const orderIds = useOrderStore.getState().activeOrderIds;
     // Lo que sale en el ticket, para que el historial sepa qué se vendió.
     const detail = {
-      lines: lines.map((l) => ({
-        name: l.product.name,
-        quantity: l.quantity,
-        unitPrice: lineUnitPrice(l),
-        total: lineUnitPrice(l) * l.quantity,
-        notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
-      })),
+      lines: lines.map((l) => {
+        const gifted = st.full || courtesyIds.has(l.id);
+        return {
+          name: l.product.name,
+          quantity: l.quantity,
+          unitPrice: lineUnitPrice(l),
+          total: gifted ? 0 : lineUnitPrice(l) * l.quantity,
+          notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
+          courtesy: gifted || undefined,
+        };
+      }),
       taxes,
+      courtesy: st.full ? subtotal : courtesyAmount,
     };
     if (orderIds.length > 0) return { orderIds, ...detail };
     const direct = !table && saleType !== "takeaway";
@@ -267,7 +302,7 @@ export default function CheckoutPage() {
       : detail;
   };
 
-  const completeSale = async () => {
+  const completeSale = async (usedMethod: PaymentMethod = method) => {
     const ref = table ? `mesa ${table}` : "mostrador";
     // BACKLOG #5: el inventario se descuenta cuando la cocina prepara el pedido
     // (backend consume_order_inventory), NUNCA al cobrar.
@@ -314,7 +349,7 @@ export default function CheckoutPage() {
       lines: [], subtotal, taxes, tip, discount: effectiveDiscount, total,
       collected: total, table, origin: st.label, waiter: waiter.trim(),
       invoiceNumber: invoiceNumber || undefined,
-      method: splitCollected > 0 ? "varios medios" : PAYMENT_LABEL[method],
+      method: splitCollected > 0 ? "varios medios" : PAYMENT_LABEL[usedMethod],
     });
     await markPaid();
     clear();
@@ -323,8 +358,8 @@ export default function CheckoutPage() {
       auditLog({ action: "Cuenta dividida cerrada", details: `${st.label} · ${formatCurrency(total)}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}`, user: waiter.trim() || "Sistema", module: "ventas" });
       toast.success("Cuenta cerrada", { description: `${formatCurrency(total)} cobrados en partes` });
     } else {
-      auditLog({ action: "Venta cobrada", details: `${st.label} · ${formatCurrency(total)} · ${PAYMENT_LABEL[method]}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}${invoiceNumber ? ` · ${invoiceNumber}` : ""}`, user: waiter.trim() || "Sistema", module: "ventas" });
-      toast.success("Venta registrada", { description: st.label });
+      auditLog({ action: usedMethod === "courtesy" ? "Cortesía registrada" : "Venta cobrada", details: `${st.label} · ${formatCurrency(total)} · ${PAYMENT_LABEL[usedMethod]}${table ? ` · Mesa ${table}` : ""} · Mesero: ${waiter.trim()}${invoiceNumber ? ` · ${invoiceNumber}` : ""}`, user: waiter.trim() || "Sistema", module: "ventas" });
+      toast.success(usedMethod === "courtesy" ? "Cortesía registrada" : "Venta registrada", { description: usedMethod === "courtesy" ? `${formatCurrency(subtotal)} invitados por la casa` : st.label });
     }
     setSplitCollected(0);
     setInvoiceNumber("");
@@ -495,18 +530,32 @@ export default function CheckoutPage() {
             <CardTitle>Detalle de la cuenta</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {lines.map((l) => (
-              <div key={l.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
-                <ProductImage emoji={l.product.image} category={l.product.category} size="sm" className="h-11 w-11 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{l.product.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {l.quantity} × {formatCurrency(l.unitPrice)}
-                  </p>
+            {lines.map((l) => {
+              const gifted = courtesyIds.has(l.id);
+              return (
+                <div key={l.id} className={cn("flex items-center gap-3 rounded-xl border p-3", gifted ? "border-emerald-500/40 bg-emerald-500/5" : "border-border")}>
+                  <ProductImage emoji={l.product.image} category={l.product.category} size="sm" className="h-11 w-11 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{l.product.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {l.quantity} × {formatCurrency(l.unitPrice)}
+                      {gifted && <span className="ml-2 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">Cortesía</span>}
+                    </p>
+                  </div>
+                  <span className={cn("text-sm font-semibold", gifted && "text-muted-foreground line-through")}>{formatCurrency(orderSelectors.lineTotal(l))}</span>
+                  {!st.full && (
+                    <button
+                      type="button"
+                      onClick={() => toggleCourtesy(l.id)}
+                      title={gifted ? "Quitar cortesía" : "Invitar este producto"}
+                      className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors", gifted ? "border-emerald-500 bg-emerald-500 text-white" : "border-border text-muted-foreground hover:bg-muted")}
+                    >
+                      <Gift className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-                <span className="text-sm font-semibold">{formatCurrency(orderSelectors.lineTotal(l))}</span>
-              </div>
-            ))}
+              );
+            })}
 
             <Separator className="my-3" />
 
@@ -554,8 +603,11 @@ export default function CheckoutPage() {
             </CardHeader>
             <CardContent className="space-y-1.5 text-sm">
               <Row label="Subtotal" value={formatCurrency(subtotal)} />
-              {effectiveDiscount > 0 && (
-                <Row label={st.full ? `Descuento (${st.label})` : "Descuento"} value={`- ${formatCurrency(effectiveDiscount)}`} accent />
+              {courtesyAmount > 0 && !st.full && (
+                <Row label={`Cortesías (${courtesyIds.size})`} value={`- ${formatCurrency(courtesyAmount)}`} accent />
+              )}
+              {effectiveDiscount - (st.full ? 0 : courtesyAmount) > 0 && (
+                <Row label={st.full ? `Descuento (${st.label})` : "Descuento"} value={`- ${formatCurrency(effectiveDiscount - (st.full ? 0 : courtesyAmount))}`} accent />
               )}
               {st.noTax ? (
                 <Row label="Impuestos (exento)" value={formatCurrency(0)} muted />
