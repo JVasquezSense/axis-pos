@@ -61,9 +61,14 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
 
   registerPurchase: (supplier, lines, invoicePhoto, invoice) => {
     const code = `OC-${get().seq}`;
-    const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
-    const taxTotal = lines.reduce((s, l) => s + l.quantity * l.unitCost * ((l.taxRate ?? 0) / 100), 0);
-    const total = subtotal + taxTotal;
+    // Redondeado a centavos: 3 × 2.333,33 daba 6.999,9900000001 y el servidor
+    // rechazaba la compra por "más de 14 dígitos". La cortesía no se paga y el
+    // descuento resta.
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const net = (l: PurchaseLine) => Math.max(l.quantity * l.unitCost - (l.discount ?? 0), 0);
+    const subtotal = r2(lines.reduce((s, l) => s + net(l), 0));
+    const taxTotal = r2(lines.reduce((s, l) => s + net(l) * ((l.taxRate ?? 0) / 100), 0));
+    const total = r2(subtotal + taxTotal);
     const purchase: Purchase = {
       id: `purchase-${Date.now()}`,
       code,
@@ -89,7 +94,14 @@ export const useSuppliersStore = create<SuppliersState>()((set, get) => ({
         subtotal,
         taxTotal,
         total,
-        lines,
+        lines: lines.map((l) => ({
+          ...l,
+          quantity: Math.round(l.quantity * 1000) / 1000,
+          unitCost: r2(l.unitCost),
+          taxRate: r2(l.taxRate ?? 0),
+          bonusQty: Math.round((l.bonusQty ?? 0) * 1000) / 1000,
+          discount: r2(l.discount ?? 0),
+        })),
         invoicePhoto,
         invoiceNumber: invoice?.invoiceNumber || undefined,
         receivedAt: invoice?.receivedAt || undefined,
