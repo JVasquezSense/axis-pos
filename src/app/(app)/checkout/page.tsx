@@ -49,7 +49,6 @@ export default function CheckoutPage() {
   const markPaid = useOrderStore((s) => s.markPaid);
   const allTables = useTablesStore((s) => s.tables);
   const freeTable = useTablesStore((s) => s.free);
-  const occupyTable = useTablesStore((s) => s.occupy);
   const recordSale = useSalesStore((s) => s.record);
   const consumeStock = useInventoryStore((s) => s.applySale);
   const auditLog = useAuditStore((s) => s.log);
@@ -347,10 +346,6 @@ export default function CheckoutPage() {
       } catch { /* error silencioso — la venta ya se registró */ }
     }
 
-    if (table) {
-      occupyTable(table, undefined, waiter.trim() || undefined);
-      freeTable(table);
-    }
     // El domicilio cobrado sale de la lista de pendientes; si no, reaparecería
     // como origen y se podría cobrar dos veces.
     if (deliveryId) {
@@ -365,7 +360,13 @@ export default function CheckoutPage() {
       invoiceNumber: invoiceNumber || undefined,
       method: splitCollected > 0 ? "varios medios" : PAYMENT_LABEL[usedMethod],
     });
+    // Cerrar los pedidos va PRIMERO: al quedarse sin pedidos activos el backend
+    // libera la mesa solo. Antes se ocupaba y se liberaba la mesa aquí mismo,
+    // dos PATCH a la vez sin esperar ninguno: si el de ocupar llegaba de último,
+    // la mesa seguía ocupada después de cobrar. (Ocupar tampoco servía de nada:
+    // guardaba el mesero y liberar lo borra enseguida.)
     await markPaid();
+    if (table) freeTable(table);
     clear();
     if (splitCollected > 0) {
       // Los cobros ya quedaron registrados uno a uno; aquí solo se cierra.
