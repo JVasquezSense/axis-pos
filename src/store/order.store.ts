@@ -40,6 +40,27 @@ const lineTotal = (l: OrderLine) =>
 // 7 puede resolver después y pisar el estado con la mesa equivocada.
 let loadTableOrderSeq = 0;
 
+/**
+ * Reparte las líneas del ticket entre las órdenes activas de la mesa.
+ *
+ * El POS muestra una mesa con varias rondas como un solo ticket, pero cada
+ * línea pertenece a la orden en la que se envió. Guardarlas todas en la primera
+ * dejaba los productos de las demás duplicados (en la primera y en la suya), y
+ * el inventario se descontaba dos veces. Lo agregado en el POS todavía no tiene
+ * orden: va a la primera, que es la que el usuario ve como "la cuenta".
+ */
+export function groupLinesByOrder(activeOrderIds: string[], lines: OrderLine[]): Map<string, OrderLine[]> {
+  // Se parte de todas las órdenes, no solo de las que tienen líneas: una que se
+  // quedó vacía debe guardarse vacía (el mesero borró sus productos).
+  const byOrder = new Map<string, OrderLine[]>(activeOrderIds.map((id) => [id, []]));
+  const [firstId] = activeOrderIds;
+  lines.forEach((l) => {
+    const target = l.orderId && byOrder.has(l.orderId) ? l.orderId : firstId;
+    byOrder.get(target)!.push(l);
+  });
+  return byOrder;
+}
+
 export const useOrderStore = create<OrderState>()((set, get) => ({
   tableNumber: null,
   lines: [],
@@ -79,6 +100,8 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
           // Sin esto, al editar la cuenta se perdía la variación y el
           // servidor descontaba el insumo estándar.
           variationId: (l as { variationId?: string }).variationId || undefined,
+          // De qué orden viene, para devolvérsela al guardar (ver saveOrderChanges).
+          orderId: String(o.id),
         }))
       );
       set({ tableNumber: n, lines, activeOrderIds: orders.map((o) => String(o.id)) });
@@ -191,19 +214,27 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
 
   saveOrderChanges: async () => {
     // Backlog #4: persiste las líneas editadas de una orden ya enviada.
-    // Si hay varias órdenes activas en la mesa, actualiza la primera (la cuenta
-    // se trata como un solo ticket en el POS). Idempotente.
+    //
+    // Una mesa puede tener varias órdenes activas (rondas sucesivas) y el POS
+    // las muestra como un solo ticket. Cada línea vuelve a SU orden: mandarlas
+    // todas a la primera dejaba sus productos duplicados (en la primera y en la
+    // suya), y el inventario se descontaba dos veces.
     const { activeOrderIds, lines } = get();
     if (!USE_API || activeOrderIds.length === 0) return;
-    const orderId = activeOrderIds[0];
-    const payload = lines.map((l) => ({
+
+    const toPayload = (l: OrderLine) => ({
       productId: Number(l.product.id),
       quantity: l.quantity,
       unitPrice: Number((Number(l.unitPrice) + l.modifiers.reduce((s, m) => s + Number(m.price), 0)).toFixed(2)),
       notes: [...l.modifiers.map((m) => m.name), l.notes].filter(Boolean).join(" · ") || undefined,
       variationId: l.variationId || "",
-    }));
-    await ordersService.updateLines(orderId, payload);
+    });
+
+    await Promise.all(
+      [...groupLinesByOrder(activeOrderIds, lines)].map(([orderId, orderLines]) =>
+        ordersService.updateLines(orderId, orderLines.map(toPayload))
+      )
+    );
   },
 
   clear: () =>

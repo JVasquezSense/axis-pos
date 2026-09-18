@@ -42,6 +42,19 @@ export function inventoryOrDemo(items: InventoryItem[]): InventoryItem[] {
   return items.length > 0 ? items : INVENTORY;
 }
 
+/**
+ * Une movimientos del servidor sin repetir los que ya están.
+ *
+ * Cada movimiento llega por DOS canales: la respuesta HTTP de la acción y el
+ * `inventory.update` que el backend emite por WebSocket. Quien gane la carrera
+ * varía, así que sin deduplicar por id la misma salida entraba dos veces al
+ * kardex y la columna "Salidas" mostraba el doble de lo vendido.
+ */
+function mergeMovements(current: InventoryMovement[], incoming: InventoryMovement[]): InventoryMovement[] {
+  const seen = new Set(current.map((m) => String(m.id)));
+  return [...current, ...incoming.filter((m) => !seen.has(String(m.id)))];
+}
+
 export function statusFor(stock: number, min: number): StockStatus {
   // Los decimales llegan como string desde DRF ("12.000"); comparar dos strings
   // con `<` es lexicografico ("12.000" < "3.000" === true). Coercionar siempre.
@@ -154,7 +167,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         const byId = new Map(items.map((i) => [String(i.id), i]));
         set((s) => ({
           items: s.items.map((i) => byId.get(String(i.id)) ?? i),
-          movements: [...s.movements, ...movements],
+          movements: mergeMovements(s.movements, movements),
         }));
         saveCache(get);
         return {
@@ -248,7 +261,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       const byId = new Map(res.items.map((i) => [String(i.id), i]));
       set((s) => ({
         items: s.items.map((i) => byId.get(String(i.id)) ?? i),
-        movements: [...s.movements, ...res.movements],
+        movements: mergeMovements(s.movements, res.movements),
       }));
       saveCache(get);
       return res.applied;
@@ -303,14 +316,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           const byId = new Map(incoming.map((i) => [String(i.id), i]));
           set((s) => {
             const known = new Set(s.items.map((i) => String(i.id)));
-            const seen = new Set(s.movements.map((m) => String(m.id)));
             return {
               // Un insumo recién creado en otro dispositivo también debe aparecer.
               items: [
                 ...s.items.map((i) => byId.get(String(i.id)) ?? i),
                 ...incoming.filter((i) => !known.has(String(i.id))),
               ],
-              movements: [...s.movements, ...moves.filter((m) => !seen.has(String(m.id)))],
+              movements: mergeMovements(s.movements, moves),
             };
           });
           saveCache(get);

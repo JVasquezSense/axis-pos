@@ -235,6 +235,12 @@ export interface OrderLine {
   unitPrice: number;
   /** Variación elegida (Product.variations[].id): el servidor descuenta según ella. */
   variationId?: string;
+  /**
+   * Order del backend de la que salió esta línea. Una mesa puede tener varias
+   * órdenes activas (rondas sucesivas); al guardar hay que devolver cada línea
+   * a la suya. Sin definir = línea nueva del carrito, aún sin order.
+   */
+  orderId?: string;
 }
 
 export type OrderStatus = "draft" | "pending" | "preparing" | "ready" | "served" | "paid";
