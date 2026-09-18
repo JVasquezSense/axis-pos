@@ -30,7 +30,22 @@ interface KardexSummary {
 }
 
 type SummarySortKey = "name" | "category" | "inicial" | "entradas" | "salidas" | "final" | "value";
-type DetailSortKey = "date" | "type" | "in" | "out" | "balance" | "table" | "shift" | "waiter";
+type DetailSortKey = "date" | "type" | "in" | "out" | "balance" | "table" | "shift" | "waiter" | "invoice";
+
+/** Valor por el que se ordena cada columna del detalle. Las vacías van al fondo con 0 / "". */
+function detailValue(m: InventoryMovement, key: DetailSortKey): string | number {
+  switch (key) {
+    case "date": return m.date;
+    case "type": return m.type;
+    case "in": return m.quantity > 0 ? m.quantity : 0;
+    case "out": return m.quantity < 0 ? Math.abs(m.quantity) : 0;
+    case "balance": return m.balance;
+    case "table": return m.tableNumber ?? 0;
+    case "shift": return m.shiftNumber ?? 0;
+    case "waiter": return m.waiter ?? "";
+    case "invoice": return m.invoiceNumber ?? "";
+  }
+}
 
 export function KardexView({ items, movements }: { items: InventoryItem[]; movements: InventoryMovement[] }) {
   const [mode, setMode] = useState<"summary" | "detail">("summary");
@@ -86,25 +101,7 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
   const detailItem = items.find((i) => String(i.id) === selectedId);
   const detail = useMemo(() => {
     const rows = [...(byItem.get(selectedId) ?? [])];
-    rows.sort((a, b) => {
-      const av = detailSort.key === "date" ? a.date
-        : detailSort.key === "type" ? a.type
-        : detailSort.key === "in" ? (a.quantity > 0 ? a.quantity : 0)
-        : detailSort.key === "out" ? (a.quantity < 0 ? Math.abs(a.quantity) : 0)
-        : detailSort.key === "balance" ? a.balance
-        : detailSort.key === "table" ? (a.tableNumber ?? 0)
-        : detailSort.key === "shift" ? (a.shiftNumber ?? 0)
-        : (a.waiter ?? "");
-      const bv = detailSort.key === "date" ? b.date
-        : detailSort.key === "type" ? b.type
-        : detailSort.key === "in" ? (b.quantity > 0 ? b.quantity : 0)
-        : detailSort.key === "out" ? (b.quantity < 0 ? Math.abs(b.quantity) : 0)
-        : detailSort.key === "balance" ? b.balance
-        : detailSort.key === "table" ? (b.tableNumber ?? 0)
-        : detailSort.key === "shift" ? (b.shiftNumber ?? 0)
-        : (b.waiter ?? "");
-      return compareValues(av, bv, detailSort.dir);
-    });
+    rows.sort((a, b) => compareValues(detailValue(a, detailSort.key), detailValue(b, detailSort.key), detailSort.dir));
     return rows;
   }, [byItem, selectedId, detailSort]);
 
@@ -120,12 +117,13 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
     if (!detailItem) return;
     exportCsv(
       `kardex-${detailItem.name.toLowerCase().replace(/\s+/g, "-")}`,
-      ["Fecha", "Tipo", "Entrada", "Salida", "Saldo", "Costo unit.", "Mesa", "Turno", "Mesero", "Motivo"],
+      ["Fecha", "Tipo", "Entrada", "Salida", "Saldo", "Costo unit.", "Mesa", "Turno", "Mesero", "Factura", "Pedido", "Motivo"],
       detail.map((m) => [
         formatExactDateTime(m.date), TYPE_BADGE[m.type].label,
         m.quantity > 0 ? m.quantity : "", m.quantity < 0 ? Math.abs(m.quantity) : "",
         m.balance, m.unitCost,
         m.tableNumber ?? "", m.shiftNumber ?? "", m.waiter || "",
+        m.invoiceNumber || "", m.orderCode || "",
         m.reason,
       ])
     );
@@ -204,13 +202,14 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
                 <SortHead label="Mesa" k="table" sort={detailSort} onSort={toggleDetailSort} />
                 <SortHead label="Turno" k="shift" sort={detailSort} onSort={toggleDetailSort} />
                 <SortHead label="Mesero" k="waiter" sort={detailSort} onSort={toggleDetailSort} />
+                <SortHead label="Factura" k="invoice" sort={detailSort} onSort={toggleDetailSort} />
                 <TableHead>Motivo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {detail.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={10} className="py-8 text-center text-sm text-muted-foreground">
                     Sin movimientos en {describeRange(range)}.
                   </TableCell>
                 </TableRow>
@@ -229,6 +228,11 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
                   <TableCell className="text-xs text-muted-foreground">{m.tableNumber ? `Mesa ${m.tableNumber}` : "—"}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{m.shiftNumber ? `#${m.shiftNumber}` : "—"}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{m.waiter || "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs font-medium">
+                    {/* Sin factura mientras el pedido siga abierto: la cocina
+                        descuenta el inventario antes de que la caja cobre. */}
+                    {m.invoiceNumber || <span className="font-normal text-muted-foreground">{m.orderCode || "—"}</span>}
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{m.reason}</TableCell>
                 </TableRow>
               ))}

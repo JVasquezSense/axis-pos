@@ -320,6 +320,10 @@ export interface InventoryMovement {
   /** Mesa que originó el consumo (ventas de mostrador o ajustes van sin mesa). */
   tableNumber?: number | null;
   waiter?: string;
+  /** Factura de la venta que cobró el pedido; vacía mientras no se haya cobrado. */
+  invoiceNumber?: string;
+  /** Código del pedido que movió el inventario. */
+  orderCode?: string;
   /** Turno en el que cayó el movimiento (calculado por el backend contra los cierres). */
   shiftNumber?: number | null;
 }
