@@ -10,9 +10,6 @@ import {
   AlertTriangle,
   TrendingDown,
   Package,
-  ArrowUp,
-  ArrowDown,
-  ChevronsUpDown,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -40,6 +37,7 @@ import {
 import { KardexView } from "@/components/inventory/kardex-view";
 import { PhysicalCountView } from "@/components/inventory/physical-count-view";
 import { ConsumptionView } from "@/components/inventory/consumption-view";
+import { useSort, SortHead, compareValues } from "@/components/shared/sortable-table";
 import { STOCK_STATUS } from "@/lib/status";
 import { exportCsv } from "@/lib/export";
 import { cn, formatCurrency, formatDateTime, alphabetical } from "@/lib/utils";
@@ -61,7 +59,7 @@ export default function InventoryPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [category, setCategory] = useState("all");
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "status", dir: "asc" });
+  const { sort, toggleSort } = useSort<SortKey>("status");
   const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -85,8 +83,7 @@ export default function InventoryPage() {
         case "value": av = a.stock * a.cost; bv = b.stock * b.cost; break;
         case "status": av = STATUS_RANK[a.status]; bv = STATUS_RANK[b.status]; break;
       }
-      const cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv));
-      return sort.dir === "asc" ? cmp : -cmp;
+      return compareValues(av, bv, sort.dir);
     });
     return out;
   }, [items, status, category, query, sort]);
@@ -97,9 +94,6 @@ export default function InventoryPage() {
     low: items.filter((i) => i.status === "low").length,
     value: items.reduce((s, i) => s + i.stock * i.cost, 0),
   }), [items]);
-
-  const toggleSort = (key: SortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
 
   const exportStock = () => {
     exportCsv(
@@ -254,41 +248,6 @@ export default function InventoryPage() {
         onUpdate={updateItem}
       />
     </div>
-  );
-}
-
-function SortHead({
-  label,
-  k,
-  sort,
-  onSort,
-  align,
-}: {
-  label: string;
-  k: SortKey;
-  sort: { key: SortKey; dir: "asc" | "desc" };
-  onSort: (k: SortKey) => void;
-  align?: "right";
-}) {
-  const active = sort.key === k;
-  return (
-    <TableHead className={align === "right" ? "text-right" : ""}>
-      <button
-        onClick={() => onSort(k)}
-        className={cn(
-          "inline-flex items-center gap-1 transition-colors hover:text-foreground",
-          align === "right" && "flex-row-reverse",
-          active && "text-foreground"
-        )}
-      >
-        {label}
-        {active ? (
-          sort.dir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />
-        )}
-      </button>
-    </TableHead>
   );
 }
 

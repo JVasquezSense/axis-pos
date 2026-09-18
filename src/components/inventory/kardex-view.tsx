@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportCsv } from "@/lib/export";
 import { DateRangeFilter, inRange, describeRange, ALL_TIME, type DateRange } from "@/components/shared/date-range-filter";
+import { useSort, SortHead, compareValues } from "@/components/shared/sortable-table";
 import { cn, formatCurrency, formatExactDateTime, formatQty, alphabetical } from "@/lib/utils";
 
 const TYPE_BADGE: Record<InventoryMovement["type"], { label: string; variant: "success" | "warning" | "secondary" | "destructive" }> = {
@@ -28,11 +29,17 @@ interface KardexSummary {
   value: number;
 }
 
+type SummarySortKey = "name" | "category" | "inicial" | "entradas" | "salidas" | "final" | "value";
+type DetailSortKey = "date" | "type" | "in" | "out" | "balance" | "table" | "shift" | "waiter";
+
 export function KardexView({ items, movements }: { items: InventoryItem[]; movements: InventoryMovement[] }) {
   const [mode, setMode] = useState<"summary" | "detail">("summary");
   const [selectedId, setSelectedId] = useState(String(items[0]?.id ?? ""));
   // Por defecto todo el histórico: es el saldo que cuadra con el stock actual.
   const [range, setRange] = useState<DateRange>(ALL_TIME);
+  // Alfabético por defecto: el kardex se lee buscando un insumo por nombre.
+  const { sort: summarySort, toggleSort: toggleSummarySort } = useSort<SummarySortKey>("name");
+  const { sort: detailSort, toggleSort: toggleDetailSort } = useSort<DetailSortKey>("date");
 
   const filtered = Boolean(range.from || range.to);
 
@@ -52,27 +59,54 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
     return map;
   }, [inPeriod]);
 
-  const summary: KardexSummary[] = useMemo(
-    () =>
-      // Alfabético: el kardex se lee buscando un insumo por nombre.
-      [...items]
-        .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
-        .map((item) => {
-        const mv = byItem.get(String(item.id)) ?? [];
-        const inicial = mv.find((m) => m.type === "inicial")?.quantity ?? 0;
-        const entradas = Math.round(mv.filter((m) => m.type !== "inicial" && m.quantity > 0).reduce((s, m) => s + m.quantity, 0) * 1000) / 1000;
-        const salidas = Math.round(mv.filter((m) => m.quantity < 0).reduce((s, m) => s + Math.abs(m.quantity), 0) * 1000) / 1000;
-        // Con un periodo acotado el saldo del corte es el del último movimiento
-        // del periodo, no el stock de hoy: si no, las columnas no cuadran.
-        const last = mv.length > 0 ? mv[mv.length - 1].balance : item.stock;
-        const final = filtered ? last : item.stock;
-        return { item, inicial, entradas, salidas, final, value: final * item.cost };
-      }),
-    [items, byItem, filtered]
-  );
+  const summary: KardexSummary[] = useMemo(() => {
+    const rows = items.map((item) => {
+      const mv = byItem.get(String(item.id)) ?? [];
+      const inicial = mv.find((m) => m.type === "inicial")?.quantity ?? 0;
+      const entradas = Math.round(mv.filter((m) => m.type !== "inicial" && m.quantity > 0).reduce((s, m) => s + m.quantity, 0) * 1000) / 1000;
+      const salidas = Math.round(mv.filter((m) => m.quantity < 0).reduce((s, m) => s + Math.abs(m.quantity), 0) * 1000) / 1000;
+      // Con un periodo acotado el saldo del corte es el del último movimiento
+      // del periodo, no el stock de hoy: si no, las columnas no cuadran.
+      const last = mv.length > 0 ? mv[mv.length - 1].balance : item.stock;
+      const final = filtered ? last : item.stock;
+      return { item, inicial, entradas, salidas, final, value: final * item.cost };
+    });
+    rows.sort((a, b) => {
+      const av = summarySort.key === "name" ? a.item.name
+        : summarySort.key === "category" ? a.item.category
+        : a[summarySort.key];
+      const bv = summarySort.key === "name" ? b.item.name
+        : summarySort.key === "category" ? b.item.category
+        : b[summarySort.key];
+      return compareValues(av, bv, summarySort.dir);
+    });
+    return rows;
+  }, [items, byItem, filtered, summarySort]);
 
-  const detail = byItem.get(selectedId) ?? [];
   const detailItem = items.find((i) => String(i.id) === selectedId);
+  const detail = useMemo(() => {
+    const rows = [...(byItem.get(selectedId) ?? [])];
+    rows.sort((a, b) => {
+      const av = detailSort.key === "date" ? a.date
+        : detailSort.key === "type" ? a.type
+        : detailSort.key === "in" ? (a.quantity > 0 ? a.quantity : 0)
+        : detailSort.key === "out" ? (a.quantity < 0 ? Math.abs(a.quantity) : 0)
+        : detailSort.key === "balance" ? a.balance
+        : detailSort.key === "table" ? (a.tableNumber ?? 0)
+        : detailSort.key === "shift" ? (a.shiftNumber ?? 0)
+        : (a.waiter ?? "");
+      const bv = detailSort.key === "date" ? b.date
+        : detailSort.key === "type" ? b.type
+        : detailSort.key === "in" ? (b.quantity > 0 ? b.quantity : 0)
+        : detailSort.key === "out" ? (b.quantity < 0 ? Math.abs(b.quantity) : 0)
+        : detailSort.key === "balance" ? b.balance
+        : detailSort.key === "table" ? (b.tableNumber ?? 0)
+        : detailSort.key === "shift" ? (b.shiftNumber ?? 0)
+        : (b.waiter ?? "");
+      return compareValues(av, bv, detailSort.dir);
+    });
+    return rows;
+  }, [byItem, selectedId, detailSort]);
 
   const exportSummary = () => {
     exportCsv(
@@ -123,12 +157,12 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Insumo</TableHead>
-                <TableHead className="text-right">Saldo inicial</TableHead>
-                <TableHead className="text-right">Entradas</TableHead>
-                <TableHead className="text-right">Salidas</TableHead>
-                <TableHead className="text-right">Saldo final</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
+                <SortHead label="Insumo" k="name" sort={summarySort} onSort={toggleSummarySort} />
+                <SortHead label="Saldo inicial" k="inicial" sort={summarySort} onSort={toggleSummarySort} align="right" />
+                <SortHead label="Entradas" k="entradas" sort={summarySort} onSort={toggleSummarySort} align="right" />
+                <SortHead label="Salidas" k="salidas" sort={summarySort} onSort={toggleSummarySort} align="right" />
+                <SortHead label="Saldo final" k="final" sort={summarySort} onSort={toggleSummarySort} align="right" />
+                <SortHead label="Valor" k="value" sort={summarySort} onSort={toggleSummarySort} align="right" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -162,14 +196,14 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha y hora</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead className="text-right">Entrada</TableHead>
-                <TableHead className="text-right">Salida</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
-                <TableHead>Mesa</TableHead>
-                <TableHead>Turno</TableHead>
-                <TableHead>Mesero</TableHead>
+                <SortHead label="Fecha y hora" k="date" sort={detailSort} onSort={toggleDetailSort} />
+                <SortHead label="Tipo" k="type" sort={detailSort} onSort={toggleDetailSort} />
+                <SortHead label="Entrada" k="in" sort={detailSort} onSort={toggleDetailSort} align="right" />
+                <SortHead label="Salida" k="out" sort={detailSort} onSort={toggleDetailSort} align="right" />
+                <SortHead label="Saldo" k="balance" sort={detailSort} onSort={toggleDetailSort} align="right" />
+                <SortHead label="Mesa" k="table" sort={detailSort} onSort={toggleDetailSort} />
+                <SortHead label="Turno" k="shift" sort={detailSort} onSort={toggleDetailSort} />
+                <SortHead label="Mesero" k="waiter" sort={detailSort} onSort={toggleDetailSort} />
                 <TableHead>Motivo</TableHead>
               </TableRow>
             </TableHeader>

@@ -76,6 +76,10 @@ export default function CheckoutPage() {
     if (role === "admin") return "Administrador";
     return "";
   });
+  // Guard contra doble tap en "Finalizar y nueva venta": sin esto, un segundo
+  // toque antes de que el dialog se cierre volvía a descontar el inventario
+  // (mostrador/para llevar) y a marcar la orden pagada dos veces.
+  const completingRef = useRef(false);
   const [payOpen, setPayOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitCollected, setSplitCollected] = useState(0);
@@ -303,6 +307,16 @@ export default function CheckoutPage() {
   };
 
   const completeSale = async (usedMethod: PaymentMethod = method) => {
+    if (completingRef.current) return;
+    completingRef.current = true;
+    try {
+      await completeSaleInner(usedMethod);
+    } finally {
+      completingRef.current = false;
+    }
+  };
+
+  const completeSaleInner = async (usedMethod: PaymentMethod) => {
     const ref = table ? `mesa ${table}` : "mostrador";
     // BACKLOG #5: el inventario se descuenta cuando la cocina prepara el pedido
     // (backend consume_order_inventory), NUNCA al cobrar.

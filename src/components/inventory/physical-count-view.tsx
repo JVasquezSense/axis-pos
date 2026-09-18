@@ -13,6 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { exportCsv } from "@/lib/export";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useInventoryStore } from "@/store/inventory.store";
+import { useSort, SortHead, compareValues } from "@/components/shared/sortable-table";
+
+type CountSortKey = "name" | "category" | "theoretical" | "phys" | "diff" | "valueDiff" | "status";
+const STATUS_RANK = (diff: number) => (diff === 0 ? 0 : diff < 0 ? -1 : 1);
 
 export function PhysicalCountView({ items, counts }: { items: InventoryItem[]; counts: PhysicalCount[] }) {
   const applyPhysicalCount = useInventoryStore((s) => s.applyPhysicalCount);
@@ -22,15 +26,29 @@ export function PhysicalCountView({ items, counts }: { items: InventoryItem[]; c
     Object.fromEntries(counts.map((c) => [c.inventoryId, c.physical]))
   );
 
+  const { sort, toggleSort } = useSort<CountSortKey>("name");
+
   const rows = useMemo(() => {
-    return items.map((item) => {
+    const out = items.map((item) => {
       const theoretical = item.stock;
       const phys = physical[item.id] ?? theoretical;
       const diff = Math.round((phys - theoretical) * 100) / 100;
       const valueDiff = Math.round(diff * item.cost);
       return { item, theoretical, phys, diff, valueDiff };
     });
-  }, [items, physical]);
+    out.sort((a, b) => {
+      const av = sort.key === "name" ? a.item.name
+        : sort.key === "category" ? a.item.category
+        : sort.key === "status" ? STATUS_RANK(a.diff)
+        : a[sort.key];
+      const bv = sort.key === "name" ? b.item.name
+        : sort.key === "category" ? b.item.category
+        : sort.key === "status" ? STATUS_RANK(b.diff)
+        : b[sort.key];
+      return compareValues(av, bv, sort.dir);
+    });
+    return out;
+  }, [items, physical, sort]);
 
   const summary = useMemo(() => {
     const withDiff = rows.filter((r) => Math.abs(r.diff) > 0.001);
@@ -98,12 +116,12 @@ export function PhysicalCountView({ items, counts }: { items: InventoryItem[]; c
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Insumo</TableHead>
-              <TableHead className="text-right">Teórico</TableHead>
-              <TableHead className="text-right">Físico</TableHead>
-              <TableHead className="text-right">Diferencia</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead>Estado</TableHead>
+              <SortHead label="Insumo" k="name" sort={sort} onSort={toggleSort} />
+              <SortHead label="Teórico" k="theoretical" sort={sort} onSort={toggleSort} align="right" />
+              <SortHead label="Físico" k="phys" sort={sort} onSort={toggleSort} align="right" />
+              <SortHead label="Diferencia" k="diff" sort={sort} onSort={toggleSort} align="right" />
+              <SortHead label="Valor" k="valueDiff" sort={sort} onSort={toggleSort} align="right" />
+              <SortHead label="Estado" k="status" sort={sort} onSort={toggleSort} />
             </TableRow>
           </TableHeader>
           <TableBody>
