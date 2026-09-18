@@ -35,6 +35,11 @@ interface OrderState {
 const lineTotal = (l: OrderLine) =>
   (l.unitPrice + l.modifiers.reduce((s, m) => s + m.price, 0)) * l.quantity;
 
+// Última llamada a loadTableOrder gana: si dos mesas se cargan casi a la vez
+// (p. ej. se abrió el cajón de la 7 y luego se cobró la 1), la petición de la
+// 7 puede resolver después y pisar el estado con la mesa equivocada.
+let loadTableOrderSeq = 0;
+
 export const useOrderStore = create<OrderState>()((set, get) => ({
   tableNumber: null,
   lines: [],
@@ -58,8 +63,11 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
       get().setTable(n);
       return;
     }
+    const seq = ++loadTableOrderSeq;
     try {
       const orders = await ordersService.getActive(n);
+      // Llegó una petición más nueva mientras esta estaba en vuelo: se descarta.
+      if (seq !== loadTableOrderSeq) return;
       const lines: OrderLine[] = orders.flatMap((o) =>
         o.lines.map((l) => ({
           id: `${o.id}-${l.id}`,
@@ -75,6 +83,7 @@ export const useOrderStore = create<OrderState>()((set, get) => ({
       );
       set({ tableNumber: n, lines, activeOrderIds: orders.map((o) => String(o.id)) });
     } catch {
+      if (seq !== loadTableOrderSeq) return;
       // Sin conexión: cae al último estado local conocido para no bloquear al usuario.
       get().setTable(n);
     }

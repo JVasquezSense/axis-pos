@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportCsv } from "@/lib/export";
 import { DateRangeFilter, inRange, describeRange, ALL_TIME, type DateRange } from "@/components/shared/date-range-filter";
-import { cn, formatCurrency, formatDateTime, formatQty, alphabetical } from "@/lib/utils";
+import { cn, formatCurrency, formatExactDateTime, formatQty, alphabetical } from "@/lib/utils";
 
 const TYPE_BADGE: Record<InventoryMovement["type"], { label: string; variant: "success" | "warning" | "secondary" | "destructive" }> = {
   inicial: { label: "Inicial", variant: "secondary" },
@@ -86,8 +86,14 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
     if (!detailItem) return;
     exportCsv(
       `kardex-${detailItem.name.toLowerCase().replace(/\s+/g, "-")}`,
-      ["Fecha", "Tipo", "Entrada", "Salida", "Saldo", "Costo unit.", "Motivo"],
-      detail.map((m) => [formatDateTime(m.date), TYPE_BADGE[m.type].label, m.quantity > 0 ? m.quantity : "", m.quantity < 0 ? Math.abs(m.quantity) : "", m.balance, m.unitCost, m.reason])
+      ["Fecha", "Tipo", "Entrada", "Salida", "Saldo", "Costo unit.", "Mesa", "Turno", "Mesero", "Motivo"],
+      detail.map((m) => [
+        formatExactDateTime(m.date), TYPE_BADGE[m.type].label,
+        m.quantity > 0 ? m.quantity : "", m.quantity < 0 ? Math.abs(m.quantity) : "",
+        m.balance, m.unitCost,
+        m.tableNumber ?? "", m.shiftNumber ?? "", m.waiter || "",
+        m.reason,
+      ])
     );
   };
 
@@ -156,25 +162,28 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha</TableHead>
+                <TableHead>Fecha y hora</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Entrada</TableHead>
                 <TableHead className="text-right">Salida</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
+                <TableHead>Mesa</TableHead>
+                <TableHead>Turno</TableHead>
+                <TableHead>Mesero</TableHead>
                 <TableHead>Motivo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {detail.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
                     Sin movimientos en {describeRange(range)}.
                   </TableCell>
                 </TableRow>
               )}
               {detail.map((m) => (
                 <TableRow key={m.id}>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(m.date)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">{formatExactDateTime(m.date)}</TableCell>
                   <TableCell><Badge variant={TYPE_BADGE[m.type].variant}>{TYPE_BADGE[m.type].label}</Badge></TableCell>
                   <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">
                     {m.quantity > 0 ? <span className="inline-flex items-center gap-1"><ArrowDownToLine className="h-3 w-3" />{formatQty(m.quantity)}</span> : "—"}
@@ -183,6 +192,9 @@ export function KardexView({ items, movements }: { items: InventoryItem[]; movem
                     {m.quantity < 0 ? <span className="inline-flex items-center gap-1"><ArrowUpFromLine className="h-3 w-3" />{formatQty(Math.abs(m.quantity))}</span> : "—"}
                   </TableCell>
                   <TableCell className="text-right font-semibold">{formatQty(m.balance)}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{m.tableNumber ? `Mesa ${m.tableNumber}` : "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{m.shiftNumber ? `#${m.shiftNumber}` : "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{m.waiter || "—"}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{m.reason}</TableCell>
                 </TableRow>
               ))}

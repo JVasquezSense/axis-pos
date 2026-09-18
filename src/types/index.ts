@@ -311,6 +311,11 @@ export interface InventoryMovement {
   balance: number; // saldo tras el movimiento
   unitCost: number;
   reason: string;
+  /** Mesa que originó el consumo (ventas de mostrador o ajustes van sin mesa). */
+  tableNumber?: number | null;
+  waiter?: string;
+  /** Turno en el que cayó el movimiento (calculado por el backend contra los cierres). */
+  shiftNumber?: number | null;
 }
 
 export interface PhysicalCount {

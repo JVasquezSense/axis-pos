@@ -87,19 +87,19 @@ export function TableDrawer({
   const status = TABLE_STATUS[table.status];
   const elapsed = table.seatedAt ? minutesAgo(new Date(table.seatedAt)) : 0;
 
-  const takeOrder = () => {
+  const takeOrder = async () => {
     setTable(table.number);
     // Backlog #4: si la mesa ya tiene una orden enviada, la cargamos para
     // editarla (agregar/quitar/modificar) en lugar de empezar un carrito nuevo.
     if (table.status === "occupied" || table.status === "billing") {
-      loadTableOrder(table.mergedInto ?? table.number);
+      await loadTableOrder(table.mergedInto ?? table.number);
     }
     close(false);
     router.push("/orders");
   };
 
-  const goCheckout = () => {
-    loadTableOrder(table.mergedInto ?? table.number);
+  const goCheckout = async () => {
+    await loadTableOrder(table.mergedInto ?? table.number);
     close(false);
     router.push("/checkout");
   };

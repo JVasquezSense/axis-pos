@@ -20,3 +20,6 @@ backend/.env
 backend/db.sqlite3
 backend/staticfiles/
 backend/media/
+
+.vercel
+.env*

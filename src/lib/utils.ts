@@ -61,6 +61,16 @@ export function formatDateTime(value?: string | null): string {
   return d.getFullYear() === now.getFullYear() ? `${day} ${time}` : `${day} ${d.getFullYear()}`;
 }
 
+/** Fecha y hora completas sin atajos relativos ("Hoy"/"Ayer"): para auditoría (kardex, bitácora). */
+export function formatExactDateTime(value?: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  const day = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+  return `${day}, ${time}`;
+}
+
 /** Fecha sin hora: "28 jul" del año en curso, "28 jul 2025" si es de otro año. */
 export function formatDate(value?: string | null): string {
   if (!value) return "";
