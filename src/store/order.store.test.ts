@@ -23,14 +23,22 @@ describe("reparto de líneas entre las órdenes de una mesa", () => {
   });
 
   it("lo agregado en el POS (sin orden) va a la primera", () => {
-    const grouped = groupLinesByOrder(["10", "11"], [line("nueva")]);
+    const grouped = groupLinesByOrder(["10", "11"], [line("nueva"), line("a", "11")]);
     expect(grouped.get("10")!.map((l) => l.id)).toEqual(["nueva"]);
-    expect(grouped.get("11")).toEqual([]);
+    expect(grouped.get("11")!.map((l) => l.id)).toEqual(["a"]);
   });
 
   it("una orden que se quedó sin líneas se guarda vacía", () => {
     const grouped = groupLinesByOrder(["10", "11"], [line("a", "10")]);
     expect(grouped.get("11")).toEqual([]);
+  });
+
+  it("si ninguna línea sabe su orden, solo se toca la primera (no se vacían las demás)", () => {
+    // Vaciar una orden borra sus lineas y le devuelve el inventario: sin saber
+    // el origen no se puede distinguir "el mesero las borró" de "falta el dato".
+    const grouped = groupLinesByOrder(["10", "11"], [line("x"), line("y")]);
+    expect(grouped.has("11")).toBe(false);
+    expect(grouped.get("10")!.map((l) => l.id)).toEqual(["x", "y"]);
   });
 
   it("una línea cuya orden ya no está activa cae en la primera", () => {

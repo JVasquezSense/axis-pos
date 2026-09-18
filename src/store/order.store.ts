@@ -50,10 +50,19 @@ let loadTableOrderSeq = 0;
  * orden: va a la primera, que es la que el usuario ve como "la cuenta".
  */
 export function groupLinesByOrder(activeOrderIds: string[], lines: OrderLine[]): Map<string, OrderLine[]> {
-  // Se parte de todas las órdenes, no solo de las que tienen líneas: una que se
-  // quedó vacía debe guardarse vacía (el mesero borró sus productos).
-  const byOrder = new Map<string, OrderLine[]>(activeOrderIds.map((id) => [id, []]));
   const [firstId] = activeOrderIds;
+
+  // Un carrito donde NINGUNA línea sabe de qué orden viene (se armó antes de
+  // que se guardara el origen, o son todas nuevas del POS) no permite saber si
+  // las demás órdenes quedaron vacías porque el mesero las borró o porque el
+  // dato no está. Ante la duda no se tocan: vaciar una orden borra sus líneas
+  // y le devuelve el inventario, y eso no se puede deshacer.
+  if (!lines.some((l) => l.orderId)) {
+    return new Map([[firstId, [...lines]]]);
+  }
+
+  // Con el origen conocido sí se guarda vacía la que perdió sus productos.
+  const byOrder = new Map<string, OrderLine[]>(activeOrderIds.map((id) => [id, []]));
   lines.forEach((l) => {
     const target = l.orderId && byOrder.has(l.orderId) ? l.orderId : firstId;
     byOrder.get(target)!.push(l);
