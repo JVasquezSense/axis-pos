@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/shared/product-image";
 import { useOrderStore } from "@/store/order.store";
+import { remainingUnits } from "@/lib/stock";
+import { useStockContext } from "@/hooks/use-stock";
 import { cn, formatCurrency } from "@/lib/utils";
 
 export function ModifierDialog({
@@ -29,6 +31,8 @@ export function ModifierDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const addProduct = useOrderStore((s) => s.addProduct);
+  const lines = useOrderStore((s) => s.lines);
+  const stockCtx = useStockContext();
   const [selected, setSelected] = useState<Record<string, ModifierOption[]>>({});
   const [variation, setVariation] = useState<ProductVariation | null>(null);
   const [notes, setNotes] = useState("");
@@ -47,6 +51,14 @@ export function ModifierDialog({
   const chosen = [...Object.values(selected).flat(), ...(variationOption ? [variationOption] : [])];
   const extra = chosen.reduce((s, m) => s + m.price, 0);
 
+  // Tope real de unidades: depende de la variación elegida, porque una
+  // variación puede descontar un insumo distinto al estándar del producto.
+  const left = remainingUnits(product, lines, stockCtx, variation?.id ? String(variation.id) : undefined);
+  const capped = Number.isFinite(left);
+  // Si la variación elegida deja menos de lo que ya estaba puesto, se ajusta
+  // solo en vez de dejar el botón pidiendo más de lo que hay.
+  const wanted = capped ? Math.min(qty, Math.max(left, 1)) : qty;
+
   const toggle = (groupId: string, opt: ModifierOption, multiple: boolean) => {
     setSelected((prev) => {
       const current = prev[groupId] ?? [];
@@ -59,8 +71,12 @@ export function ModifierDialog({
   };
 
   const confirm = () => {
-    for (let i = 0; i < qty; i++) addProduct(product, chosen, notes || undefined, variation?.id ? String(variation.id) : undefined);
-    toast.success(`${qty > 1 ? `${qty}× ` : ""}${product.name}${variation ? ` · ${variation.name}` : ""} agregado al pedido`);
+    if (capped && left <= 0) {
+      toast.error("Sin insumos suficientes", { description: `No queda inventario para preparar más ${product.name}.` });
+      return;
+    }
+    for (let i = 0; i < wanted; i++) addProduct(product, chosen, notes || undefined, variation?.id ? String(variation.id) : undefined);
+    toast.success(`${wanted > 1 ? `${wanted}× ` : ""}${product.name}${variation ? ` · ${variation.name}` : ""} agregado al pedido`);
     onOpenChange(false);
     setSelected({});
     setVariation(null);
@@ -178,14 +194,27 @@ export function ModifierDialog({
             <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="flex h-11 w-11 items-center justify-center rounded-l-lg hover:bg-muted" aria-label="Menos">
               <Minus className="h-4 w-4" />
             </button>
-            <span className="w-10 text-center text-lg font-bold tabular-nums">{qty}</span>
-            <button type="button" onClick={() => setQty((q) => Math.min(99, q + 1))} className="flex h-11 w-11 items-center justify-center rounded-r-lg hover:bg-muted" aria-label="Más">
+            <span className="w-10 text-center text-lg font-bold tabular-nums">{wanted}</span>
+            <button
+              type="button"
+              onClick={() => setQty((q) => Math.min(capped ? left : 99, q + 1))}
+              disabled={capped && wanted >= left}
+              className="flex h-11 w-11 items-center justify-center rounded-r-lg hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Más"
+            >
               <Plus className="h-4 w-4" />
             </button>
           </div>
-          <Button className="flex-1" size="lg" onClick={confirm}>
-            Agregar {qty > 1 ? `${qty} ` : ""}· {formatCurrency((product.price + extra) * qty)}
-          </Button>
+          <div className="flex flex-1 flex-col gap-1">
+            <Button className="w-full" size="lg" onClick={confirm} disabled={capped && left <= 0}>
+              Agregar {wanted > 1 ? `${wanted} ` : ""}· {formatCurrency((product.price + extra) * wanted)}
+            </Button>
+            {capped && (
+              <p className={cn("text-center text-xs", left <= 0 ? "text-destructive" : "text-muted-foreground")}>
+                {left <= 0 ? "Sin insumos para preparar más" : `Alcanza para ${left} con el inventario actual`}
+              </p>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -18,6 +18,8 @@ import { toast } from "sonner";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useFeatures } from "@/lib/features";
 import { needsSupply } from "@/lib/product-supply";
+import { remainingUnits } from "@/lib/stock";
+import { useStockContext } from "@/hooks/use-stock";
 
 /** Categoría comodín: muestra toda la carta. */
 const ALL = "all";
@@ -66,8 +68,25 @@ export default function OrdersPage() {
     setQuery("");
   };
 
+  // Cuántas unidades de cada producto quedan con los insumos que hay, ya
+  // descontando lo que este mismo pedido reserva. Se calcula sobre lo visible
+  // para no recorrer la carta entera en cada tecla del buscador.
+  const stockCtx = useStockContext();
+  const left = useMemo(() => {
+    const map = new Map<string, number>();
+    visible.forEach((p) => map.set(String(p.id), remainingUnits(p, lines, stockCtx)));
+    return map;
+  }, [visible, lines, stockCtx]);
+  const unitsLeft = (p: Product) => left.get(String(p.id)) ?? Infinity;
+
   const handleAdd = (p: Product) => {
     if (!p.available) return;
+    if (unitsLeft(p) <= 0) {
+      toast.error("Sin insumos suficientes", {
+        description: `No queda inventario para preparar más ${p.name}.`,
+      });
+      return;
+    }
     setModProduct(p);
     setModOpen(true);
   };
@@ -155,14 +174,14 @@ export default function OrdersPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.02 }}
                   onClick={() => handleAdd(p)}
-                  disabled={!p.available}
+                  disabled={!p.available || unitsLeft(p) <= 0}
                   className={cn(
                     // Sin overflow-hidden: en un elemento de rejilla convierte
                     // la fila en una sola línea de alto y la tarjeta salía
                     // recortada, sin nombre ni precio. Las esquinas las redondea
                     // la propia imagen.
                     "group relative flex flex-col rounded-xl border border-border bg-background text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
-                    !p.available && "cursor-not-allowed opacity-50"
+                    (!p.available || unitsLeft(p) <= 0) && "cursor-not-allowed opacity-50"
                   )}
                 >
                   {/* shrink-0: dentro de una columna flex la imagen se encogía
@@ -179,7 +198,19 @@ export default function OrdersPage() {
                       Agotado
                     </span>
                   )}
-                  {p.available && hasInventory && needsSupply(p) && (
+                  {p.available && unitsLeft(p) <= 0 && (
+                    <span className="absolute right-2 top-2 rounded-md bg-destructive/90 px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground" title="No hay insumos suficientes para preparar otro">
+                      Sin insumos
+                    </span>
+                  )}
+                  {/* Aviso temprano: el mesero ve que se está acabando mientras
+                      todavía puede ofrecer otra cosa, no cuando ya no queda. */}
+                  {p.available && unitsLeft(p) > 0 && unitsLeft(p) <= 5 && (
+                    <span className="absolute right-2 top-2 rounded-md bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white" title="Unidades que alcanzan con el inventario actual">
+                      Quedan {unitsLeft(p)}
+                    </span>
+                  )}
+                  {p.available && unitsLeft(p) > 5 && hasInventory && needsSupply(p) && (
                     <span className="absolute right-2 top-2 rounded-md bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white" title="Se vende pero no descuenta inventario">
                       Requiere insumo
                     </span>

@@ -17,7 +17,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/shared/empty-state";
+import type { OrderLine } from "@/types";
 import { useOrderStore, orderSelectors } from "@/store/order.store";
+import { remainingUnits } from "@/lib/stock";
+import { useStockContext } from "@/hooks/use-stock";
 import { useTaxesStore } from "@/store/taxes.store";
 import { computeTaxes } from "@/lib/taxes";
 import { useAppStore } from "@/store/app.store";
@@ -45,6 +48,12 @@ export function OrderPanel() {
   const [sending, setSending] = useState(false);
   // Backlog #4: modo edición cuando hay órdenes ya enviadas para esta mesa.
   const editing = activeOrderIds.length > 0;
+
+  // Tope de cada línea: lo que alcanza con el inventario, sin contar la reserva
+  // de la propia línea (si no, una línea de 3 se creería a sí misma sin stock).
+  const stockCtx = useStockContext();
+  const maxFor = (l: OrderLine) =>
+    remainingUnits(l.product, lines, stockCtx, l.variationId, l.id);
 
   return (
     <div className="flex h-full flex-col">
@@ -169,7 +178,12 @@ export function OrderPanel() {
                             <Minus className="h-3.5 w-3.5" />
                           </button>
                           <span className="w-6 text-center text-sm font-semibold">{l.quantity}</span>
-                          <button onClick={() => increment(l.id)} className="flex h-7 w-7 items-center justify-center rounded-r-lg hover:bg-muted">
+                          <button
+                            onClick={() => increment(l.id)}
+                            disabled={l.quantity >= maxFor(l)}
+                            title={l.quantity >= maxFor(l) ? "No hay insumos para una unidad más" : undefined}
+                            className="flex h-7 w-7 items-center justify-center rounded-r-lg hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                          >
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                         </div>
